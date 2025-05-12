@@ -16,6 +16,7 @@ using FinanceTool.Repositories;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using ClosedXML.Excel;
+using FinanceTool.Data;
 
 namespace FinanceTool
 {
@@ -27,13 +28,13 @@ namespace FinanceTool
         //private HashSet<int> hiddenRows = new HashSet<int>();
 
         // SQLite 관련 추가 필드
-        private DataConverter dataConverter;
+        
         private int currentPage = 1;
         private int pageSize = 1000;
         private int totalPages = 1;
         private int totalRows = 0;
 
-       
+        private bool excelLoadinitFlag = true;
 
         // uc_FileLoad 클래스에서 멤버 변수 추가
         private bool _fileLoaded = false;
@@ -46,7 +47,6 @@ namespace FinanceTool
             InitializeComponent();
             InitializePagingControls(false);
 
-            dataConverter = new DataConverter();
         }
 
         private void InitializePagingControls(bool attachEvents)
@@ -138,47 +138,70 @@ namespace FinanceTool
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                // 기존 데이터 존재 여부 확인
-                bool dataExists = DBManager.Instance.IsInitialized && DBManager.Instance.TableExists("raw_data");
-
-                // 기존 데이터가 있으면 확인 메시지 표시
-                if (dataExists)
+                try
                 {
-                    DialogResult result = MessageBox.Show(
-                        "파일을 새로 업로드 할 경우 \n기존 업로드 내역 및 작업 내용이 모두 초기화 됩니다.\n" +
-                        "파일을 계속 업로드 하시겠습니까?",
-                        "경고",
-                        MessageBoxButtons.OKCancel,
-                        MessageBoxIcon.Warning
-                    );
+                    // MongoDB 초기화 상태 확인
+                    var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                    bool isInitialized = await mongoManager.EnsureInitializedAsync();
 
-                    if (result == DialogResult.Cancel)
+                    if (!isInitialized)
                     {
-                        return; // 사용자가 취소함
-                    }
-
-                    // 사용자가 확인했으므로 데이터베이스 초기화 진행
-                    if (!DBManager.Instance.ResetDatabase())
-                    {
-                        MessageBox.Show("데이터베이스 초기화에 실패했습니다.", "오류",
+                        MessageBox.Show("MongoDB 초기화에 실패했습니다.", "오류",
                             MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
-                }
-                else
-                {
-                    // 초기 데이터베이스 설정 (첫 실행 시)
-                    if (!DBManager.Instance.EnsureInitialized())
-                    {
-                        MessageBox.Show("데이터베이스 초기화에 실패했습니다.", "오류",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-                }
 
-                string filePath = openFileDialog.FileName;
-                await LoadExcelDataAsync(filePath);
-                lbl_filename.Text = filePath;
+                    // MongoDB 데이터 존재 여부 확인
+                    var rawDataCollection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
+                    var filter = Builders<RawDataDocument>.Filter.Empty;
+                    long documentCount = await rawDataCollection.CountDocumentsAsync(filter);
+
+                    bool dataExists = documentCount > 0;
+                    bool resetRequired = MongoDBManager.ResetDatabaseOnStartup;
+
+                    //파일 최초 load의 경우 바로 초기화
+                    if (excelLoadinitFlag && resetRequired)
+                    {
+                        // MongoDB 데이터베이스 초기화
+                        await mongoManager.ResetDatabaseAsync();
+                        excelLoadinitFlag = false;
+                    }
+                    // 기존 데이터가 있거나 MongoDB 리셋이 필요한 경우
+                    else if (dataExists || resetRequired)
+                    {
+                        if (dataExists)
+                        {
+                            DialogResult result = MessageBox.Show(
+                                "파일을 새로 업로드 할 경우 \n기존 업로드 내역 및 작업 내용이 모두 초기화 됩니다.\n" +
+                                "파일을 계속 업로드 하시겠습니까?",
+                                "경고",
+                                MessageBoxButtons.OKCancel,
+                                MessageBoxIcon.Warning
+                            );
+
+                            if (result == DialogResult.Cancel)
+                            {
+                                return; // 사용자가 취소함
+                            }
+                        }
+                        
+
+                        // MongoDB 데이터베이스 초기화
+                        await mongoManager.ResetDatabaseAsync();
+                        Debug.WriteLine("MongoDB 데이터베이스 초기화 완료");
+                    }
+
+                    // 파일 로드 진행
+                    string filePath = openFileDialog.FileName;
+                    await LoadExcelDataAsync(filePath);
+                    lbl_filename.Text = filePath;
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"파일 로드 준비 중 오류가 발생했습니다: {ex.Message}", "오류",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Debug.WriteLine($"파일 로드 준비 오류: {ex.Message}\n{ex.StackTrace}");
+                }
             }
         }
 
@@ -285,8 +308,18 @@ namespace FinanceTool
                 if (progressYN)
                 {
                     // MongoDB에서 페이징된 데이터 가져오기
+                    var filter = Builders<RawDataDocument>.Filter.Empty;
+
+                    // hiddenData가 false인 경우, 숨겨진 문서 제외
+                    if (!DataHandler.hiddenData)
+                    {
+                        filter = Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false);
+                    }
+
                     var (documents, totalCount) = await mongoConverter.GetPagedRawDataAsync(
                         currentPage, pageSize, DataHandler.hiddenData);
+
+
 
                     // 페이징 메타데이터 계산
                     totalRows = (int)totalCount;
@@ -314,8 +347,17 @@ namespace FinanceTool
                         // MongoDB에서 페이징된 데이터 가져오기
                         var result = await Task.Run(async () =>
                         {
+                            // MongoDB에서 페이징된 데이터 가져오기
+                            var filter = Builders<RawDataDocument>.Filter.Empty;
+
+                            // hiddenData가 false인 경우, 숨겨진 문서 제외
+                            if (!DataHandler.hiddenData)
+                            {
+                                filter = Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false);
+                            }
+
                             var (documents, totalCount) = await mongoConverter.GetPagedRawDataAsync(
-                                currentPage, pageSize, DataHandler.hiddenData);
+                            currentPage, pageSize, DataHandler.hiddenData);
 
                             // 페이징 메타데이터 계산
                             totalRows = (int)totalCount;
@@ -360,7 +402,7 @@ namespace FinanceTool
             // 기본 컬럼 추가
             dataTable.Columns.Add("id", typeof(string));
             dataTable.Columns.Add("import_date", typeof(DateTime));
-            dataTable.Columns.Add("hiddenYN", typeof(int));
+            dataTable.Columns.Add("is_hidden", typeof(bool));  // hiddenYN 대신 is_hidden 사용
 
             // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
             if (documents.Count > 0 && documents[0].Data != null)
@@ -380,7 +422,7 @@ namespace FinanceTool
                 DataRow row = dataTable.NewRow();
                 row["id"] = doc.Id;
                 row["import_date"] = doc.ImportDate;
-                row["hiddenYN"] = doc.IsHidden ? 0 : 1;
+                row["is_hidden"] = doc.IsHidden;  // 직접 is_hidden 값 사용
 
                 // 동적 데이터 필드 추가
                 if (doc.Data != null)
@@ -467,7 +509,13 @@ namespace FinanceTool
                     column.ColumnName != "import_date" &&
                     column.ColumnName != "hiddenYN")
                 {
-                    process_col_list.Add(column.ColumnName);
+                    // 선택된 열(visibleColumns)이 있는 경우 그 열만 포함
+                    if (DataHandler.visibleColumns == null ||
+                        DataHandler.visibleColumns.Count == 0 ||
+                        DataHandler.visibleColumns.Contains(column.ColumnName))
+                    {
+                        process_col_list.Add(column.ColumnName);
+                    }
                 }
             }
 
@@ -514,33 +562,48 @@ namespace FinanceTool
             // DataGridView의 DataSource를 DataTable로 설정
             dataGridView.DataSource = dataTable;
 
-            // hiddenYN 컬럼이 있는지 확인
-            if (dataTable.Columns.Contains("hiddenYN"))
+            // id와 import_date 컬럼을 항상 숨김 처리
+            if (dataGridView.Columns.Contains("id"))
             {
-                // hiddenYN 컬럼을 숨김
-                dataGridView.Columns["hiddenYN"].Visible = false;
-
-                // 각 행을 순회하며 hiddenYN 값이 0인 경우 스타일 적용
-                foreach (DataGridViewRow row in dataGridView.Rows)
-                {
-                    // hiddenYN 컬럼의 값이 0인지 확인
-                    if (row.Cells["hiddenYN"].Value != null && row.Cells["hiddenYN"].Value.ToString() == "0")
-                    {
-                        //Debug.WriteLine($"hidden row Process row id : {row.Cells["id"].Value.ToString()} , row hiddenyn  : {row.Cells["hiddenYN"].Value.ToString()}");
-                        // 배경색과 글자색 변경
-                        row.DefaultCellStyle.BackColor = System.Drawing.Color.LightGray;
-                        row.DefaultCellStyle.ForeColor = System.Drawing.Color.DarkGray;
-                    }
-                    else
-                    {
-                        //Debug.WriteLine($"hidden row Process row id : {row.Cells["id"].Value.ToString()} , row hiddenyn  : {row.Cells["hiddenYN"].Value.ToString()}");
-                    }
-                }
+                dataGridView.Columns["id"].Visible = false;
             }
-            else
+
+            if (dataGridView.Columns.Contains("import_date"))
             {
-                // hiddenYN 컬럼이 없는 경우 경고 메시지 출력 (옵션)
-                MessageBox.Show("'hiddenYN' 컬럼이 존재하지 않습니다.", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                dataGridView.Columns["import_date"].Visible = false;
+            }
+
+            // is_hidden 컬럼이 있다면 그것도 숨김
+            if (dataGridView.Columns.Contains("is_hidden"))
+            {
+                dataGridView.Columns["is_hidden"].Visible = false;
+            }
+
+            // 각 행을 순회하며 is_hidden 필드에 따라 스타일 적용
+            foreach (DataGridViewRow row in dataGridView.Rows)
+            {
+                bool isHidden = false;
+
+                // is_hidden 컬럼 확인
+                if (dataGridView.Columns.Contains("is_hidden") &&
+                    row.Cells["is_hidden"].Value != null)
+                {
+                    isHidden = Convert.ToBoolean(row.Cells["is_hidden"].Value);
+                }
+                // 기존 hiddenYN 컬럼 확인 (하위 호환성 유지)
+                else if (dataGridView.Columns.Contains("hiddenYN") &&
+                         row.Cells["hiddenYN"].Value != null &&
+                         row.Cells["hiddenYN"].Value.ToString() == "0")
+                {
+                    isHidden = true;
+                }
+
+                // 숨겨진 행이면 회색 스타일 적용
+                if (isHidden)
+                {
+                    row.DefaultCellStyle.BackColor = System.Drawing.Color.LightGray;
+                    row.DefaultCellStyle.ForeColor = System.Drawing.Color.DarkGray;
+                }
             }
         }
 
@@ -892,31 +955,65 @@ namespace FinanceTool
         {
             List<string> restore_list = GetCheckedRowsData(dataGridView_delete_col);
 
-            // 선택된 열이 없는 경우
-            //if (restore_list.Count == 0) return;
+            // 선택된 열 목록 저장
+            DataHandler.visibleColumns = new List<string>(restore_list);
 
             for (int i = 0; i < dataGridView_process.Columns.Count; i++)
             {
                 if (restore_list.Contains(dataGridView_process.Columns[i].Name))
                 {
                     dataGridView_process.Columns[i].Visible = true;
-
-                    // SQLite에서 컬럼 가시성 업데이트
-                    dataConverter.UpdateColumnVisibility(dataGridView_process.Columns[i].Name, true);
                 }
                 else
                 {
                     dataGridView_process.Columns[i].Visible = false;
-
-                    // SQLite에서 컬럼 가시성 업데이트
-                    dataConverter.UpdateColumnVisibility(dataGridView_process.Columns[i].Name, false);
                 }
             }
 
+            // MongoDB 컬렉션에서 컬럼 가시성 업데이트
+            foreach (DataColumn column in DataHandler.excelData.Columns)
+            {
+                if (column.ColumnName != "id" &&
+                    column.ColumnName != "import_date" &&
+                    column.ColumnName != "hiddenYN")
+                {
+                    bool isVisible = restore_list.Contains(column.ColumnName);
+                    try
+                    {
+                        // MongoDB에서 컬럼 매핑 정보 업데이트
+                        UpdateColumnVisibilityInMongo(column.ColumnName, isVisible);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"컬럼 가시성 업데이트 오류: {ex.Message}");
+                    }
+                }
+            }
+
+            // 선택된 열만 사용하도록 컬럼 목록 업데이트
             GetMongoColumnList(DataHandler.excelData.Columns);
             SetupColumnLists();
         }
 
+        // MongoDB에서 컬럼 가시성 업데이트하는 새 메서드
+        private async void UpdateColumnVisibilityInMongo(string columnName, bool isVisible)
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var columnCollection = await mongoManager.GetCollectionAsync<BsonDocument>("column_mapping");
+
+                var filter = Builders<BsonDocument>.Filter.Eq("original_name", columnName);
+                var update = Builders<BsonDocument>.Update.Set("is_visible", isVisible);
+
+                await columnCollection.UpdateOneAsync(filter, update);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 컬럼 가시성 업데이트 오류: {ex.Message}");
+                // 오류 무시하고 계속 진행
+            }
+        }
 
 
         private void stand_col_combo_SelectedIndexChanged(object sender, EventArgs e)
@@ -1045,9 +1142,8 @@ namespace FinanceTool
         {
             try
             {
-                // 모든 그리드 선택 초기화 - 이 부분이 중요!
+                // 모든 그리드 선택 초기화
                 InitializeCursors();
-
 
                 DataHandler.hiddenData = false;
 
@@ -1056,18 +1152,23 @@ namespace FinanceTool
                     progressForm.Show();
                     progressForm.UpdateProgressHandler(20);
 
-                    // 변경해야 할 코드
-                    MongoDataConverter mongoConverter = new MongoDataConverter();
-                    await mongoConverter.UnhideAllDocumentsAsync();
+                    // MongoDB에서 모든 데이터의 is_hidden을 false로 설정
+                    await Task.Run(async () =>
+                    {
+                        var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                        var rawDataCollection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
+
+                        var filter = Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, true);
+                        var update = Builders<RawDataDocument>.Update.Set(d => d.IsHidden, false);
+
+                        await rawDataCollection.UpdateManyAsync(filter, update);
+                    });
 
                     progressForm.UpdateProgressHandler(50);
 
                     // UI 업데이트
                     this.BeginInvoke(new Action(() =>
                     {
-                        // 숨겨진 행 컬렉션 초기화
-                        //hiddenRows.Clear();
-
                         // 모든 행 표시 설정 & 스타일 초기화
                         RestoreAllRowsVisibility();
                     }));
@@ -1082,7 +1183,7 @@ namespace FinanceTool
 
                     progressForm.UpdateProgressHandler(90);
 
-                    // 페이지 데이터 리로드               
+                    // 페이지 데이터 리로드
                     await LoadMongoPagedDataAsync();
                     progressForm.UpdateProgressHandler(100);
                 }
@@ -1132,24 +1233,28 @@ namespace FinanceTool
                     progressForm.Show();
                     progressForm.UpdateProgressHandler(10);
 
-                    // MongoDB 데이터 컨버터 생성
-                    var mongoConverter = new MongoDataConverter();
-
                     // MongoDB에서 숨기기 처리
                     int hiddenCount = 0;
                     await Task.Run(async () =>
                     {
+                        // MongoDB 저장소 접근
+                        var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                        var rawDataCollection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
+
                         // 각 값에 대해 해당하는 문서 숨기기
                         foreach (string value in delList)
                         {
-                            // MongoDataConverter 클래스에 실제로 있는 메서드 호출
-                            // 필드 값 기준으로 문서 숨기기
-                            await mongoConverter.HideDocumentsByFieldAsync(selectedStandColumn, value, "사용자에 의해 숨겨짐");
-                            hiddenCount++; // 여기서는 각 값마다 카운트 증가 (실제로는 숨겨진 문서 수를 반환받는 것이 좋음)
+                            // 필드 값이 일치하는 문서 찾기
+                            var filter = Builders<RawDataDocument>.Filter.Eq($"Data.{selectedStandColumn}", value);
+                            var update = Builders<RawDataDocument>.Update.Set("is_hidden", true);
+
+                            // 업데이트 실행
+                            var result = await rawDataCollection.UpdateManyAsync(filter, update);
+                            hiddenCount += (int)result.ModifiedCount;
                         }
                     });
 
-                    progressForm.UpdateProgressHandler(60);
+                    progressForm.UpdateProgressHandler(30);
 
                     // UI 업데이트는 메인 스레드에서 수행
                     this.BeginInvoke(new Action(() =>
@@ -1165,7 +1270,7 @@ namespace FinanceTool
 
                     progressForm.UpdateProgressHandler(90);
 
-                    // 페이지 데이터 리로드 (MongoDB 버전 사용)
+                    // 페이지 데이터 리로드 (MongoDB 버전 메서드 호출)
                     await LoadMongoPagedDataAsync();
 
                     progressForm.UpdateProgressHandler(100);

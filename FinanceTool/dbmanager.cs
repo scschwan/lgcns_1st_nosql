@@ -12,17 +12,17 @@ namespace FinanceTool
     /// <summary>
     /// SQLite 데이터베이스 관리 클래스
     /// </summary>
-    public class DBManager : IDisposable
+    public class dbmanager : IDisposable
     {
         private static readonly object _lockObj = new object();
-        private static DBManager _instance;
+        private static dbmanager _instance;
         private SQLiteConnection _connection;
         private string _dbFilePath;
         private bool _disposed = false;
         private bool _isInitialized = false;
 
         // 싱글톤 인스턴스 접근자 - 필요시에만 인스턴스 생성
-        public static DBManager Instance
+        public static dbmanager Instance
         {
             get
             {
@@ -32,7 +32,7 @@ namespace FinanceTool
                     {
                         if (_instance == null)
                         {
-                            _instance = new DBManager();
+                            _instance = new dbmanager();
                         }
                     }
                 }
@@ -41,7 +41,7 @@ namespace FinanceTool
         }
 
         // 생성자 - 초기화는 별도 수행
-        private DBManager()
+        private dbmanager()
         {
             // 생성자에서는 초기화하지 않음
         }
@@ -586,7 +586,7 @@ namespace FinanceTool
             }
         }
 
-        ~DBManager()
+        ~dbmanager()
         {
             Dispose(false);
         }

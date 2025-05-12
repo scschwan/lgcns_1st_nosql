@@ -378,7 +378,7 @@ namespace FinanceTool
             WHERE is_visible = 1 
             ORDER BY sequence";
 
-                DataTable visibleColumnsTable = DBManager.Instance.ExecuteQuery(columnsQuery);
+                DataTable visibleColumnsTable = dbmanager.Instance.ExecuteQuery(columnsQuery);
                 List<string> visibleColumns = visibleColumnsTable.AsEnumerable()
                     .Select(row => row["original_name"].ToString())
                     .ToList();
@@ -429,14 +429,14 @@ namespace FinanceTool
                     return resultTable;
 
                 // 4. 임시 테이블 생성 및 ID 삽입
-                DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids");
-                DBManager.Instance.ExecuteNonQuery("CREATE TEMP TABLE temp_ids (id INTEGER PRIMARY KEY)");
+                dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids");
+                dbmanager.Instance.ExecuteNonQuery("CREATE TEMP TABLE temp_ids (id INTEGER PRIMARY KEY)");
 
                 // 배치로 나누어 ID 삽입
                 const int batchSize = 100; // 더 작은 배치 크기
                 List<int> idList = rawTableIds.ToList();
 
-                using (var transaction = DBManager.Instance.BeginTransaction())
+                using (var transaction = dbmanager.Instance.BeginTransaction())
                 {
                     for (int i = 0; i < idList.Count; i += batchSize)
                     {
@@ -450,7 +450,7 @@ namespace FinanceTool
                             insertBatch.Append($"({idList[i + j]})");
                         }
 
-                        DBManager.Instance.ExecuteNonQuery(insertBatch.ToString());
+                        dbmanager.Instance.ExecuteNonQuery(insertBatch.ToString());
                     }
 
                     transaction.Commit();
@@ -463,7 +463,7 @@ namespace FinanceTool
             FROM raw_data r
             JOIN temp_ids t ON r.id = t.id";
 
-                DataTable rawData = DBManager.Instance.ExecuteQuery(joinQuery);
+                DataTable rawData = dbmanager.Instance.ExecuteQuery(joinQuery);
 
                 // 6. 조회된 데이터를 결과 테이블에 매핑
                 foreach (DataRow rawRow in rawData.Rows)
@@ -483,7 +483,7 @@ namespace FinanceTool
                 }
 
                 // 7. 임시 테이블 삭제
-                DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids");
+                dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids");
 
                 return resultTable;
             }
@@ -491,7 +491,7 @@ namespace FinanceTool
             {
                 Debug.WriteLine($"RAW_TABLE 데이터 추가 중 오류 발생: {ex.Message}");
                 // 예외 발생 시에도 임시 테이블 정리
-                try { DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids"); } catch { }
+                try { dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids"); } catch { }
                 return resultTable;
             }
         }

@@ -1,15 +1,34 @@
 # MongoDB 마이그레이션 아키텍처 및 진행 상황
 
+## 프롬프트 지침
+
+이 문서는 코드 마이그레이션 작업 시 AI 어시스턴트가 따라야 할 규칙을 포함합니다:
+
+* **소스 수정 규칙**: 
+     - 소스를 수정하기 전 프로젝트 내 모든 코드를 확인하여 각 소스 간 참조 영역을 인지할 것
+     - MongoDB 관련 데이터 CRUD 로직만 수정할 것
+     - 화면 출력 방식이나 UI 상에서 수정하는 데이터 수정 내역은 변경하지 말 것
+* **폐기 예정 코드 처리**:
+     - DBManager.cs, DataConverter.cs는 폐기할 소스이므로 해당 인스턴스에서 호출되는 함수는 MongoDBManager나 MongoDataConverter를 활용하거나 신규로 추가하여 활용할 것
+* **문서 관리 규칙**:
+     - MD 파일 수정 요청 시에는 기존 내용을 그대로 유지하면서 업데이트 내역만 신규로 추가할 것
+
 ## 프로젝트 개요
 
 SQLite 기반의 데이터 처리 애플리케이션을 MongoDB로 마이그레이션하는 프로젝트입니다. 주요 목적은 대용량 데이터 처리 성능 향상과 동적 컬럼 관리의 유연성 확보입니다.
+
+## 기본 원칙
+
+* **SQLite 대체**: SQLite를 활용하는 모든 로직은 MongoDB 로직으로 완전히 대체합니다.
+* **코드 관리**: Git repository 내용은 직접 수정할 수 없으며, 접근 권한만 가지고 있습니다. 모든 변경 사항은 별도로 관리합니다.
+* **버전 이력**: 소스 버전 이력을 계속 남겨 수정 사항을 다른 세션에서도 이해할 수 있도록 합니다.
+* **최소 수정 원칙**: UI 로직은 그대로 유지하고 데이터 액세스 로직만 MongoDB로 교체합니다.
+* **역할 분리**: DBManager.cs는 MongoDBManager.cs로, DataConverter.cs는 MongoDataConverter.cs로 대체합니다.
 
 ## 폴더 구조
 
 ```
 FinanceTool/
-│
-├── [기존 파일들 그대로 유지]  # 기존 SQLite 기반 코드
 │
 ├── Data/  # 데이터 액세스 계층 폴더
 │   ├── MongoDBManager.cs     # MongoDB 연결 및 기본 작업 관리 (완료됨)
@@ -30,40 +49,42 @@ FinanceTool/
     └── ClusteringRepository.cs      # 클러스터링 관련 특화 작업 (완료됨)
 ```
 
-## 기존 코드 대체 계획
+## 진행 상황
 
-1. **완전히 삭제할 파일**:
-   - `DBManager.cs` - MongoDB로 완전히 대체됨
+### 완료된 작업
 
-2. **대폭 수정할 파일**:
-   - `DataConverter.cs` - MongoDataConverter.cs로 대체
-   - `DataHandler.cs` - MongoDB 저장소 패턴 사용하도록 수정 (진행 중)
+1. **코어 인프라 구축**:
+   - MongoDB 연결 관리자 구현 (`MongoDBManager.cs`)
+   - 문서 모델 클래스 정의 (`RawDataDocument.cs` 등)
+   - 저장소 패턴 구현 (`BaseRepository.cs` 등)
 
-3. **부분 수정할 파일**:
-   - UI 컴포넌트 파일들 (uc_*.cs) - DataHandler 변경에 따른 연동 수정 필요
+2. **uc_FileLoad.cs 수정**:
+   - Excel 파일 -> MongoDB 저장 구현
+   - MongoDB 기반의 데이터 페이징 처리
+   - `is_hidden` 필드를 사용한 데이터 숨김 처리
+   - UI 그리드뷰에 데이터 표시 및 스타일링
 
-## 구현된 주요 컴포넌트
+### 진행 중인 작업
 
-### 1. MongoDBManager.cs
-- MongoDB 서버 연결 관리
-- 컬렉션 생성 및 관리
-- 기본 CRUD 작업 지원
-- 데이터 영속성 플래그 지원 (SQLite 방식과 유사하게 필요시 초기화 가능)
+1. **UI 컴포넌트 MongoDB 연동**:
+   - `uc_Preprocessing.cs` MongoDB 연동
+   - `uc_Classification.cs` MongoDB 연동
+   - `uc_Clustering.cs` MongoDB 연동
 
-### 2. MongoDB 문서 모델
-- RawDataDocument: 원본 데이터 저장
-- ProcessDataDocument: 가공 데이터 저장
-- ClusteringResultDocument: 클러스터링 결과 저장
-- 등 MongoDB 컬렉션과 매핑되는 클래스들
+### 남은 작업
 
-### 3. 리포지토리 패턴
-- BaseRepository: 공통 CRUD 작업 추상화
-- 특화 리포지토리: 각 컬렉션별 특수 기능 구현
-  - RawDataRepository: 원본 데이터 관리
-  - ProcessDataRepository: 가공 데이터 관리
-  - ClusteringRepository: 클러스터링 결과 관리
+1. **DataHandler.cs 완전 대체**:
+   - 모든 SQLite 참조 제거
+   - MongoDB 기반 데이터 처리 로직으로 교체
 
-## MongoDB 데이터 구조
+2. **전체 애플리케이션 테스트**:
+   - 모든 기능 테스트
+   - 성능 검증
+
+3. **SQLite 코드 제거**:
+   - 불필요한 참조 제거
+
+## 데이터 구조
 
 ### 1. raw_data 컬렉션
 ```json
@@ -95,56 +116,27 @@ FinanceTool/
 }
 ```
 
-### 3. clustering_results 컬렉션
-```json
-{
-  "_id": ObjectId("..."),
-  "cluster_id": 5,
-  "cluster_name": "클러스터_5",
-  "keywords": ["키워드1", "키워드2", "키워드3"],
-  "count": 120,
-  "total_amount": 15000000,
-  "data_indices": [ObjectId("..."), ObjectId("..."), ...],
-  "created_at": ISODate("2025-05-05T12:30:00Z")
-}
-```
-
 ## 주요 변경 사항
 
-1. **데이터 접근 방식**:
-   - SQLite 쿼리 → MongoDB 문서 쿼리로 변경
-   - SQL 문 → MongoDB 필터 표현식으로 변경
-   - DataTable 직접 사용 → MongoDB 문서 객체 사용 후 필요시 변환
+### 데이터 숨김 처리
+- SQLite의 `hidden_rows` 테이블 대신 `RawDataDocument` 클래스의 `is_hidden` 필드 사용
+- 행 숨김/복원 시 해당 문서의 `is_hidden` 속성만 업데이트
+- UI에서도 `is_hidden` 값에 따라 회색 처리
 
-2. **비동기 패턴 적용**:
-   - 기존 동기 메서드 → 비동기 메서드(Task 기반)로 변경
-   - UI 블로킹 방지
+### 컬럼 가시성
+- `column_mapping` 컬렉션에 `is_visible` 필드 사용
+- 컬럼 표시/숨김 시 해당 필드만 업데이트
+- UI 콤보박스에는 가시적인 컬럼만 표시
 
-3. **데이터 흐름 변화**:
-   - 엑셀 → MongoDB 직접 저장
-   - 클러스터링 결과 → MongoDB 컬렉션에 저장
+### 비동기 패턴
+- 모든 데이터 접근 코드를 비동기(async/await)로 전환
+- UI 응답성 향상 및 대용량 데이터 처리 최적화
 
-## 진행 상황
+## 업데이트 내역
 
-1. **완료된 작업**:
-   - 코어 MongoDB 인프라 구축
-   - 문서 모델 클래스 정의
-   - 저장소 패턴 구현
-   - 기본 CRUD 기능 구현
-
-2. **진행 중인 작업**:
-   - DataHandler.cs 수정 - MongoDB 접근 방식으로 변경
-
-3. **남은 작업**:
-   - UI 컴포넌트 수정 및 연동
-   - 전체 애플리케이션 테스트
-
-## 추가 참고 사항
-
-1. **MongoDB 설정**:
-   - `mongod.conf` 파일에서 성능 최적화 설정 적용
-   - 초기 실행 시 데이터 리셋 여부 설정 가능 (`MongoDBManager.ResetDatabaseOnStartup`)
-
-2. **DataTable 호환성**:
-   - UI 연동을 위해 MongoDB 문서 ↔ DataTable 변환 기능 구현 필요
-   - ClusteringRepository에 `ToDataTable()` 메서드 구현됨
+### 2025-05-12
+- `uc_FileLoad.cs` 파일에서 데이터 숨김 처리 로직을 MongoDB 기반으로 수정
+- `is_hidden` 필드를 활용한 데이터 필터링 구현
+- UI에서 숨겨진 데이터 회색 처리 적용
+- `delete_data_btn_Click` 및 `restore_del_data_btn_Click` 메서드 MongoDB 버전으로 리팩터링
+- `MongoDataConverter.GetPagedRawDataAsync` 메서드의 파라미터 의미 명확화

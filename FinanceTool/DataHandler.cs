@@ -79,6 +79,8 @@ namespace FinanceTool
         public static ProcessDataRepository processDataRepo = new ProcessDataRepository();
         public static ClusteringRepository clusteringRepo = new ClusteringRepository();
 
+        public static List<string> visibleColumns  = new List<string>();
+
         public static async Task<DataTable> CreateDataTableFromColumnsAsync(DataTable sourceTable, List<int> columnIndices)
         {
             // 새로운 DataTable을 생성

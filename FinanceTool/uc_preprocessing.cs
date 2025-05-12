@@ -579,7 +579,7 @@ namespace FinanceTool
                 await progress(20, "테이블 생성 중...");
                 await Task.Run(() =>
                 {
-                    DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS process_view_data");
+                    dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS process_view_data");
 
                     StringBuilder createTableQuery = new StringBuilder();
                     createTableQuery.AppendLine("CREATE TABLE process_view_data (");
@@ -610,12 +610,12 @@ namespace FinanceTool
                     createTableQuery.AppendLine(string.Join(",\n", columns));
                     createTableQuery.AppendLine(");");
 
-                    DBManager.Instance.ExecuteNonQuery(createTableQuery.ToString());
-                    DBManager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
-                    DBManager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
+                    dbmanager.Instance.ExecuteNonQuery(createTableQuery.ToString());
+                    dbmanager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
+                    dbmanager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
 
                     // 인덱스 생성
-                    DBManager.Instance.ExecuteNonQuery("CREATE INDEX idx_process_view_data_raw_id ON process_view_data(raw_data_id)");
+                    dbmanager.Instance.ExecuteNonQuery("CREATE INDEX idx_process_view_data_raw_id ON process_view_data(raw_data_id)");
                 });
 
                 int totalRows = dataTable.Rows.Count;
@@ -665,7 +665,7 @@ namespace FinanceTool
                 var tasks = new List<Task>();
                 var lockObj = new object();
 
-                using (var transaction = DBManager.Instance.BeginTransaction())
+                using (var transaction = dbmanager.Instance.BeginTransaction())
                 {
                     try
                     {
@@ -692,7 +692,7 @@ namespace FinanceTool
                                         }
                                     }
 
-                                    DBManager.Instance.ExecuteNonQuery(insertQuery, rowData);
+                                    dbmanager.Instance.ExecuteNonQuery(insertQuery, rowData);
                                     rowsProcessed++;
 
                                     if (rowsProcessed % 1000 == 0)

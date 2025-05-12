@@ -55,7 +55,7 @@ namespace FinanceTool
 
                 // 데이터 로딩은 이미 백그라운드 스레드에서 실행 중이므로 직접 실행
                 string query = "SELECT * FROM process_view_data";
-                DataTable viewData = DBManager.Instance.ExecuteQuery(query);
+                DataTable viewData = dbmanager.Instance.ExecuteQuery(query);
                 Debug.WriteLine("data Transform initUI->select Query End");
 
                 // DataTable 설정
@@ -226,7 +226,7 @@ namespace FinanceTool
                         //컬럼종류가 다르다면 테이블 다시 생성
                         if (transformDataTable.Columns.Count != keywordColumnsCount)
                         {
-                            DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_transform_data");
+                            dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_transform_data");
                         }
 
                         Debug.WriteLine("DROP TABLE IF EXISTS temp_transform_data complete");
@@ -242,17 +242,17 @@ namespace FinanceTool
                         Debug.WriteLine($"  transformDataTable.Columns : {string.Join(",", columns)}");
 
                         // 데이터베이스 최적화 설정 추가
-                        DBManager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
-                        DBManager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
-                        DBManager.Instance.ExecuteNonQuery("PRAGMA cache_size = 10000");
-                        DBManager.Instance.ExecuteNonQuery("PRAGMA temp_store = MEMORY");
+                        dbmanager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
+                        dbmanager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
+                        dbmanager.Instance.ExecuteNonQuery("PRAGMA cache_size = 10000");
+                        dbmanager.Instance.ExecuteNonQuery("PRAGMA temp_store = MEMORY");
 
                         // 임시 테이블에 인덱스 생성
-                        DBManager.Instance.ExecuteNonQuery("CREATE INDEX IF NOT EXISTS idx_temp_transform_value ON temp_transform_data(raw_data_id)");
+                        dbmanager.Instance.ExecuteNonQuery("CREATE INDEX IF NOT EXISTS idx_temp_transform_value ON temp_transform_data(raw_data_id)");
 
                         // 컬럼 정보 가져오기 (기존 코드와 동일)
                         string tableInfoQuery = "PRAGMA table_info(temp_transform_data)";
-                        DataTable columnInfo = DBManager.Instance.ExecuteQuery(tableInfoQuery);
+                        DataTable columnInfo = dbmanager.Instance.ExecuteQuery(tableInfoQuery);
 
                         await progressForm.UpdateProgressHandler(40, "키워드 요약 테이블 생성 중...");
                         await Task.Delay(10);
@@ -299,13 +299,13 @@ namespace FinanceTool
                     GROUP BY TRIM(value)
                     ORDER BY occurrence_count DESC, keyword ASC;";
 
-                        DBManager.Instance.ExecuteNonQuery(extractQuery);
-                        DBManager.Instance.ExecuteNonQuery("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword)");
+                        dbmanager.Instance.ExecuteNonQuery(extractQuery);
+                        dbmanager.Instance.ExecuteNonQuery("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword)");
 
                         Debug.WriteLine("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword) complete");
 
                         // 5.2 전체 키워드 수 확인
-                        int totalKeywords = Convert.ToInt32(DBManager.Instance.ExecuteScalar("SELECT COUNT(*) FROM temp_keywords"));
+                        int totalKeywords = Convert.ToInt32(dbmanager.Instance.ExecuteScalar("SELECT COUNT(*) FROM temp_keywords"));
                         Debug.WriteLine($"총 키워드 수: {totalKeywords}");
 
                         // 5.3 페이징 처리를 위한 설정
@@ -360,7 +360,7 @@ namespace FinanceTool
                     ORDER BY k.occurrence_count DESC, k.keyword ASC;";
 
                                 Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 시작");
-                                DataTable pageResult = DBManager.Instance.ExecuteQuery(pageQuery);
+                                DataTable pageResult = dbmanager.Instance.ExecuteQuery(pageQuery);
                                 Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 완료: {pageResult.Rows.Count}개 행");
 
                                 return pageResult;
@@ -463,7 +463,7 @@ namespace FinanceTool
 
                         // 임시 테이블 정리
                         //CleanupTempTables();
-                        DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_keywords");
+                        dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_keywords");
 
                        
 
@@ -479,7 +479,7 @@ namespace FinanceTool
                     //컬럼종류가 다르다면 테이블 다시 생성
                     if (transformDataTable.Columns.Count != keywordColumnsCount)
                     {
-                        DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_transform_data");
+                        dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_transform_data");
                     }
 
 
@@ -493,17 +493,17 @@ namespace FinanceTool
                     Debug.WriteLine(string.Join(",", columns));
 
                     // 데이터베이스 최적화 설정 추가
-                    DBManager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
-                    DBManager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
-                    DBManager.Instance.ExecuteNonQuery("PRAGMA cache_size = 10000");
-                    DBManager.Instance.ExecuteNonQuery("PRAGMA temp_store = MEMORY");
+                    dbmanager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
+                    dbmanager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
+                    dbmanager.Instance.ExecuteNonQuery("PRAGMA cache_size = 10000");
+                    dbmanager.Instance.ExecuteNonQuery("PRAGMA temp_store = MEMORY");
 
                     // 임시 테이블에 인덱스 생성
-                    DBManager.Instance.ExecuteNonQuery("CREATE INDEX IF NOT EXISTS idx_temp_transform_value ON temp_transform_data(raw_data_id)");
+                    dbmanager.Instance.ExecuteNonQuery("CREATE INDEX IF NOT EXISTS idx_temp_transform_value ON temp_transform_data(raw_data_id)");
 
                     // 컬럼 정보 가져오기 (기존 코드와 동일)
                     string tableInfoQuery = "PRAGMA table_info(temp_transform_data)";
-                    DataTable columnInfo = DBManager.Instance.ExecuteQuery(tableInfoQuery);
+                    DataTable columnInfo = dbmanager.Instance.ExecuteQuery(tableInfoQuery);
 
                     List<string> columnNames = new List<string>();
                     foreach (DataRow row in columnInfo.Rows)
@@ -546,11 +546,11 @@ namespace FinanceTool
                     GROUP BY TRIM(value)
                     ORDER BY occurrence_count DESC, keyword ASC;";
 
-                    DBManager.Instance.ExecuteNonQuery(extractQuery);
-                    DBManager.Instance.ExecuteNonQuery("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword)");
+                    dbmanager.Instance.ExecuteNonQuery(extractQuery);
+                    dbmanager.Instance.ExecuteNonQuery("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword)");
 
                     // 5.2 전체 키워드 수 확인
-                    int totalKeywords = Convert.ToInt32(DBManager.Instance.ExecuteScalar("SELECT COUNT(*) FROM temp_keywords"));
+                    int totalKeywords = Convert.ToInt32(dbmanager.Instance.ExecuteScalar("SELECT COUNT(*) FROM temp_keywords"));
                     Debug.WriteLine($"총 키워드 수: {totalKeywords}");
 
                     // 5.3 페이징 처리를 위한 설정
@@ -598,7 +598,7 @@ namespace FinanceTool
                     ORDER BY k.occurrence_count DESC, k.keyword ASC;";
 
                             Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 시작");
-                            DataTable pageResult = DBManager.Instance.ExecuteQuery(pageQuery);
+                            DataTable pageResult = dbmanager.Instance.ExecuteQuery(pageQuery);
                             Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 완료: {pageResult.Rows.Count}개 행");
 
                             return pageResult;
@@ -718,7 +718,7 @@ namespace FinanceTool
 
                     // 임시 테이블 정리
                     //CleanupTempTables();
-                    DBManager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_keywords");
+                    dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_keywords");
                 }
                
                 
@@ -751,7 +751,7 @@ namespace FinanceTool
                                     WHERE is_visible = 1 
                                     ORDER BY sequence";
 
-                DataTable visibleColumnsTable = DBManager.Instance.ExecuteQuery(columnsQuery);
+                DataTable visibleColumnsTable = dbmanager.Instance.ExecuteQuery(columnsQuery);
                 List<string> visibleColumns = visibleColumnsTable.AsEnumerable()
                     .Select(row => row["original_name"].ToString())
                     .ToList();
@@ -855,7 +855,7 @@ namespace FinanceTool
                                     FROM raw_data
                                     WHERE id IN ({batchIdList})";
 
-                    DataTable batchRawData = DBManager.Instance.ExecuteQuery(rawDataQuery);
+                    DataTable batchRawData = dbmanager.Instance.ExecuteQuery(rawDataQuery);
 
                     // 조회된 데이터를 매핑
                     foreach (DataRow rawRow in batchRawData.Rows)
@@ -952,7 +952,7 @@ namespace FinanceTool
                 // 테이블 존재 여부 확인
                 bool tableExists = false;
                 string checkQuery = $"SELECT name FROM sqlite_master WHERE type='table' AND name='{tableName}'";
-                object result = DBManager.Instance.ExecuteScalar(checkQuery);
+                object result = dbmanager.Instance.ExecuteScalar(checkQuery);
                 tableExists = (result != null);
 
 
@@ -970,7 +970,7 @@ namespace FinanceTool
                             .ToList();
                         createQuery.AppendLine(string.Join(",\n", columns));
                         createQuery.AppendLine(");");
-                        DBManager.Instance.ExecuteNonQuery(createQuery.ToString());
+                        dbmanager.Instance.ExecuteNonQuery(createQuery.ToString());
 
 
                         //temp_transform_data의 경우 keywordColumns 값 저장
@@ -986,7 +986,7 @@ namespace FinanceTool
                         if (!preserveTable)
                         {
                             Debug.WriteLine($"DELETE FROM {tableName}");
-                            DBManager.Instance.ExecuteNonQuery($"DELETE FROM {tableName}");
+                            dbmanager.Instance.ExecuteNonQuery($"DELETE FROM {tableName}");
                         }
                     }
                 }
@@ -998,7 +998,7 @@ namespace FinanceTool
                 }
 
                 // 데이터 삽입
-                using (var transaction = DBManager.Instance.BeginTransaction())
+                using (var transaction = dbmanager.Instance.BeginTransaction())
                 {
                     var paramNames = dt.Columns.Cast<DataColumn>()
                         .Select(col => $"@{col.ColumnName}")
@@ -1011,7 +1011,7 @@ namespace FinanceTool
                         {
                             parameters[col.ColumnName] = row[col] ?? DBNull.Value;
                         }
-                        DBManager.Instance.ExecuteNonQuery(insertQuery, parameters);
+                        dbmanager.Instance.ExecuteNonQuery(insertQuery, parameters);
                     }
                     transaction.Commit();
                 }

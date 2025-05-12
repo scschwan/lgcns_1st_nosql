@@ -65,7 +65,7 @@ namespace FinanceTool
             try
             {
                 // DBManager 초기화 확인
-                if (!DBManager.Instance.EnsureInitialized())
+                if (!dbmanager.Instance.EnsureInitialized())
                 {
                     throw new InvalidOperationException("데이터베이스 초기화에 실패했습니다.");
                 }
@@ -274,7 +274,7 @@ namespace FinanceTool
                 await Task.Delay(10);
 
                 // 트랜잭션 시작
-                using (var transaction = DBManager.Instance.BeginTransaction())
+                using (var transaction = dbmanager.Instance.BeginTransaction())
                 {
                     try
                     {
@@ -324,7 +324,7 @@ namespace FinanceTool
         {
             if (rows.Count == 0) return;
 
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             try
             {
@@ -424,7 +424,7 @@ namespace FinanceTool
         // DataConverter.cs에 추가
         private void OptimizeSQLiteForBulkInsert()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             // 대량 삽입을 위한 SQLite 최적화
             dbManager.ExecuteNonQuery("PRAGMA journal_mode = WAL");            // Write-Ahead Logging 모드
@@ -552,7 +552,7 @@ namespace FinanceTool
         {
             try
             {
-                DBManager dbManager = DBManager.Instance;
+                dbmanager dbManager = dbmanager.Instance;
 
                 // 기존 매핑 정보 초기화
                 dbManager.ExecuteNonQuery("DELETE FROM column_mapping");
@@ -612,7 +612,7 @@ namespace FinanceTool
         // raw_data 테이블 생성
         private void CreateRawDataTable(DataTable dataTable)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             // 기존 테이블 삭제
             dbManager.DropTableIfExists(RAW_TABLE);
@@ -666,7 +666,7 @@ namespace FinanceTool
             int batchSize = 1000;
             int processedRows = 0;
 
-            using (var dbManager = DBManager.Instance)
+            using (var dbManager = dbmanager.Instance)
             using (var transaction = dbManager.BeginTransaction())
             {
                 try
@@ -703,7 +703,7 @@ namespace FinanceTool
         }
 
         // 단일 배치 삽입
-        private void InsertBatch(string tableName, List<Dictionary<string, object>> rows, DBManager dbManager)
+        private void InsertBatch(string tableName, List<Dictionary<string, object>> rows, dbmanager dbManager)
         {
             if (rows.Count == 0) return;
 
@@ -744,7 +744,7 @@ namespace FinanceTool
         // raw_data 테이블에 인덱스 생성
         private void CreateIndicesForRawData()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             // 자주 검색하는 컬럼에 인덱스 생성
             dbManager.ExecuteNonQuery($"CREATE INDEX IF NOT EXISTS idx_{RAW_TABLE}_import_date ON {RAW_TABLE} ({IMPORT_DATE_COLUMN})");
@@ -756,14 +756,14 @@ namespace FinanceTool
         // SQLite에서 원본 데이터 조회
         public DataTable GetRawDataFromSQLite(int limit = 1000)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             return dbManager.ExecuteQuery($"SELECT * FROM {RAW_TABLE} LIMIT {limit}");
         }
 
         // 페이징된 원본 데이터 조회
         public DataTable GetPagedRawData(int pageNumber, int pageSize , bool hiddenTableYN=false)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             string baseQuery = $"SELECT * FROM {RAW_TABLE}";
             //hidden_row 존재할 경우
             if (hiddenTableYN)
@@ -794,7 +794,7 @@ namespace FinanceTool
                 // 클러스터 매핑 임시 테이블 생성
                 CreateTempClusterMappingTable();
 
-                DBManager dbManager = DBManager.Instance;
+                dbmanager dbManager = dbmanager.Instance;
 
                 // 컬럼 목록 문자열 생성 (r.id는 항상 포함)
                 string columnSelection = "r.id";
@@ -906,7 +906,7 @@ namespace FinanceTool
                 }
 
                 // 전체 데이터 수 확인
-                DBManager dbManager = DBManager.Instance;
+                dbmanager dbManager = dbmanager.Instance;
 
                 // totalRecords가 제공되지 않았으면 계산
                 if (totalRecords <= 0)
@@ -1005,7 +1005,7 @@ namespace FinanceTool
 
         private void CreateTempClusterMappingTable()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             try
             {
@@ -1110,7 +1110,7 @@ namespace FinanceTool
 
         private void DropTempClusterMappingTable()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             dbManager.ExecuteNonQuery("DROP TABLE IF EXISTS temp_cluster_mapping");
             Debug.WriteLine("임시 클러스터 매핑 테이블 삭제 완료");
         }
@@ -1119,7 +1119,7 @@ namespace FinanceTool
         {
             try
             {
-                DBManager dbManager = DBManager.Instance;
+                dbmanager dbManager = dbmanager.Instance;
                 DataTable segment = dbManager.ExecuteQuery(query);
                 Debug.WriteLine($"스레드 {threadId}: {segment.Rows.Count}개 행 조회 완료");
                 return segment;
@@ -1196,7 +1196,7 @@ namespace FinanceTool
         // 프로세스 테이블 준비
         public void PrepareProcessTable(IEnumerable<string> selectedColumns)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             // 기존 테이블 삭제
             dbManager.DropTableIfExists(PROCESS_TABLE);
 
@@ -1261,7 +1261,7 @@ namespace FinanceTool
         // 프로세스 테이블 인덱스 생성
         private void CreateIndicesForProcessTable()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             // 임포트 날짜 인덱스
             dbManager.ExecuteNonQuery($"CREATE INDEX IF NOT EXISTS idx_{PROCESS_TABLE}_import_date ON {PROCESS_TABLE} ({IMPORT_DATE_COLUMN})");
@@ -1301,14 +1301,14 @@ namespace FinanceTool
         // process_data 테이블에서 데이터 가져오기
         public DataTable GetProcessData(int limit = 1000)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             return dbManager.ExecuteQuery($"SELECT * FROM {PROCESS_TABLE} LIMIT {limit}");
         }
 
         // 페이징된 프로세스 데이터 조회
         public DataTable GetPagedProcessData(int pageNumber, int pageSize)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             string baseQuery = $"SELECT * FROM {PROCESS_TABLE}";
             string countQuery = $"SELECT COUNT(*) FROM {PROCESS_TABLE}";
 
@@ -1322,7 +1322,7 @@ namespace FinanceTool
         // 특정 컬럼 가시성 업데이트
         public void UpdateColumnVisibility(string columnName, bool isVisible)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             Dictionary<string, object> parameters = new Dictionary<string, object>
             {
@@ -1340,7 +1340,7 @@ namespace FinanceTool
         // 행 숨기기 플래그 테이블 생성
         public void CreateHiddenRowsTable()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             dbManager.ExecuteNonQuery(@"
                 CREATE TABLE IF NOT EXISTS hidden_rows (
@@ -1354,7 +1354,7 @@ namespace FinanceTool
         // 행 숨기기
         public void HideRow(int rowId, string reason = null)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             // hidden_rows 테이블이 없으면 생성
             CreateHiddenRowsTable();
@@ -1375,7 +1375,7 @@ namespace FinanceTool
         // 보이는 행만 가져오기
         public DataTable GetVisibleRows(int limit = 1000)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             return dbManager.ExecuteQuery($@"
                 SELECT r.* FROM {RAW_TABLE} r
@@ -1387,7 +1387,7 @@ namespace FinanceTool
         // 숨겨진 행 보이기
         public void UnhideRow(int rowId)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             Dictionary<string, object> parameters = new Dictionary<string, object>
             {
@@ -1404,7 +1404,7 @@ namespace FinanceTool
         // 숨겨진 모든 행 보이기
         public void UnhideAllRows()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             Dictionary<string, object> parameters = new Dictionary<string, object>
             {
@@ -1420,7 +1420,7 @@ namespace FinanceTool
         // 특정 컬럼 값을 기준으로 행 숨기기
         public int HideRowsByColumnValue(string columnName, string value)
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
 
             // 1. 숨길 row_id 목록 가져오기
             Dictionary<string, object> parameters = new Dictionary<string, object>

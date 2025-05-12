@@ -137,7 +137,7 @@ namespace FinanceTool
             FROM raw_data
             WHERE id IN ({idListStr})";
 
-                DataTable resultTable = DBManager.Instance.ExecuteQuery(query);
+                DataTable resultTable = dbmanager.Instance.ExecuteQuery(query);
 
                 // 결과가 없으면 다음으로
                 if (resultTable.Rows.Count == 0)
@@ -440,7 +440,7 @@ namespace FinanceTool
 
         public List<int> GetHiddenRowIds()
         {
-            DBManager dbManager = DBManager.Instance;
+            dbmanager dbManager = dbmanager.Instance;
             DataTable hiddenRowsTable = dbManager.ExecuteQuery("SELECT row_id FROM hidden_rows WHERE original_table = 'raw_data'");
 
             List<int> hiddenRowIds = new List<int>();
@@ -702,7 +702,7 @@ namespace FinanceTool
                                     WHERE is_visible = 1 
                                     ORDER BY sequence";
 
-            DataTable visibleColumnsTable = DBManager.Instance.ExecuteQuery(columnsQuery);
+            DataTable visibleColumnsTable = dbmanager.Instance.ExecuteQuery(columnsQuery);
             List<string> visibleColumns = visibleColumnsTable.AsEnumerable()
                 .Select(row => row["original_name"].ToString())
                 .ToList();

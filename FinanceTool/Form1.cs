@@ -143,7 +143,7 @@ namespace FinanceTool
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             // 모든 처리가 끝났을 때만 데이터베이스 정리
-            DBManager.Instance.ManualDispose();
+            dbmanager.Instance.ManualDispose();
         }
 
         private void exportToolStripMenuItem_Click(object sender, EventArgs e)

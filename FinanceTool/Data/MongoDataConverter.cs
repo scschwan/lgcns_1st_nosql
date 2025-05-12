@@ -217,14 +217,17 @@ namespace FinanceTool
         /// <summary>
         /// 페이징 처리된 raw_data 문서 조회
         /// </summary>
+        // MongoDataConveter.cs의 GetPagedRawDataAsync 메서드 수정
         public async Task<(List<RawDataDocument> Items, long TotalCount)> GetPagedRawDataAsync(
-            int pageNumber, int pageSize, bool hideHidden = false)
+            int pageNumber, int pageSize, bool includeHidden = false)
         {
             var filterBuilder = Builders<RawDataDocument>.Filter;
             var filter = filterBuilder.Empty;
 
-            // 숨겨진 문서 제외 옵션
-            if (hideHidden)
+            // 파라미터 이름을 hideHidden에서 includeHidden으로 변경
+            // includeHidden=false일 때는 숨겨진 문서를 제외
+            // includeHidden=true일 때는 모든 문서를 포함
+            if (!includeHidden)
             {
                 filter = filterBuilder.Eq(d => d.IsHidden, false);
             }
