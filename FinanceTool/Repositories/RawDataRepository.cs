@@ -152,5 +152,7 @@ namespace FinanceTool.Repositories
             var result = await _collection.UpdateManyAsync(filter, update);
             return result.ModifiedCount;
         }
+
+
     }
 }
