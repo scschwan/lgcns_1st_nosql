@@ -1404,18 +1404,18 @@ namespace FinanceTool
             form.ShowDialog();
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private async void button2_Click(object sender, EventArgs e)
         {
             //Data Clustering
             //데이터가 없을 경우 신규 생성
             if (DataHandler.firstClusteringData.Rows.Count == 0)
             {
-                DataHandler.firstClusteringData = DataHandler.CreateSetGroupDataTable(originDataTable, DataHandler.moneyDataTable);
+                DataHandler.firstClusteringData = await DataHandler.CreateSetGroupDataTableAsync(originDataTable, DataHandler.moneyDataTable);
             }
 
             if (DataHandler.secondClusteringData.Rows.Count == 0)
             {
-                DataHandler.secondClusteringData = DataHandler.CreateSetGroupDataTable(transformDataTable, DataHandler.moneyDataTable, true);
+                DataHandler.secondClusteringData = await DataHandler.CreateSetGroupDataTableAsync(transformDataTable, DataHandler.moneyDataTable, true);
             }
 
 
@@ -1455,7 +1455,7 @@ namespace FinanceTool
                 progressForm.Show();
                 await progressForm.UpdateProgressHandler(10, "데이터 저장 준비 중...");
                 await Task.Delay(10);
-                DataHandler.secondClusteringData = DataHandler.CreateSetGroupDataTable(transformDataTable, DataHandler.moneyDataTable, true);
+                DataHandler.secondClusteringData = await DataHandler.CreateSetGroupDataTableAsync(transformDataTable, DataHandler.moneyDataTable, true);
 
                 Debug.WriteLine("CreateSetGroupDataTable 수행 완료");
 
@@ -1522,26 +1522,26 @@ namespace FinanceTool
 
         }
 
-        private void dept_col_check_CheckedChanged(object sender, EventArgs e)
+        private async void dept_col_check_CheckedChanged(object sender, EventArgs e)
         {
             DataHandler.dept_col_yn = dept_col_check.Checked;
 
             //기존 clustering 결과는 초기화
             if (DataHandler.secondClusteringData.Rows.Count > 0)
             {
-                DataHandler.secondClusteringData = DataHandler.CreateSetGroupDataTable(transformDataTable, DataHandler.moneyDataTable, true);
+                DataHandler.secondClusteringData = await DataHandler.CreateSetGroupDataTableAsync(transformDataTable, DataHandler.moneyDataTable, true);
             }
             
         }
 
-        private void prod_col_check_CheckedChanged(object sender, EventArgs e)
+        private async void prod_col_check_CheckedChanged(object sender, EventArgs e)
         {
             DataHandler.prod_col_yn = prod_col_check.Checked;
 
             //기존 clustering 결과는 초기화
             if (DataHandler.secondClusteringData.Rows.Count > 0)
             {
-                DataHandler.secondClusteringData = DataHandler.CreateSetGroupDataTable(transformDataTable, DataHandler.moneyDataTable, true);
+                DataHandler.secondClusteringData = await DataHandler.CreateSetGroupDataTableAsync(transformDataTable, DataHandler.moneyDataTable, true);
             }
             
         }

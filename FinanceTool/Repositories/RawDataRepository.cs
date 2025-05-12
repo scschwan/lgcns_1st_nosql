@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using FinanceTool.Models.MongoModels;
 using FinanceTool.MongoModels;
@@ -151,6 +152,24 @@ namespace FinanceTool.Repositories
 
             var result = await _collection.UpdateManyAsync(filter, update);
             return result.ModifiedCount;
+        }
+
+        public async Task<List<RawDataDocument>> GetByKeywordAsync(string keyword)
+        {
+            // MongoDB Text Search 인덱스 활용
+            var filter = Builders<RawDataDocument>.Filter.Text(keyword);
+            return await _collection.Find(filter).ToListAsync();
+        }
+
+        public async Task<List<RawDataDocument>> GetWithPaginationAsync(int page, int pageSize, Expression<Func<RawDataDocument, object>> sortField = null)
+        {
+            // 페이징 처리와 정렬 기능 추가
+            var query = _collection.Find(Builders<RawDataDocument>.Filter.Empty);
+
+            if (sortField != null)
+                query = query.Sort(Builders<RawDataDocument>.Sort.Ascending(sortField));
+
+            return await query.Skip((page - 1) * pageSize).Limit(pageSize).ToListAsync();
         }
 
 

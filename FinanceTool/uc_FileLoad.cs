@@ -11,6 +11,12 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
+using FinanceTool.MongoModels;
+using FinanceTool.Repositories;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using ClosedXML.Excel;
+
 namespace FinanceTool
 {
     public partial class uc_FileLoad : UserControl
@@ -31,6 +37,9 @@ namespace FinanceTool
 
         // uc_FileLoad 클래스에서 멤버 변수 추가
         private bool _fileLoaded = false;
+
+        // MongoDB Repository 객체
+        private RawDataRepository rawDataRepo = new RawDataRepository();
 
         public uc_FileLoad()
         {
@@ -111,7 +120,7 @@ namespace FinanceTool
 
             // 페이지 이동
             currentPage = (int)num_pageNumber.Value;
-            await LoadPagedDataAsync();
+            await LoadMongoPagedDataAsync();
         }
 
         private void uc_FileLoad_Load(object sender, EventArgs e)
@@ -182,14 +191,35 @@ namespace FinanceTool
                     progress.Show();
                     await Task.Delay(10);
 
-                    await progress.UpdateProgressHandler(5, "파일 업로드 중...");
+                    await progress.UpdateProgressHandler(5, "파일 업로드 준비 중...");
 
-                    // Convert Excel to SQLite using the data converter
-                    await dataConverter.ConvertExcelToSQLiteAsync(filePath, progress.UpdateProgressHandler);
+                    // MongoDB 데이터 컨버터 생성
+                    MongoDataConverter mongoConverter = new MongoDataConverter();
 
-                    await progress.UpdateProgressHandler(80, "페이징 정보 생성중...");
-                    await Task.Delay(10);
+                    // 1. Excel 파일 직접 열기
+                    await progress.UpdateProgressHandler(10, "Excel 파일 로드 중...");
+                    DataTable excelData;
 
+                    using (var workbook = new XLWorkbook(filePath))
+                    {
+                        var worksheet = workbook.Worksheets.First();
+                        var range = worksheet.RangeUsed();
+
+                        // Excel 데이터를 DataTable로 변환
+                        excelData = range.AsTable().AsNativeDataTable();
+
+                    }
+
+                    await progress.UpdateProgressHandler(40, "데이터 전처리 완료...");
+
+                    // 2. DataTable을 MongoDB에 바로 저장
+                    await progress.UpdateProgressHandler(50, "MongoDB에 데이터 저장 중...");
+                    List<RawDataDocument> documents = await mongoConverter.ConvertExcelToMongoDBAsync(
+                        excelData, Path.GetFileName(filePath), progress.UpdateProgressHandler);
+
+                    await progress.UpdateProgressHandler(80, "데이터 처리 중...");
+
+                    // 3. UI 초기화 및 데이터 표시 설정
                     // File load completed - register events if first load
                     if (!_fileLoaded)
                     {
@@ -200,28 +230,34 @@ namespace FinanceTool
                     // Enable paging controls
                     EnablePagingControls(true);
 
-                    // Initialize paging and load first page
+                    // 로드된 데이터 설정 - 전역 변수에 저장 (기존 코드 호환성 유지)
+                    DataHandler.excelData = excelData;
+
+                    // 4. 페이징 처리 초기화
                     currentPage = 1;
                     pageSize = 1000;
-                    await LoadPagedDataAsync(true);
+
+                    // 5. MongoDB에서 데이터 로드하여 DataGridView에 표시
+                    await LoadMongoPagedDataAsync(true);
                     await Task.Delay(10);
 
-                    await AddSelectedColumnToGrid(dataGridView_delete_col, dataGridView_process);
+                    // 6. 선택 가능한 컬럼 목록 그리드에 추가
+                    await AddMongoColumnsToGrid(dataGridView_delete_col, excelData.Columns);
 
-                    await progress.UpdateProgressHandler(90, "컬럼 정보 생성 중...");
+                    await progress.UpdateProgressHandler(90, "컬럼 정보 설정 중...");
                     await Task.Delay(10);
 
-                    Debug.WriteLine("GetColumnList call");
-                    GetColumnList();
+                    // 7. 컬럼 목록 가져오기
+                    GetMongoColumnList(excelData.Columns);
 
-                    Debug.WriteLine("setup_col_list call");
-                    setup_col_list();
+                    // 8. 컬럼 콤보박스 설정
+                    SetupColumnLists();
 
-                    await progress.UpdateProgressHandler(100);
+                    await progress.UpdateProgressHandler(100, "데이터 로드 완료!");
                     await Task.Delay(10);
                     progress.Close();
 
-                    Debug.WriteLine("File loading completed successfully");
+                    Debug.WriteLine("File loading completed successfully with MongoDB");
                 }
             }
             catch (Exception ex)
@@ -231,10 +267,9 @@ namespace FinanceTool
             }
         }
 
-        // 페이지 데이터 로드
-        private async Task LoadPagedDataAsync(bool progressYN = false)
+        // MongoDB 기반으로 페이징 데이터 로드
+        private async Task LoadMongoPagedDataAsync(bool progressYN = false)
         {
-
             // 파일이 로드되지 않았으면 아무 작업도 수행하지 않음
             if (!_fileLoaded)
             {
@@ -244,46 +279,29 @@ namespace FinanceTool
 
             try
             {
-                // dataConverter가 null인지 확인하고 필요한 경우 초기화
-                if (dataConverter == null)
-                {
-                    dataConverter = new DataConverter();
-                }
+                // MongoDB 데이터 컨버터
+                MongoDataConverter mongoConverter = new MongoDataConverter();
 
                 if (progressYN)
                 {
-                    // 페이징된 데이터 가져오기
-                    DataTable pageData = null;
+                    // MongoDB에서 페이징된 데이터 가져오기
+                    var (documents, totalCount) = await mongoConverter.GetPagedRawDataAsync(
+                        currentPage, pageSize, DataHandler.hiddenData);
 
-                    await Task.Run(() =>
-                    {
-                        pageData = dataConverter.GetPagedRawData(currentPage, pageSize, DataHandler.hiddenData);
-                        
-                    });
+                    // 페이징 메타데이터 계산
+                    totalRows = (int)totalCount;
+                    totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
 
-                    // 페이징 메타데이터 추출
-                    if (pageData != null && pageData.ExtendedProperties.Contains("Paging"))
-                    {
-                        DataTable metaData = pageData.ExtendedProperties["Paging"] as DataTable;
-                        if (metaData != null && metaData.Rows.Count > 0)
-                        {
-                            totalRows = Convert.ToInt32(metaData.Rows[0]["TotalRows"]);
-                            totalPages = Convert.ToInt32(metaData.Rows[0]["TotalPages"]);
-                            currentPage = Convert.ToInt32(metaData.Rows[0]["CurrentPage"]);
-                        }
-                    }
-
+                    // MongoDB 문서를 DataTable로 변환
+                    DataTable pageData = ConvertMongoDocumentsToDataTable(documents);
 
                     // UI 업데이트는 메인 스레드에서 수행
                     this.BeginInvoke(new Action(() =>
                     {
-                       
                         ConfigureDataGridView(pageData, dataGridView_target);
                         ConfigureDataGridView(pageData, dataGridView_process);
                         UpdatePaginationInfo();
                         ApplyGridFormatting();
-
-                        
                     }));
                 }
                 else
@@ -293,46 +311,31 @@ namespace FinanceTool
                         loadingForm.Show();
                         loadingForm.UpdateProgressHandler(10);
 
-                        // 페이징된 데이터 가져오기
-                        DataTable pageData = null;
-
-                        await Task.Run(() =>
+                        // MongoDB에서 페이징된 데이터 가져오기
+                        var result = await Task.Run(async () =>
                         {
-                            pageData = dataConverter.GetPagedRawData(currentPage, pageSize, DataHandler.hiddenData);
+                            var (documents, totalCount) = await mongoConverter.GetPagedRawDataAsync(
+                                currentPage, pageSize, DataHandler.hiddenData);
+
+                            // 페이징 메타데이터 계산
+                            totalRows = (int)totalCount;
+                            totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
+
                             loadingForm.UpdateProgressHandler(70);
-                        });
 
-                        // 페이징 메타데이터 추출
-                        if (pageData != null && pageData.ExtendedProperties.Contains("Paging"))
-                        {
-                            DataTable metaData = pageData.ExtendedProperties["Paging"] as DataTable;
-                            if (metaData != null && metaData.Rows.Count > 0)
-                            {
-                                totalRows = Convert.ToInt32(metaData.Rows[0]["TotalRows"]);
-                                totalPages = Convert.ToInt32(metaData.Rows[0]["TotalPages"]);
-                                currentPage = Convert.ToInt32(metaData.Rows[0]["CurrentPage"]);
-                            }
-                        }
+                            // MongoDB 문서를 DataTable로 변환
+                            return ConvertMongoDocumentsToDataTable(documents);
+                        });
 
                         loadingForm.UpdateProgressHandler(80);
 
                         // UI 업데이트는 메인 스레드에서 수행
                         this.BeginInvoke(new Action(() =>
                         {
-                            //dataGridView_target.DataSource = pageData;
-                            //dataGridView_process.DataSource = pageData;
-                            ConfigureDataGridView(pageData, dataGridView_target);
-                            ConfigureDataGridView(pageData, dataGridView_process);
+                            ConfigureDataGridView(result, dataGridView_target);
+                            ConfigureDataGridView(result, dataGridView_process);
                             UpdatePaginationInfo();
                             ApplyGridFormatting();
-
-                            // 숨겨진 행 상태 적용
-                            /*
-                            if (hiddenRows.Count > 0)
-                            {
-                                ApplyHiddenRowsToGrids();
-                            }
-                            */
                         }));
 
                         loadingForm.UpdateProgressHandler(100);
@@ -340,15 +343,171 @@ namespace FinanceTool
                         loadingForm.Close();
                     }
                 }
-                
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"페이지 데이터 로드 중 오류: {ex.Message}");
+                Debug.WriteLine($"MongoDB 페이지 데이터 로드 중 오류: {ex.Message}");
                 MessageBox.Show($"데이터 로드 중 오류 발생: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        // MongoDB 문서를 DataTable로 변환하는 헬퍼 메서드
+        private DataTable ConvertMongoDocumentsToDataTable(List<RawDataDocument> documents)
+        {
+            DataTable dataTable = new DataTable();
+
+            // 기본 컬럼 추가
+            dataTable.Columns.Add("id", typeof(string));
+            dataTable.Columns.Add("import_date", typeof(DateTime));
+            dataTable.Columns.Add("hiddenYN", typeof(int));
+
+            // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
+            if (documents.Count > 0 && documents[0].Data != null)
+            {
+                foreach (var key in documents[0].Data.Keys)
+                {
+                    if (!dataTable.Columns.Contains(key))
+                    {
+                        dataTable.Columns.Add(key);
+                    }
+                }
+            }
+
+            // 문서 데이터를 DataTable에 추가
+            foreach (var doc in documents)
+            {
+                DataRow row = dataTable.NewRow();
+                row["id"] = doc.Id;
+                row["import_date"] = doc.ImportDate;
+                row["hiddenYN"] = doc.IsHidden ? 0 : 1;
+
+                // 동적 데이터 필드 추가
+                if (doc.Data != null)
+                {
+                    foreach (var kvp in doc.Data)
+                    {
+                        if (dataTable.Columns.Contains(kvp.Key))
+                        {
+                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+                }
+
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+
+        // MongoDB 컬럼 목록을 그리드에 추가
+        private async Task AddMongoColumnsToGrid(DataGridView targetDgv, DataColumnCollection columns)
+        {
+            // 대상 DataGridView 초기화
+            targetDgv.DataSource = null;
+            targetDgv.Rows.Clear();
+            targetDgv.Columns.Clear();
+
+            if (DataHandler.dragSelections.ContainsKey(targetDgv))
+            {
+                DataHandler.dragSelections[targetDgv].Clear();
+            }
+
+            // 체크박스 컬럼 추가
+            DataGridViewCheckBoxColumn checkColumn = new DataGridViewCheckBoxColumn
+            {
+                Name = "CheckBox",
+                HeaderText = "",
+                Width = 50,
+                ThreeState = false,
+                FillWeight = 20
+            };
+            targetDgv.Columns.Add(checkColumn);
+
+            // 데이터 컬럼 추가
+            DataGridViewTextBoxColumn textColumn = new DataGridViewTextBoxColumn
+            {
+                Name = "Data",
+                HeaderText = "컬럼명"
+            };
+            targetDgv.Columns.Add(textColumn);
+
+            // GridView 설정
+            targetDgv.AllowUserToAddRows = false;
+            targetDgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            targetDgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+
+            targetDgv.Columns["Data"].ReadOnly = true;
+            targetDgv.Columns["CheckBox"].ReadOnly = false;
+            targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+
+            // 컬럼 추가
+            foreach (DataColumn column in columns)
+            {
+                if (!column.ColumnName.Equals("id") &&
+                    !column.ColumnName.Equals("import_date") &&
+                    !column.ColumnName.Equals("hiddenYN"))
+                {
+                    int rowIndex = targetDgv.Rows.Add();
+                    targetDgv.Rows[rowIndex].Cells["CheckBox"].Value = true;
+                    targetDgv.Rows[rowIndex].Cells["Data"].Value = column.ColumnName;
+                }
+            }
+        }
+
+        // MongoDB 컬럼 목록 가져오기
+        private void GetMongoColumnList(DataColumnCollection columns)
+        {
+            process_col_list = new List<string>();
+
+            foreach (DataColumn column in columns)
+            {
+                if (column.ColumnName != "id" &&
+                    column.ColumnName != "import_date" &&
+                    column.ColumnName != "hiddenYN")
+                {
+                    process_col_list.Add(column.ColumnName);
+                }
+            }
+
+            Debug.WriteLine($"MongoDB process_col_list count: {process_col_list.Count}");
+        }
+
+        // 컬럼 목록 설정
+        private void SetupColumnLists()
+        {
+            try
+            {
+                // ComboBox에 열 이름 추가 (공통 로직)
+                SetupComboBox(stand_col_combo, "데이터 삭제 기준 열 선택");
+                SetupComboBox(sub_acc_col_combo, "세목 열 선택");
+                SetupComboBox(dept_col_combo, "부서 열 선택");
+                SetupComboBox(prod_col_combo, "공급업체 열 선택");
+                SetupComboBox(cmb_target, "키워드 대상 열 선택");
+                SetupComboBox(cmb_money, "금액 열 선택");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"컬럼 목록 설정 중 오류 발생: {ex.Message}");
+            }
+        }
+
+        // ComboBox 설정 공통 로직
+        private void SetupComboBox(ComboBox comboBox, string defaultText)
+        {
+            comboBox.Items.Clear();
+            comboBox.Items.Add(defaultText);
+
+            foreach (string column in process_col_list)
+            {
+                comboBox.Items.Add(column);
+            }
+
+            if (comboBox.Items.Count > 0)
+                comboBox.SelectedIndex = 0;
+        }
+
 
         public void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)
         {
@@ -451,194 +610,14 @@ namespace FinanceTool
             {
                 pageSize = Convert.ToInt32(cmb_pageSize.SelectedItem);
                 currentPage = 1; // 페이지 크기 변경 시 첫 페이지로
-                await LoadPagedDataAsync();
+                await LoadMongoPagedDataAsync();
             }
         }
 
-        public void GetColumnList()
-        {
-            process_col_list = new List<string>();
+       
 
-            foreach (DataGridViewColumn column in dataGridView_process.Columns)
-            {
-                if (column.Visible && column.HeaderText != "id" && column.HeaderText != "import_date")
-                {
-                    process_col_list.Add(column.HeaderText);
-                }
-            }
-
-            Debug.WriteLine($"process_col_list count : {process_col_list.Count}");
-        }
-
-        private void setup_col_list()
-        {
-            try
-            {
-              
-                // ComboBox에 열 이름 추가
-                stand_col_combo.Items.Clear();
-                stand_col_combo.Items.Add("데이터 삭제 기준 열 선택");
-                foreach (string column in process_col_list)
-                {
-                    stand_col_combo.Items.Add(column);
-                }
-                stand_col_combo.SelectedIndex = 0; // 첫 번째 열 선택
-
-                // ComboBox에 열 이름 추가
-                sub_acc_col_combo.Items.Clear();
-                sub_acc_col_combo.Items.Add("세목 열 선택");
-                foreach (string column in process_col_list)
-                {
-                    sub_acc_col_combo.Items.Add(column);
-                }
-                sub_acc_col_combo.SelectedIndex = 0; // 첫 번째 열 선택
-
-                // ComboBox에 열 이름 추가
-                dept_col_combo.Items.Clear();
-                dept_col_combo.Items.Add("부서 열 선택");
-                foreach (string column in process_col_list)
-                {
-                    dept_col_combo.Items.Add(column);
-                }
-                dept_col_combo.SelectedIndex = 0; // 첫 번째 열 선택
-
-                prod_col_combo.Items.Clear();
-                prod_col_combo.Items.Add("공급업체 열 선택");
-                foreach (string column in process_col_list)
-                {
-                    prod_col_combo.Items.Add(column);
-                }
-                prod_col_combo.SelectedIndex = 0; // 첫 번째 열 선택
-
-                // ComboBox에 열 이름 추가
-                cmb_target.Items.Clear();
-                cmb_target.Items.Add("키워드 대상 열 선택");
-                foreach (string column in process_col_list)
-                {
-                    cmb_target.Items.Add(column);
-                }
-
-                if (cmb_target.Items.Count > 0)
-                    cmb_target.SelectedIndex = 0; // 첫 번째 열 선택
-
-                // ComboBox에 열 이름 추가
-                cmb_money.Items.Clear();
-                cmb_money.Items.Add("금액 열 선택");
-                foreach (string column in process_col_list)
-                {
-                    cmb_money.Items.Add(column);
-                }
-
-                if (cmb_money.Items.Count > 0)
-                    cmb_money.SelectedIndex = 0; // 첫 번째 열 선택
-
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"키워드 생성 중 오류 발생: {ex.Message}");
-            }
-        }
-
-        public void initCursor()
-        {
-            dataGridView_target.ClearSelection();
-            dataGridView_process.ClearSelection();
-
-            dataGridView_target.CurrentCell = null;
-            dataGridView_process.CurrentCell = null;
-        }
-
-        public async Task AddSelectedColumnToGrid(DataGridView targetDgv, DataGridView sourceDgv)
-        {
-            
-            // 대상 DataGridView가 비어있는 경우에만 컬럼 초기 설정
-            if (targetDgv.Columns.Count == 0)
-            {
-                // 체크박스 컬럼 추가
-                DataGridViewCheckBoxColumn checkColumn = new DataGridViewCheckBoxColumn
-                {
-                    Name = "CheckBox",
-                    HeaderText = "",
-                    Width = 50,
-                    ThreeState = false,
-                    FillWeight = 20
-                };
-                targetDgv.Columns.Add(checkColumn);
-
-                // 데이터 컬럼 추가
-                DataGridViewTextBoxColumn textColumn = new DataGridViewTextBoxColumn
-                {
-                    Name = "Data",  // 고정된 컬럼명 사용
-                    HeaderText = "컬럼명"
-                };
-                targetDgv.Columns.Add(textColumn);
-
-                // GridView 설정
-                targetDgv.AllowUserToAddRows = false;
-                targetDgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                targetDgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-
-                targetDgv.Columns["Data"].ReadOnly = true;  // 체크박스 컬럼만 편집 가능
-                targetDgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-                targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-            } 
-            //데이터가 있을 경우 초기화
-            else
-            {
-                // dataGridView_delete_col 초기화
-                targetDgv.DataSource = null;
-                targetDgv.Rows.Clear();
-                targetDgv.Columns.Clear();
-                if (DataHandler.dragSelections.ContainsKey(targetDgv))
-                {
-                    DataHandler.dragSelections[targetDgv].Clear();
-                }
-
-                // 체크박스 컬럼 추가
-                DataGridViewCheckBoxColumn checkColumn = new DataGridViewCheckBoxColumn
-                {
-                    Name = "CheckBox",
-                    HeaderText = "",
-                    Width = 50,
-                    ThreeState = false,
-                    FillWeight = 20
-                };
-                targetDgv.Columns.Add(checkColumn);
-
-                // 데이터 컬럼 추가
-                DataGridViewTextBoxColumn textColumn = new DataGridViewTextBoxColumn
-                {
-                    Name = "Data",  // 고정된 컬럼명 사용
-                    HeaderText = "컬럼명"
-                };
-                targetDgv.Columns.Add(textColumn);
-
-                // GridView 설정
-                targetDgv.AllowUserToAddRows = false;
-                targetDgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                targetDgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-
-                targetDgv.Columns["Data"].ReadOnly = true;  // 체크박스 컬럼만 편집 가능
-                targetDgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-                targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-            }
-
-            Debug.WriteLine($"AddSelectedColumnToGrid  sourceDgv.Columns.Count: {sourceDgv.Columns.Count} ");
-            for (int i = 0; i < sourceDgv.Columns.Count; i++)
-            {
-
-                if (!"id".Equals(sourceDgv.Columns[i].Name) && !"import_date".Equals(sourceDgv.Columns[i].Name) && !"hiddenYN".Equals(sourceDgv.Columns[i].Name))
-                {
-                    // 새 행 추가
-                    int rowIndex = targetDgv.Rows.Add();
-                    targetDgv.Rows[rowIndex].Cells["CheckBox"].Value = true;
-                    targetDgv.Rows[rowIndex].Cells["Data"].Value = sourceDgv.Columns[i].Name;  // 고정된 컬럼명 사용
-                }
-                
-            }
-
-            Debug.WriteLine($"AddSelectedColumnToGrid  complete targetDgv.Rows.Count: {targetDgv.Rows.Count} ");
-        }
+       
+     
 
         
 
@@ -712,7 +691,7 @@ namespace FinanceTool
             }
         }
 
-        private void btn_complete_Click(object sender, EventArgs e)
+        private async void btn_complete_Click(object sender, EventArgs e)
         {
             //data Validation 
             if (sub_acc_col_combo.SelectedIndex < 1)
@@ -805,8 +784,9 @@ namespace FinanceTool
 
                     progressForm.UpdateProgressHandler(30);
 
-                    // process_data 테이블 준비
-                    dataConverter.PrepareProcessTable(selectedColumns);
+                    // 변경해야 할 코드
+                    MongoDataConverter mongoConverter = new MongoDataConverter();
+                    await mongoConverter.PrepareProcessDataAsync(selectedColumns);
 
                     progressForm.UpdateProgressHandler(70);
 
@@ -888,11 +868,11 @@ namespace FinanceTool
                 }
             }
 
-            GetColumnList();
-            setup_col_list();
+            GetMongoColumnList(DataHandler.excelData.Columns);
+            SetupColumnLists();
         }
 
-       
+
 
         private void stand_col_combo_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -983,8 +963,9 @@ namespace FinanceTool
                     progressForm.Show();
                     progressForm.UpdateProgressHandler(20);
 
-                    // SQLite에서 모든 숨겨진 행 복원
-                    dataConverter.UnhideAllRows();
+                    // 변경해야 할 코드
+                    MongoDataConverter mongoConverter = new MongoDataConverter();
+                    await mongoConverter.UnhideAllDocumentsAsync();
 
                     progressForm.UpdateProgressHandler(50);
 
@@ -1015,7 +996,7 @@ namespace FinanceTool
                         await LoadPagedDataAsync();
                     }).Wait();
                     */
-                    await LoadPagedDataAsync();
+                    await LoadMongoPagedDataAsync();
                     progressForm.UpdateProgressHandler(100);
                 }
             }
@@ -1064,58 +1045,30 @@ namespace FinanceTool
                     progressForm.Show();
                     progressForm.UpdateProgressHandler(10);
 
-                    // SQLite에서 숨기기 처리
+                    // MongoDB 데이터 컨버터 생성
+                    var mongoConverter = new MongoDataConverter();
+
+                    // MongoDB에서 숨기기 처리
                     int hiddenCount = 0;
-                    await Task.Run(() =>
+                    await Task.Run(async () =>
                     {
-                        // 각 값에 대해 해당하는 행 숨기기
+                        // 각 값에 대해 해당하는 문서 숨기기
                         foreach (string value in delList)
                         {
-                            hiddenCount += dataConverter.HideRowsByColumnValue(selectedStandColumn, value);
+                            // MongoDataConverter 클래스에 실제로 있는 메서드 호출
+                            // 필드 값 기준으로 문서 숨기기
+                            await mongoConverter.HideDocumentsByFieldAsync(selectedStandColumn, value, "사용자에 의해 숨겨짐");
+                            hiddenCount++; // 여기서는 각 값마다 카운트 증가 (실제로는 숨겨진 문서 수를 반환받는 것이 좋음)
                         }
                     });
 
-                    progressForm.UpdateProgressHandler(30);
-
-                    // UI에 숨겨진 행 표시 - 기존 코드와 유사한 방식 적용
-                    /*
-                    await Task.Run(() =>
-                    {
-                        // 각 행을 순회하며 값이 일치하는 행 찾기
-                        for (int i = 0; i < dataGridView_process.Rows.Count; i++)
-                        {
-                            try
-                            {
-                                if (i >= dataGridView_process.Rows.Count) continue;
-
-                                object cellObj = dataGridView_process.Rows[i].Cells[selectedStandColumn].Value;
-                                if (cellObj == null) continue;
-
-                                string cellValue = cellObj.ToString();
-                                if (delList.Contains(cellValue))
-                                {
-                                    // 숨길 행 인덱스 저장
-                                    hiddenRows.Add(i);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"행 {i} 처리 중 오류: {ex.Message}");
-                            }
-                        }
-                    });
-                    */
-
-                    //progressForm.UpdateProgressHandler(60);
+                    progressForm.UpdateProgressHandler(60);
 
                     // UI 업데이트는 메인 스레드에서 수행
                     this.BeginInvoke(new Action(() =>
                     {
-                        // 모든 그리드 선택 초기화 - 이 부분이 중요!
+                        // 모든 그리드 선택 초기화
                         InitializeCursors();
-
-                        // 숨겨진 행 적용
-                        //ApplyHiddenRowsToGrids();
                     }));
 
                     progressForm.UpdateProgressHandler(80);
@@ -1125,8 +1078,8 @@ namespace FinanceTool
 
                     progressForm.UpdateProgressHandler(90);
 
-                    // 페이지 데이터 리로드
-                    await LoadPagedDataAsync();
+                    // 페이지 데이터 리로드 (MongoDB 버전 사용)
+                    await LoadMongoPagedDataAsync();
 
                     progressForm.UpdateProgressHandler(100);
                 }
@@ -1141,35 +1094,6 @@ namespace FinanceTool
             }
         }
 
-        // 그리드에 숨김 처리 적용하는 새 메서드
-        private void ApplyHiddenRowsToGrids()
-        {
-
-            // 먼저 그리드 선택 및 현재 셀 초기화
-            InitializeCursors();
-
-            // 각 숨겨진 행에 대해 처리
-            /*
-            foreach (int rowIndex in hiddenRows)
-            {
-                if (rowIndex < dataGridView_process.Rows.Count)
-                {
-                    //dataGridView_process.Rows[rowIndex].Visible = false;
-                    //2025.02.21
-                    //페이징 처리 기준으로 data를 hidden 처리 하는 것이 더 확인이 어려울 것으로 판단 됨.
-                    dataGridView_process.Rows[rowIndex].DefaultCellStyle.BackColor = System.Drawing.Color.LightGray;
-                    dataGridView_process.Rows[rowIndex].DefaultCellStyle.ForeColor = System.Drawing.Color.DarkGray;
-                }
-
-                if (rowIndex < dataGridView_target.Rows.Count)
-                {
-                    // 숨겨진 행 스타일링
-                    dataGridView_target.Rows[rowIndex].DefaultCellStyle.BackColor = System.Drawing.Color.LightGray;
-                    dataGridView_target.Rows[rowIndex].DefaultCellStyle.ForeColor = System.Drawing.Color.DarkGray;
-                }
-            }
-            */
-        }
 
         // 그리드 커서 초기화 메서드 분리
         private void InitializeCursors()
@@ -1216,38 +1140,13 @@ namespace FinanceTool
         {
             if (dataGridView_target.SelectedRows.Count > 0)
             {
-                /*
-                foreach (DataGridViewRow row in dataGridView_target.SelectedRows)
-                {
-                    if (hiddenRows.Contains(row.Index))
-                    {
-                        
-                        // 선택을 제거
-                        row.Selected = false;
-                    }
-                }
-                */
             }
-            /*
-            if (dataGridView_target.CurrentCell != null &&
-                hiddenRows.Contains(dataGridView_target.CurrentCell.RowIndex))
-            {
-                int selectRow = dataGridView_target.CurrentCell.RowIndex;
-                initCursor();
-                dataGridView_process.Rows[selectRow].Visible = false;
-            }
-            */
+          
         }
 
         private void dataGridView_target_CellClick(object sender, DataGridViewCellEventArgs e)
         {
-            /*
-            if (e.RowIndex >= 0 && hiddenRows.Contains(e.RowIndex))
-            {
-                // 선택을 캔슬
-                initCursor();
-            }
-            */
+          
         }
 
         private void delete_search_button_Click(object sender, EventArgs e)

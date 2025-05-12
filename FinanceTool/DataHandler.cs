@@ -725,166 +725,7 @@ namespace FinanceTool
         //2025.02.13
         //dataTable Clustering 함수 구현
         //2025.05.12 -> mongodb 변환에 따라 삭제 예정
-        public static DataTable CreateSetGroupDataTable(DataTable sourceTable, DataTable referenceTable, bool secondyn = false)
-        {
-            Debug.WriteLine("CreateSetGroupDataTable 수행");
-            Debug.WriteLine($"sourceTable Table count: {sourceTable.Rows.Count}");
-
-            // 결과 DataTable 생성
-            DataTable resultTable = new DataTable();
-            resultTable.Columns.Add("ID", typeof(int));
-            resultTable.Columns.Add("ClusterID", typeof(int));
-            resultTable.Columns.Add("클러스터명", typeof(string));
-            resultTable.Columns.Add("키워드목록", typeof(string));
-            resultTable.Columns.Add("Count", typeof(int));
-            resultTable.Columns.Add("합산금액", typeof(decimal));
-            resultTable.Columns.Add("dataIndex", typeof(string));
-
-            // referenceTable의 0번 컬럼명 가져오기 (금액 컬럼)
-            string moneyColumnName = referenceTable.Columns[0].ColumnName;
-
-            // 금액 정보 조회를 위한 딕셔너리 생성
-            Dictionary<int, decimal> moneyLookup = new Dictionary<int, decimal>();
-
-            // SQL을 통해 금액 데이터 조회 (raw_data_id 기준)
-            string moneyQuery = $"SELECT raw_data_id, {moneyColumnName} FROM temp_money_data";
-            DataTable moneyTable = DBManager.Instance.ExecuteQuery(moneyQuery);
-
-            foreach (DataRow row in moneyTable.Rows)
-            {
-                int rawDataId = Convert.ToInt32(row["raw_data_id"]);
-                decimal moneyValue = Convert.ToDecimal(row[moneyColumnName]);
-                moneyLookup[rawDataId] = moneyValue;
-            }
-
-            // secondyn=true인 경우 process_data에서 부서/공급업체 정보 조회
-            Dictionary<int, string> deptLookup = new Dictionary<int, string>();
-            Dictionary<int, string> prodLookup = new Dictionary<int, string>();
-
-            if (secondyn && (dept_col_yn || prod_col_yn))
-            {
-                List<string> columnsToSelect = new List<string> { "raw_data_id" };
-                if (dept_col_yn) columnsToSelect.Add(dept_col_name);
-                if (prod_col_yn) columnsToSelect.Add(prod_col_name);
-
-                string processQuery = $"SELECT {string.Join(", ", columnsToSelect)} FROM process_data";
-                DataTable processInfo = DBManager.Instance.ExecuteQuery(processQuery);
-
-                foreach (DataRow row in processInfo.Rows)
-                {
-                    int rawDataId = Convert.ToInt32(row["raw_data_id"]);
-
-                    if (dept_col_yn)
-                    {
-                        string deptValue = row[dept_col_name]?.ToString() ?? "";
-                        deptLookup[rawDataId] = deptValue;
-                    }
-
-                    if (prod_col_yn)
-                    {
-                        string prodValue = row[prod_col_name]?.ToString() ?? "";
-                        prodLookup[rawDataId] = prodValue;
-                    }
-                }
-            }
-
-            // 집합 셋을 저장할 Dictionary
-            Dictionary<string, (int ID, int Count, decimal SumValue, List<int> SourceIndices)> setGroups =
-                new Dictionary<string, (int, int, decimal, List<int>)>();
-
-            // 데이터 테이블 이름 결정
-            string dataTableName = secondyn ? "temp_transform_data" : "process_view_data";
-
-            // 키워드 데이터를 한 번에 가져오기
-            string keywordQuery = $@"
-        SELECT * FROM {dataTableName}
-    ";
-
-            DataTable keywordData = DBManager.Instance.ExecuteQuery(keywordQuery);
-
-            // 각 행을 순회하면서 집합 셋 생성
-            foreach (DataRow row in keywordData.Rows)
-            {
-                int rawDataId = Convert.ToInt32(row["raw_data_id"]);
-
-                // 집합 셋 생성
-                List<string> setElements = new List<string>();
-
-                // 테이블의 모든 컬럼을 확인하면서 키워드 추출
-                foreach (DataColumn col in keywordData.Columns)
-                {
-                    string colName = col.ColumnName;
-
-                    // id, raw_data_id, import_date는 제외
-                    if (colName == "id" || colName == "raw_data_id" || colName == "import_date")
-                    {
-                        continue;
-                    }
-
-                    string keywordValue = row[colName]?.ToString() ?? "";
-                    if (!string.IsNullOrWhiteSpace(keywordValue))
-                    {
-                        setElements.Add(keywordValue);
-                    }
-                }
-
-                // secondyn=true인 경우 부서/공급업체 정보 추가
-                if (secondyn)
-                {
-                    if (dept_col_yn && deptLookup.TryGetValue(rawDataId, out string deptValue) && !string.IsNullOrWhiteSpace(deptValue))
-                    {
-                        setElements.Add(deptValue);
-                    }
-
-                    if (prod_col_yn && prodLookup.TryGetValue(rawDataId, out string prodValue) && !string.IsNullOrWhiteSpace(prodValue))
-                    {
-                        setElements.Add(prodValue);
-                    }
-                }
-
-                // 집합 셋을 정렬하여 일관성 유지
-                setElements.Sort();
-
-                // 집합 셋 문자열 생성
-                string setKey = string.Join(",", setElements);
-
-                // 금액 정보 조회
-                decimal refValue = 0;
-                moneyLookup.TryGetValue(rawDataId, out refValue);
-
-                // Dictionary에 추가 또는 업데이트
-                if (setGroups.ContainsKey(setKey))
-                {
-                    var existing = setGroups[setKey];
-                    existing.SourceIndices.Add(rawDataId);
-                    setGroups[setKey] = (existing.ID, existing.Count + 1, existing.SumValue + refValue, existing.SourceIndices);
-                }
-                else
-                {
-                    setGroups.Add(setKey, (setGroups.Count, 1, refValue, new List<int> { rawDataId }));
-                }
-            }
-
-            // Dictionary의 데이터를 결과 테이블에 추가
-            foreach (var group in setGroups)
-            {
-                string[] elements = group.Key.Split(',');
-                DataRow newRow = resultTable.NewRow();
-                newRow["ID"] = group.Value.ID;
-                newRow["ClusterID"] = -1;
-                newRow["클러스터명"] = string.Join("_", elements);
-                newRow["키워드목록"] = group.Key;
-                newRow["Count"] = group.Value.Count;
-                newRow["합산금액"] = group.Value.SumValue;
-                newRow["dataIndex"] = string.Join(",", group.Value.SourceIndices);
-                resultTable.Rows.Add(newRow);
-            }
-
-            Debug.WriteLine("CreateSetGroupDataTable 수행완료");
-            Debug.WriteLine($"result Table count: {resultTable.Rows.Count}");
-            return resultTable;
-        }
-
+        
         //2025.05.12
         //CreateSetGroupDataTable 대체 함수 (기존 함수 삭제 예정)
         // MongoDB 문서 모델 객체에 직접 접근하는 방식 대신
@@ -1518,61 +1359,6 @@ namespace FinanceTool
             return 0;
         }
 
-        //2025.05.12
-        //mongodb 변환에 다른 삭제 예정 함수
-        public static void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)
-        {
-            // DataGridView의 DataSource를 DataTable로 설정
-            dataGridView.DataSource = dataTable;
-
-            // hiddenYN 컬럼이 있는지 확인
-            if (dataTable.Columns.Contains("hiddenYN"))
-            {
-                // hiddenYN 컬럼을 숨김
-                dataGridView.Columns["hiddenYN"].Visible = false;
-
-                // 각 행을 순회하며 hiddenYN 값이 0인 경우 스타일 적용
-                foreach (DataGridViewRow row in dataGridView.Rows)
-                {
-                    // hiddenYN 컬럼의 값이 0인지 확인
-                    if (row.Cells["hiddenYN"].Value != null && row.Cells["hiddenYN"].Value.ToString() == "0")
-                    {
-                        //Debug.WriteLine($"hidden row Process row id : {row.Cells["id"].Value.ToString()} , row hiddenyn  : {row.Cells["hiddenYN"].Value.ToString()}");
-                        // 배경색과 글자색 변경
-                        row.DefaultCellStyle.BackColor = Color.LightGray;
-                        row.DefaultCellStyle.ForeColor = Color.DarkGray;
-                    }
-                    else
-                    {
-                        //Debug.WriteLine($"hidden row Process row id : {row.Cells["id"].Value.ToString()} , row hiddenyn  : {row.Cells["hiddenYN"].Value.ToString()}");
-                    }
-                }
-            }
-            else
-            {
-                // hiddenYN 컬럼이 없는 경우 경고 메시지 출력 (옵션)
-                //MessageBox.Show("'hiddenYN' 컬럼이 존재하지 않습니다.", "경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-
-            if (dataGridView.Columns["raw_data_id"] != null)
-            {
-                dataGridView.Columns["raw_data_id"].Visible = false;
-            }
-
-            if (dataGridView.Columns["hiddenYN"] != null)
-            {
-                dataGridView.Columns["hiddenYN"].Visible = false;
-            }
-
-            if (dataGridView.Columns["import_date"] != null)
-            {
-                dataGridView.Columns["import_date"].Visible = false;
-            }
-
-            
-        }
-
-
         public static async Task<DataTable> ConfigureDataGridViewAsync(DataTable dataTable, DataGridView dataGridView)
         {
             // MongoDB에서 hidden 상태 확인하여 DataTable에 적용
@@ -1653,6 +1439,144 @@ namespace FinanceTool
             if (dataGridView.Columns["import_date"] != null)
             {
                 dataGridView.Columns["import_date"].Visible = false;
+            }
+
+            return dataTable;
+        }
+
+        // MongoDB에서 데이터를 가져와 DataTable로 변환하는 Helper 메서드 추가
+        public static async Task<DataTable> GetDataTableFromRawDataAsync(string collectionName = "raw_data")
+        {
+            try
+            {
+                var documents = await rawDataRepo.GetAllAsync();
+                return ConvertDocumentsToDataTable(documents);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 데이터 가져오기 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        public static async Task<DataTable> GetDataTableFromProcessDataAsync(string collectionName = "process_data")
+        {
+            try
+            {
+                var documents = await processDataRepo.GetAllAsync();
+                return ConvertProcessDocumentsToDataTable(documents);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 데이터 가져오기 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        // RawDataDocument를 DataTable로 변환
+        private static DataTable ConvertDocumentsToDataTable(List<RawDataDocument> documents)
+        {
+            DataTable dataTable = new DataTable();
+
+            // 기본 컬럼 추가
+            dataTable.Columns.Add("raw_data_id", typeof(string));
+            dataTable.Columns.Add("import_date", typeof(DateTime));
+            dataTable.Columns.Add("hiddenYN", typeof(int));
+
+            // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
+            if (documents.Count > 0 && documents[0].Data != null)
+            {
+                foreach (var key in documents[0].Data.Keys)
+                {
+                    // 이미 추가된 컬럼은 건너뜀
+                    if (!dataTable.Columns.Contains(key))
+                    {
+                        dataTable.Columns.Add(key);
+                    }
+                }
+            }
+
+            // 문서 데이터를 DataTable에 추가
+            foreach (var doc in documents)
+            {
+                DataRow row = dataTable.NewRow();
+                row["raw_data_id"] = doc.Id;
+                row["import_date"] = doc.ImportDate;
+                row["hiddenYN"] = doc.IsHidden ? 0 : 1;
+
+                // 동적 데이터 필드 추가
+                if (doc.Data != null)
+                {
+                    foreach (var kvp in doc.Data)
+                    {
+                        if (dataTable.Columns.Contains(kvp.Key))
+                        {
+                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+                }
+
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+        // ProcessDataDocument를 DataTable로 변환
+        private static DataTable ConvertProcessDocumentsToDataTable(List<ProcessDataDocument> documents)
+        {
+            DataTable dataTable = new DataTable();
+
+            // 기본 컬럼 추가
+            dataTable.Columns.Add("id", typeof(string));
+            dataTable.Columns.Add("raw_data_id", typeof(string));
+            dataTable.Columns.Add("import_date", typeof(DateTime));
+            dataTable.Columns.Add("processed_date", typeof(DateTime));
+            dataTable.Columns.Add("cluster_id", typeof(int));
+            dataTable.Columns.Add("cluster_name", typeof(string));
+
+            // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
+            if (documents.Count > 0 && documents[0].Data != null)
+            {
+                foreach (var key in documents[0].Data.Keys)
+                {
+                    // 이미 추가된 컬럼은 건너뜀
+                    if (!dataTable.Columns.Contains(key))
+                    {
+                        dataTable.Columns.Add(key);
+                    }
+                }
+            }
+
+            // 문서 데이터를 DataTable에 추가
+            foreach (var doc in documents)
+            {
+                DataRow row = dataTable.NewRow();
+                row["id"] = doc.Id;
+                row["raw_data_id"] = doc.RawDataId;
+                row["import_date"] = doc.ImportDate;
+                row["processed_date"] = doc.ProcessedDate;
+
+                if (doc.ClusterId.HasValue)
+                    row["cluster_id"] = doc.ClusterId.Value;
+                else
+                    row["cluster_id"] = DBNull.Value;
+
+                row["cluster_name"] = doc.ClusterName ?? "";
+
+                // 동적 데이터 필드 추가
+                if (doc.Data != null)
+                {
+                    foreach (var kvp in doc.Data)
+                    {
+                        if (dataTable.Columns.Contains(kvp.Key))
+                        {
+                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+                }
+
+                dataTable.Rows.Add(row);
             }
 
             return dataTable;

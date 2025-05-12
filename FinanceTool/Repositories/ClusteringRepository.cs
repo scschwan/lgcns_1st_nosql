@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Threading.Tasks;
 using FinanceTool.Models.MongoModels;
 using FinanceTool.MongoModels;
@@ -287,6 +288,24 @@ namespace FinanceTool.Repositories
             }
 
             return clusters;
+        }
+
+        public async Task<List<ClusteringResultDocument>> GetByKeywordAsync(string keyword)
+        {
+            // MongoDB Text Search 인덱스 활용
+            var filter = Builders<ClusteringResultDocument>.Filter.Text(keyword);
+            return await _collection.Find(filter).ToListAsync();
+        }
+
+        public async Task<List<ClusteringResultDocument>> GetWithPaginationAsync(int page, int pageSize, Expression<Func<ClusteringResultDocument, object>> sortField = null)
+        {
+            // 페이징 처리와 정렬 기능 추가
+            var query = _collection.Find(Builders<ClusteringResultDocument>.Filter.Empty);
+
+            if (sortField != null)
+                query = query.Sort(Builders<ClusteringResultDocument>.Sort.Ascending(sortField));
+
+            return await query.Skip((page - 1) * pageSize).Limit(pageSize).ToListAsync();
         }
     }
 }

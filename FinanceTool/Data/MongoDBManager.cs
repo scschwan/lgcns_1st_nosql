@@ -2,8 +2,10 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
+using FinanceTool.MongoModels;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core;
 
 namespace FinanceTool.Data
 {
@@ -442,6 +444,71 @@ namespace FinanceTool.Data
         ~MongoDBManager()
         {
             Dispose(false);
+        }
+
+        // MongoDBManager.cs에 연결 재시도 로직 추가
+        public IMongoCollection<T> GetCollection<T>(string collectionName)
+        {
+            int retryCount = 0;
+            const int maxRetries = 3;
+
+            while (retryCount < maxRetries)
+            {
+                try
+                {
+                    return _database.GetCollection<T>(collectionName);
+                }
+                catch (Exception ex)
+                {
+                    retryCount++;
+                    if (retryCount >= maxRetries)
+                        throw new Exception($"MongoDB 연결 실패 (최대 재시도 횟수 초과): {ex.Message}", ex);
+
+                    Thread.Sleep(1000); // 1초 대기 후 재시도
+                }
+            }
+
+            throw new Exception("알 수 없는 오류로 MongoDB 컬렉션을 가져오지 못했습니다.");
+        }
+
+        // MongoDBManager.cs에 인덱스 생성 메서드 추가
+        public async Task CreateIndexesAsync()
+        {
+            try
+            {
+                // raw_data 컬렉션에 인덱스 생성
+                var rawDataCollection = _database.GetCollection<RawDataDocument>("raw_data");
+                await rawDataCollection.Indexes.CreateOneAsync(
+                    Builders<RawDataDocument>.IndexKeys.Ascending("import_date"));
+
+                // process_data 컬렉션에 인덱스 생성
+                var processDataCollection = _database.GetCollection<ProcessDataDocument>("process_data");
+                await processDataCollection.Indexes.CreateOneAsync(
+                    Builders<ProcessDataDocument>.IndexKeys.Ascending("raw_data_id"));
+
+                // 필요한 경우 다른 컬렉션에도 인덱스 추가
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"인덱스 생성 중 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        // FinanceTool/Data/MongoDBManager.cs 파일에 추가
+        public void Cleanup()
+        {
+            try
+            {
+                // MongoDB 드라이버는 자체적으로 연결 풀을 관리하므로
+                // 명시적인 연결 종료는 필요하지 않습니다.
+                // 추가적인 리소스 정리가 필요한 경우 여기에 구현
+                Debug.WriteLine("MongoDB 리소스 정리 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 리소스 정리 중 오류: {ex.Message}");
+            }
         }
     }
 }

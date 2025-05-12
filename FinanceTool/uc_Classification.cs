@@ -983,8 +983,8 @@ namespace FinanceTool
                     {
                         //dataGridView_target.DataSource = pageData;
                         //dataGridView_process.DataSource = pageData;
-                        DataHandler.ConfigureDataGridView(pageData, dataGridView_origin);
-                        DataHandler.ConfigureDataGridView(processPageData, dataGridView_keyword);
+                        DataHandler.ConfigureDataGridViewAsync(pageData, dataGridView_origin);
+                        DataHandler.ConfigureDataGridViewAsync(processPageData, dataGridView_keyword);
 
                         Debug.WriteLine("ConfigureDataGridView complete");
                         UpdatePaginationInfo();
