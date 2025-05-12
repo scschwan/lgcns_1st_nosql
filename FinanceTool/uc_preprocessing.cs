@@ -25,6 +25,8 @@ namespace FinanceTool
 
         private bool isExtractRunning = false;
 
+        List<string> selectedColumnNames = new List<string>();
+
         public uc_preprocessing()
         {
             InitializeComponent();
@@ -38,7 +40,21 @@ namespace FinanceTool
             // 데이터베이스에 전처리 뷰 생성
             //CreatePreprocessingView();
 
-            originKeywordDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+            // 수정 전에 선택된 컬럼명 확인
+            string moneyColumnName = DataHandler.levelName[0]; // 금액 컬럼명
+            string targetColumnName = DataHandler.levelName[1]; // 타겟 컬럼명
+
+            // 컬럼명으로 인덱스 찾기
+            int moneyColumnIndex = DataHandler.processTable.Columns.IndexOf(moneyColumnName);
+            int targetColumnIndex = DataHandler.processTable.Columns.IndexOf(targetColumnName);
+
+            // 수정된 방식: 컬럼명을 사용하여 modifiedDataTable을 생성
+            selectedColumnNames = DataHandler.levelName; // 선택된 컬럼명 목록
+
+
+
+            //originKeywordDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+            originKeywordDataTable = await DataHandler.CreateDataTableFromColumnNamesAsync(DataHandler.processTable, selectedColumnNames);
 
             dataGridView_target.DataSource = originKeywordDataTable;
             _dataLoaded = true;
@@ -49,9 +65,20 @@ namespace FinanceTool
             dataGridView_target.Columns["raw_data_id"].Visible = false;
             dataGridView_target.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+           
+
+            // 찾은 인덱스로 데이터 테이블 생성
+            DataHandler.moneyDataTable = DataHandler.ExtractColumnToNewTable(DataHandler.processTable, moneyColumnIndex);
+            DataHandler.lowLevelData = DataHandler.ExtractColumnToNewTable(DataHandler.processTable, targetColumnIndex);
+
+            //modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+
+
+            
+            modifiedDataTable = await DataHandler.CreateDataTableFromColumnNamesAsync(DataHandler.processTable, selectedColumnNames);
+
             //DataHandler.moneyDataTable = DataHandler.ExtractColumnToNewTable(modifiedDataTable, 0);
-            DataHandler.moneyDataTable = DataHandler.ExtractColumnToNewTable(DataHandler.processTable, DataHandler.levelList[0]);
+            //DataHandler.moneyDataTable = DataHandler.ExtractColumnToNewTable(DataHandler.processTable, DataHandler.levelList[0]);
 
 
             Debug.WriteLine($"modifiedDataTable.Columns.Count : {modifiedDataTable.Columns.Count}");
@@ -142,7 +169,8 @@ namespace FinanceTool
             // 키워드 추출이 이미 수행되었다면 데이터 초기화 후 재수행
             if (iskeywordExtractor)
             {
-                modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+                //modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+                modifiedDataTable = await DataHandler.CreateDataTableFromColumnNamesAsync(DataHandler.processTable, selectedColumnNames);
             }
 
             // raw_data_id 컬럼 정보 임시 저장
@@ -190,7 +218,8 @@ namespace FinanceTool
         {
             if (iskeywordExtractor)
             {
-                modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+                //modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+                modifiedDataTable = await DataHandler.CreateDataTableFromColumnNamesAsync(DataHandler.processTable, selectedColumnNames);
             }
 
 
@@ -251,7 +280,8 @@ namespace FinanceTool
                     // 키워드 추출이 이미 수행되었다면 데이터 초기화 후 재수행
                     if (iskeywordExtractor)
                     {
-                        modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+                        //modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
+                        modifiedDataTable = await DataHandler.CreateDataTableFromColumnNamesAsync(DataHandler.processTable, selectedColumnNames);
                         progressForm.UpdateProgressHandler(20);
                     }
 

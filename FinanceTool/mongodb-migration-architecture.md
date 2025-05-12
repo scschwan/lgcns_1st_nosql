@@ -25,6 +25,55 @@ SQLite 기반의 데이터 처리 애플리케이션을 MongoDB로 마이그레�
 * **최소 수정 원칙**: UI 로직은 그대로 유지하고 데이터 액세스 로직만 MongoDB로 교체합니다.
 * **역할 분리**: DBManager.cs는 MongoDBManager.cs로, DataConverter.cs는 MongoDataConverter.cs로 대체합니다.
 
+
+## 대용량 데이터 처리 전략
+
+### 하드웨어 환경
+- **CPU**: INTEL U9 285K (고성능 멀티코어 CPU)
+- **저장장치**: 2TB SSD (고속 저장 장치)
+- **메모리**: 192GB DDR5 RAM (대용량 메모리)
+- **용도**: 100만~1000만 건의 데이터 처리 환경
+
+### 최적화 권장 사항
+
+#### 데이터 로딩 전략
+- **지연 로딩(Lazy Loading) 구현**: 필요한 데이터만 메모리에 로드
+- **페이징 처리 최적화**: 현재 구현된 페이징 로직을 개선하여 대용량 데이터에서도 효율적으로 동작하도록 함
+- **인메모리 캐싱 활용**: 192GB 메모리를 활용하여 자주 접근하는 데이터 캐싱
+
+#### 데이터 처리 전략
+1. **MongoDB 서버 측 처리 확대**:
+   - MongoDB 집계 파이프라인(`$match`, `$group`, `$project` 등) 활용
+   - 데이터 필터링 및 그룹화 작업을 클라이언트가 아닌 서버에서 수행
+   - 복잡한 조인 및 집계 작업도 MongoDB 서버 측에서 처리
+
+2. **DataTable 사용 최적화**:
+   - 전체 데이터를 DataTable로 변환하는 대신 필요한 부분만 변환
+   - 대규모 DataTable 사용 시 메모리 관리와 GC 부하에 주의
+   - `DataHandler.processTable`과 같은 전역 변수 사용 최소화
+
+3. **메모리 관리 전략**:
+   - 대규모 객체는 필요 시 생성하고 빠르게 해제
+   - 192GB 메모리 활용을 위한 캐싱 전략 수립
+   - 불필요한 참조 제거 및 메모리 누수 방지
+
+4. **병렬 처리 구현**:
+   - 고성능 CPU를 활용한 병렬 데이터 처리 구현
+   - `Parallel.ForEach`와 `Task.WhenAll` 활용
+   - 데이터 처리 파이프라인 구축
+
+#### 인덱스 전략
+- **MongoDB 인덱스 최적화**: 검색, 정렬, 집계에 사용되는 필드에 적절한 인덱스 구성
+- **복합 인덱스 활용**: 자주 함께 검색되는 필드를 위한 복합 인덱스 생성
+- **인덱스 사용 모니터링**: 쿼리 실행 계획 분석을 통한 인덱스 효율성 검증
+
+#### UI 응답성 유지
+- **백그라운드 작업 처리**: 무거운 데이터 처리는 백그라운드 스레드에서 수행
+- **비동기 프로그래밍 확대**: `async/await` 패턴을 일관되게 적용하여 UI 스레드 블로킹 방지
+- **진행 상황 표시 개선**: 사용자에게 진행 상황을 보다 정확하게 전달
+
+
+
 ## 폴더 구조
 
 ```
@@ -134,9 +183,44 @@ FinanceTool/
 
 ## 업데이트 내역
 
-### 2025-05-12
+### 2025-05-12 (1차 업데이트)
 - `uc_FileLoad.cs` 파일에서 데이터 숨김 처리 로직을 MongoDB 기반으로 수정
 - `is_hidden` 필드를 활용한 데이터 필터링 구현
 - UI에서 숨겨진 데이터 회색 처리 적용
 - `delete_data_btn_Click` 및 `restore_del_data_btn_Click` 메서드 MongoDB 버전으로 리팩터링
 - `MongoDataConverter.GetPagedRawDataAsync` 메서드의 파라미터 의미 명확화
+
+### 2025-05-12 (2차 업데이트)
+
+#### 문제 해결
+- `uc_FileLoad.cs` 파일의 데이터 처리에서 MongoDB ID 타입 불일치 문제 해결
+- `raw_data_id` 필드 타입 불일치로 인한 오류 수정 (string 타입으로 일관되게 처리)
+- `DataHandler.ExtractColumnToNewTable` 메서드에서 `raw_data_id` 컬럼 타입을 decimal에서 string으로 변경
+- `CreateDataTableFromColumnNamesAsync` 메서드 추가로 컬럼 인덱스 기반에서 컬럼명 기반 접근 방식으로 전환
+- MongoDB ObjectId 처리 방식 개선 및 일관성 유지
+
+#### 코드 개선
+- MongoDB 문서와 .NET DataTable 간 데이터 변환 로직 최적화
+- `ConvertProcessDocumentsToDataTable` 메서드의 불필요한 컬럼 제거 및 간소화
+- `uc_preprocessing.cs`의 `initUI` 메서드에서 컬럼 매핑 문제 해결
+- 컬럼 인덱스 대신 컬럼명을 기준으로 하는 더 안정적인 접근 방식으로 전환
+- MongoDB ID 필드 처리 방식을 문자열 기반으로 통일하여 타입 불일치 문제 해결
+
+#### 수정된 메서드 목록
+1. `DataHandler.ExtractColumnToNewTable` - 타입 불일치 문제 해결
+2. `DataHandler.CreateDataTableFromColumnNamesAsync` - 컬럼명 기반 새 메서드 추가
+3. `DataHandler.ConvertProcessDocumentsToDataTable` - 간소화 및 최적화
+4. `MongoDataConverter.PrepareProcessDataAsync` - ID 처리 방식 개선
+
+
+
+## 다음 세션 준비 사항
+- `uc_preprocessing.cs` 파일의 컬럼 매핑 및 데이터 처리 로직 검토
+- 대용량 데이터 처리 최적화 방안 구체화
+- MongoDB 콜렉션 스키마 정규화 및 인덱스 최적화
+
+### 다음 단계 추천 작업
+1. MongoDB 쿼리 최적화 및 인덱스 설계 세부화
+2. 데이터 처리 파이프라인 구현 및 병렬 처리 확대
+3. 메모리 사용량 모니터링 및 최적화 도구 도입
+4. 대용량 데이터 테스트 시나리오 수립 및 성능 테스트

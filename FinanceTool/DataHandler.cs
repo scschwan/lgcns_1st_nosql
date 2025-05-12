@@ -81,41 +81,66 @@ namespace FinanceTool
 
         public static List<string> visibleColumns  = new List<string>();
 
-        public static async Task<DataTable> CreateDataTableFromColumnsAsync(DataTable sourceTable, List<int> columnIndices)
+        
+
+        public static async Task<DataTable> CreateDataTableFromColumnNamesAsync(DataTable sourceTable, List<string> columnNames)
         {
             // 새로운 DataTable을 생성
             DataTable resultTable = new DataTable();
 
-            Debug.WriteLine($"columns List : {String.Join(", ", columnIndices)}");
-            Debug.WriteLine($"sourceTable.Columns.Count : {sourceTable.Columns.Count}");
+            Debug.WriteLine($"Selected columns: {String.Join(", ", columnNames)}");
+            Debug.WriteLine($"sourceTable.Columns.Count: {sourceTable.Columns.Count}");
 
-            // columnIndices에 있는 인덱스를 기반으로 열을 추가
-            foreach (int index in columnIndices)
+            // 전달된 컬럼명에 대응하는 열 인덱스를 찾아서 추가
+            foreach (string columnName in columnNames)
             {
-                if (index >= 0 && index < sourceTable.Columns.Count)
+                // 소스 테이블에서 컬럼 인덱스 찾기
+                int columnIndex = sourceTable.Columns.IndexOf(columnName);
+                if (columnIndex >= 0)
                 {
-                    // 선택된 열을 resultTable에 추가
-                    Debug.WriteLine($"sourceTable.Columns[index].ColumnName : {sourceTable.Columns[index].ColumnName}");
-                    resultTable.Columns.Add(sourceTable.Columns[index].ColumnName, sourceTable.Columns[index].DataType);
+                    // 컬럼을 찾으면 결과 테이블에 추가
+                    Debug.WriteLine($"Found column: {columnName} at index {columnIndex}");
+                    DataColumn sourceColumn = sourceTable.Columns[columnIndex];
+                    resultTable.Columns.Add(columnName, sourceColumn.DataType);
                 }
                 else
                 {
-                    throw new ArgumentException($"Invalid column index: {index}");
+                    // 컬럼을 찾지 못한 경우 경고 메시지 기록
+                    Debug.WriteLine($"Warning: Column {columnName} not found in source table");
+                    // 선택적으로 예외를 발생시키거나 계속 진행할 수 있음
+                    throw new ArgumentException($"Column '{columnName}' not found in source table");
                 }
             }
-            //raw_data_id 추가
-            resultTable.Columns.Add("raw_data_id", typeof(ObjectId)); // MongoDB ObjectId로 변경
+
+            // raw_data_id 컬럼 추가 (string 타입으로)
+            resultTable.Columns.Add("raw_data_id", typeof(string));
 
             // sourceTable에서 데이터를 가져와서 resultTable에 추가
             foreach (DataRow row in sourceTable.Rows)
             {
                 DataRow newRow = resultTable.NewRow();
-                for (int i = 0; i < columnIndices.Count; i++)
+
+                // 선택된 각 컬럼의 데이터 복사
+                for (int i = 0; i < columnNames.Count; i++)
                 {
-                    newRow[i] = row[columnIndices[i]];
+                    string columnName = columnNames[i];
+                    if (sourceTable.Columns.Contains(columnName))
+                    {
+                        newRow[i] = row[columnName];
+                    }
                 }
-                //raw_data_id 추가
-                newRow[columnIndices.Count] = row["raw_data_id"]; // row["raw_data_id"]가 이미 ObjectId 타입이어야 함
+
+                // raw_data_id 추가 (string 타입으로)
+                if (sourceTable.Columns.Contains("raw_data_id") &&
+                    row["raw_data_id"] != DBNull.Value)
+                {
+                    newRow["raw_data_id"] = row["raw_data_id"].ToString();
+                }
+                else
+                {
+                    newRow["raw_data_id"] = DBNull.Value;
+                }
+
                 resultTable.Rows.Add(newRow);
             }
 
@@ -616,13 +641,6 @@ namespace FinanceTool
             }
         }
 
-        //tableB에 하위레벨과 빈도수가 적혀 있음
-       
-
-     
-
-       
-
         public static DataTable ExtractColumnToNewTable(DataTable inputTable, int index)
         {
             // 유효성 검사
@@ -634,17 +652,26 @@ namespace FinanceTool
             // 새로운 데이터테이블 생성
             DataTable resultTable = new DataTable();
             resultTable.Columns.Add(inputTable.Columns[index].ColumnName, inputTable.Columns[index].DataType);
-            resultTable.Columns.Add("raw_data_id", typeof(decimal));
+
+            // 여기서 raw_data_id 컬럼 타입을 decimal 대신 string으로 변경
+            resultTable.Columns.Add("raw_data_id", typeof(string)); // decimal -> string으로 변경
 
             // 데이터 복사
             foreach (DataRow row in inputTable.Rows)
             {
                 DataRow newRow = resultTable.NewRow();
                 newRow[0] = row[index];
-                
-                //2025.02.27
-                //raw_data_id도 추가
-                newRow[1] = row["raw_data_id"];
+
+                // raw_data_id도 추가 - 문자열로 저장
+                if (row["raw_data_id"] != null && row["raw_data_id"] != DBNull.Value)
+                {
+                    newRow[1] = row["raw_data_id"].ToString(); // 문자열로 변환하여 저장
+                }
+                else
+                {
+                    newRow[1] = DBNull.Value;
+                }
+
                 resultTable.Rows.Add(newRow);
             }
 
@@ -1466,11 +1493,36 @@ namespace FinanceTool
             try
             {
                 var documents = await processDataRepo.GetAllAsync();
+
+                // 첫 번째 문서의 타입 정보 로깅
+                if (documents.Count > 0)
+                {
+                    var doc = documents[0];
+                    Debug.WriteLine($"ProcessDataDocument - Id 타입: {doc.Id?.GetType().Name}, RawDataId 타입: {doc.RawDataId?.GetType().Name}");
+
+                    if (doc.Data != null)
+                    {
+                        foreach (var key in doc.Data.Keys)
+                        {
+                            Debug.WriteLine($"Data[{key}] 타입: {(doc.Data[key] != null ? doc.Data[key].GetType().Name : "null")}");
+                        }
+                    }
+                }
+
                 return ConvertProcessDocumentsToDataTable(documents);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"MongoDB 데이터 가져오기 오류: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+
+                // 내부 예외가 있다면 기록
+                if (ex.InnerException != null)
+                {
+                    Debug.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                    Debug.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
+                }
+
                 throw;
             }
         }
@@ -1529,20 +1581,15 @@ namespace FinanceTool
         {
             DataTable dataTable = new DataTable();
 
-            // 기본 컬럼 추가
+            // 필수 컬럼만 추가
             dataTable.Columns.Add("id", typeof(string));
             dataTable.Columns.Add("raw_data_id", typeof(string));
-            dataTable.Columns.Add("import_date", typeof(DateTime));
-            dataTable.Columns.Add("processed_date", typeof(DateTime));
-            dataTable.Columns.Add("cluster_id", typeof(int));
-            dataTable.Columns.Add("cluster_name", typeof(string));
 
-            // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
+            // 첫 번째 문서의 데이터를 기반으로 동적 데이터 컬럼 추가
             if (documents.Count > 0 && documents[0].Data != null)
             {
                 foreach (var key in documents[0].Data.Keys)
                 {
-                    // 이미 추가된 컬럼은 건너뜀
                     if (!dataTable.Columns.Contains(key))
                     {
                         dataTable.Columns.Add(key);
@@ -1556,15 +1603,6 @@ namespace FinanceTool
                 DataRow row = dataTable.NewRow();
                 row["id"] = doc.Id;
                 row["raw_data_id"] = doc.RawDataId;
-                row["import_date"] = doc.ImportDate;
-                row["processed_date"] = doc.ProcessedDate;
-
-                if (doc.ClusterId.HasValue)
-                    row["cluster_id"] = doc.ClusterId.Value;
-                else
-                    row["cluster_id"] = DBNull.Value;
-
-                row["cluster_name"] = doc.ClusterName ?? "";
 
                 // 동적 데이터 필드 추가
                 if (doc.Data != null)

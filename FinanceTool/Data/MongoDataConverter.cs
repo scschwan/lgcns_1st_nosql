@@ -241,6 +241,7 @@ namespace FinanceTool
         /// <summary>
         /// ProcessData 준비 (선택된 필드를 MongoDB에 저장)
         /// </summary>
+        // MongoDataConverter.cs에 있는 PrepareProcessDataAsync 메서드 수정
         public async Task PrepareProcessDataAsync(IEnumerable<string> selectedColumns)
         {
             bool ensureResult = await _dbManager.EnsureInitializedAsync();
@@ -262,9 +263,11 @@ namespace FinanceTool
 
             foreach (var rawDoc in rawDataDocuments)
             {
+                // ObjectId 형식으로 직접 설정
+                // 이 부분이 중요! 문자열이 아닌 ObjectId로 설정합니다.
                 var processDoc = new ProcessDataDocument
                 {
-                    RawDataId = rawDoc.Id,
+                    RawDataId = rawDoc.Id, // MongoDB 문서 ID 할당
                     ImportDate = rawDoc.ImportDate,
                     ProcessedDate = DateTime.Now,
                     Data = new Dictionary<string, object>()
