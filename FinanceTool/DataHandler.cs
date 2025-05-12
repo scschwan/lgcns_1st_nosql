@@ -9,7 +9,13 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using ClosedXML.Excel;
-using Newtonsoft.Json;
+using Newtonsoft.Json
+    ;
+// 파일 상단에 추가할 네임스페이스
+using FinanceTool.Models.MongoModels;
+using FinanceTool.Repositories;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
 
 namespace FinanceTool
@@ -67,52 +73,9 @@ namespace FinanceTool
 
         private static string tempFilePath = Path.Combine(Path.GetTempPath(), "finance_data_temp.json");
 
-        public static DataTable LoadExcelFile(string filePath)
-        {
-            try
-            {
-                using (var workbook = new XLWorkbook(filePath))
-                {
-                    var worksheet = workbook.Worksheets.First();
-                    var range = worksheet.RangeUsed();
-
-                    // 엑셀 데이터를 DataTable로 변환
-                    return range.AsTable().AsNativeDataTable();
-                }
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"엑셀 파일 읽기 실패: {ex.Message}");
-            }
-        }
-        
-        public static void DisplayColumnData(DataTable table, int columnIndex, ListBox listBox)
-        {
-            if (table == null)
-            {
-                MessageBox.Show("DataTable이 null입니다. 데이터를 로드하세요.");
-                return;
-            }
-
-            if (columnIndex < 0 || columnIndex >= table.Columns.Count)
-            {
-                MessageBox.Show("유효하지 않은 열 인덱스입니다.");
-                return;
-            }
-
-            listBox.Items.Clear();
-            foreach (DataRow row in table.Rows)
-            {
-                if (row[columnIndex] != DBNull.Value)
-                {
-                    listBox.Items.Add(row[columnIndex].ToString());
-                }
-                else
-                {
-                    listBox.Items.Add("(빈 값)");
-                }
-            }  
-        }
+        public static RawDataRepository rawDataRepo = new RawDataRepository();
+        public static ProcessDataRepository processDataRepo = new ProcessDataRepository();
+        public static ClusteringRepository clusteringRepo = new ClusteringRepository();
 
         public static DataTable CreateDataTableFromColumns(DataTable sourceTable, List<int> columnIndices)
         {
@@ -445,38 +408,7 @@ namespace FinanceTool
             return outputTable;
         }
 
-        public static DataTable ProcessUnderscoresInColumn(DataTable inputTable)
-        {
-            // 입력 검증: DataTable이 null이거나 열이 1개가 아니면 예외 발생
-            if (inputTable == null || inputTable.Columns.Count != 1)
-            {
-                throw new ArgumentException("입력 DataTable은 반드시 하나의 열만 포함해야 합니다.");
-            }
-
-            // 새로운 DataTable 생성
-            DataTable outputTable = new DataTable();
-            outputTable.Columns.Add(inputTable.Columns[0].ColumnName, typeof(string)); // 열 이름 유지
-
-            // 각 행의 데이터를 처리
-            foreach (DataRow row in inputTable.Rows)
-            {
-                if (row[0] != DBNull.Value) // 값이 null이 아닌 경우 처리
-                {
-                    string originalValue = row[0].ToString();
-                    string modifiedValue = ProcessString(originalValue);
-
-                    // 처리된 값을 새로운 DataTable에 추가
-                    outputTable.Rows.Add(modifiedValue);
-                }
-                else
-                {
-                    // null 값은 그대로 추가
-                    outputTable.Rows.Add(DBNull.Value);
-                }
-            }
-
-            return outputTable;
-        }
+      
 
         public static DataTable ProcessUnderscoresInAllColumn(DataTable inputTable)
         {
@@ -537,193 +469,6 @@ namespace FinanceTool
             return collapsed;
         }
 
-        public static DataTable CountAndSortAllOccurrences(DataTable inputTable)
-        {
-            // 입력 검증: DataTable이 null인지 확인
-            if (inputTable == null)
-            {
-                throw new ArgumentNullException(nameof(inputTable), "입력 DataTable이 null입니다.");
-            }
-
-            // 값과 반복 횟수를 저장할 Dictionary 생성
-            Dictionary<string, int> occurrenceDict = new Dictionary<string, int>();
-
-            // DataTable의 모든 행과 열을 순회하며 값의 반복 횟수를 계산
-            foreach (DataRow row in inputTable.Rows)
-            {
-                foreach (var cell in row.ItemArray) // 각 열의 값을 순회
-                {
-                    if (cell != DBNull.Value) // Null 값은 무시
-                    {
-                        string value = cell.ToString();
-                        if (occurrenceDict.ContainsKey(value))
-                        {
-                            occurrenceDict[value]++;
-                        }
-                        else
-                        {
-                            occurrenceDict[value] = 1;
-                        }
-                    }
-                }
-            }
-
-            // 반복 횟수 기준으로 내림차순 정렬
-            var sortedOccurrences = occurrenceDict
-                .OrderByDescending(x => x.Value) // 반복 횟수 내림차순
-                .ThenBy(x => x.Key)             // 값 오름차순 (반복 횟수가 같은 경우)
-                .ToList();
-
-            // 결과를 담을 새로운 DataTable 생성
-            DataTable outputTable = new DataTable();
-            outputTable.Columns.Add("Value", typeof(string));      // 값 열 추가
-            outputTable.Columns.Add("Count", typeof(int));  // 반복 횟수 열 추가
-
-            // 정렬된 값을 DataTable에 추가
-            foreach (var entry in sortedOccurrences)
-            {
-                outputTable.Rows.Add(entry.Key, entry.Value);
-            }
-
-            return outputTable;
-        }
-
-        public static int CountRowsWithOccurrencesAboveThreshold(DataTable inputTable, int threshold, string targetColumn)
-        {
-            // 입력 검증
-            if (inputTable == null)
-            {
-                MessageBox.Show("입력 DataTable이 null입니다.", "입력 검증 실패", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return 0; // 메서드 종료
-            }
-
-            if (!inputTable.Columns.Contains(targetColumn))
-            {
-                MessageBox.Show($"DataTable에 '{targetColumn}' 열이 포함되어야 합니다.", "입력 검증 실패", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return 0; // 메서드 종료
-            }
-
-            // 반복 횟수가 기준 이상인 행을 카운트 "Occurrences"
-            int count = 0;
-            foreach (DataRow row in inputTable.Rows)
-            {
-                if (row[targetColumn] != DBNull.Value && int.TryParse(row[targetColumn].ToString(), out int occurrences))
-                {
-                    if (occurrences >= threshold)
-                    {
-                        count++;
-                    }
-                }
-            }
-            return count;
-        }
-
-        /* -- backup
-        public static DataTable CreateListRowsWithOccurrencesAboveThreshold(DataTable inputTable, int threshold)
-        {
-            DataTable outputTable = new DataTable();
-            try
-            {
-                // 입력 검증
-                if (inputTable == null)
-                {
-                    throw new ArgumentNullException(nameof(inputTable), "입력 DataTable이 null입니다.");
-                }
-                if (!inputTable.Columns.Contains("Occurrences"))
-                {
-                    throw new ArgumentException("DataTable에 'Occurrences' 열이 포함되어야 합니다.");
-                }
-
-                foreach (DataRow row in inputTable.Rows)
-                {
-                    if (row["Occurrences"] != DBNull.Value && int.TryParse(row["Occurrences"].ToString(), out int occurrences))
-                    {
-                        if (occurrences >= threshold)
-                        {
-                            while (outputTable.Columns.Count < row.ItemArray.Length)
-                            {
-                                outputTable.Columns.Add($"Column{outputTable.Columns.Count + 1}");
-                            }
-                            DataRow newRow = outputTable.NewRow();
-                            newRow.ItemArray = row.ItemArray;
-                            outputTable.Rows.Add(newRow);
-                        }
-                    }
-                }
-            }
-            catch
-            {
-
-            }
-
-            return outputTable;
-        }*/
-
-        public static DataTable CreateListRowsWithOccurrencesAboveThreshold(DataTable inputTable, int threshold, string targetColumn)
-        {
-            DataTable outputTable = new DataTable();
-            try
-            {
-                // 입력 검증
-                if (inputTable == null)
-                {
-                    throw new ArgumentNullException(nameof(inputTable), "입력 DataTable이 null입니다.");
-                }
-                if (!inputTable.Columns.Contains(targetColumn))
-                {
-                    throw new ArgumentException($"DataTable에 '{targetColumn}' 열이 포함되어야 합니다.");
-                }
-
-                // 출력 테이블 열 정의 (데이터 타입 유지)
-                foreach (DataColumn column in inputTable.Columns)
-                {
-                    outputTable.Columns.Add(column.ColumnName, column.DataType); // 원본 열의 데이터 타입 유지
-                }
-
-                // 행 추가
-                foreach (DataRow row in inputTable.Rows)
-                {
-                    if (row[targetColumn] != DBNull.Value && int.TryParse(row[targetColumn].ToString(), out int occurrences))
-                    {
-                        if (occurrences >= threshold)
-                        {
-                            DataRow newRow = outputTable.NewRow();
-                            newRow.ItemArray = row.ItemArray;
-                            outputTable.Rows.Add(newRow);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"오류 발생: {ex.Message}");
-            }
-
-            return outputTable;
-        }
-
-        public static DataTable RemoveMatchingRows(DataTable A, DataTable B, int index)
-        {
-            // 결과로 반환할 DataTable 생성 (A의 스키마 복사)
-            DataTable C = A.Clone();
-
-            // B의 특정 열 데이터를 HashSet으로 저장 (중복 제거 및 빠른 조회를 위해)
-            var bValues = B.AsEnumerable()
-                           .Select(row => row.Field<object>(index))
-                           .ToHashSet();
-
-            // A의 특정 열 데이터를 순회하며 B와 겹치지 않는 행만 C에 추가
-            foreach (DataRow row in A.Rows)
-            {
-                if (!bValues.Contains(row[index]))
-                {
-                    C.Rows.Add(row.ItemArray); // A의 행 데이터를 그대로 추가
-                }
-            }
-
-            return C;
-        }
-
         public static List<string> GetColumnValuesAsList(DataTable table, int columnIndex)
         {
             // 반환할 리스트 초기화
@@ -739,27 +484,7 @@ namespace FinanceTool
             return result;
         }
 
-        public static List<string> FindMatchingPairs(List<string> listA, List<string> listB)
-        {
-            // 결과를 저장할 리스트
-            List<string> output = new List<string>();
-
-            // B의 각 값을 A와 비교
-            foreach (string valueB in listB)
-            {
-                foreach (string valueA in listA)
-                {
-                    // A와 B의 값이 서로 포함 관계인지 확인
-                    if (valueA.Contains(valueB) || valueB.Contains(valueA))
-                    {
-                        // 포함 관계가 있으면 출력 리스트에 추가
-                        output.Add($"{valueA}<{valueB}");
-                    }
-                }
-            }
-
-            return output;
-        }
+     
 
         //2025.02.13
         //키워드 기준 매칭 데이터 비교
@@ -834,22 +559,6 @@ namespace FinanceTool
 
 
 
-        public static void ReplaceCellValues(DataTable inputTable, string valueToFind, string replacementValue)
-        {
-            // DataTable의 모든 행과 열 순회
-            foreach (DataRow row in inputTable.Rows)
-            {
-                for (int columnIndex = 0; columnIndex < inputTable.Columns.Count; columnIndex++)
-                {
-                    // 특정 값(A)이 발견되면 B로 변경
-                    if (row[columnIndex]?.ToString() == valueToFind)
-                    {
-                        row[columnIndex] = replacementValue;
-                    }
-                }
-            }
-        }
-
         public static void SaveDataTableToExcel(DataTable firstTable, DataTable secondTable = null)
         {
             try
@@ -905,129 +614,11 @@ namespace FinanceTool
         }
 
         //tableB에 하위레벨과 빈도수가 적혀 있음
-        public static DataTable ProcessDataTables(DataTable tableA, DataTable tableB)
-        {
-            // Output DataTable 생성
-            DataTable outputTable = new DataTable();
-            //outputTable.Columns.Add("ValuesFromA", typeof(string));
-            outputTable.Columns.Add("MatchedValueFromB", typeof(string));
+       
 
-            // A의 각 행 순회
-            foreach (DataRow rowA in tableA.Rows)
-            {
-                string matchedValue = "Undefined"; // 기본값 "Undefined"
+     
 
-                // A의 모든 열을 순차적으로 비교
-                foreach (var valueFromA in rowA.ItemArray)
-                {
-                    int MaxCount = 0;
-                    // B의 첫 번째 열과 비교
-                    foreach (DataRow rowB in tableB.Rows)
-                    {
-                        string valueFromB = rowB[0]?.ToString();
-                        if (valueFromA.ToString() == valueFromB)
-                        {
-                            //Debug.WriteLine(rowB[1]?.ToString());
-                            int nowCount = Convert.ToInt32(rowB[1]?.ToString());
-                            if(MaxCount < nowCount)
-                            {
-                                MaxCount = nowCount;
-                                matchedValue = valueFromB; // 일치하는 값 발견 시 갱신
-                            }
-                        }
-                    }
-                    /*
-                    if (matchedValue != "Undefined")
-                    {
-                        break; // 일치하는 값을 찾았으므로 더 이상 비교할 필요 없음
-                    }*/
-                }
-
-                // Output DataTable에 결과 추가
-                string valuesFromA = string.Join(",", rowA.ItemArray); // A의 행에 있는 모든 열 값
-                outputTable.Rows.Add(matchedValue);
-            }
-
-            return outputTable;
-        }
-
-        public static DataTable AddColumnsFromBToA(DataTable target, DataTable source)
-        {
-            // B의 각 열을 A에 추가
-            foreach (DataColumn columnB in source.Columns)
-            {
-                // tableA에 B의 열을 추가
-                target.Columns.Add(columnB.ColumnName, columnB.DataType);
-            }
-
-            int rowIndex = 0;
-
-            // B의 각 행을 A의 새로운 열에 추가
-            foreach (DataRow rowB in source.Rows)
-            {
-                if (rowIndex < target.Rows.Count)
-                {
-                    // A의 각 행에 대해 B의 열 데이터를 추가
-                    for (int i = 0; i < source.Columns.Count; i++)
-                    {
-                        target.Rows[rowIndex][source.Columns[i].ColumnName] = rowB[i];
-                    }
-                    rowIndex++;
-                }
-            }
-
-            // B의 행 수가 A의 행 수보다 적으면 남은 A의 행에 기본값 추가
-            while (rowIndex < target.Rows.Count)
-            {
-                for (int i = 0; i < source.Columns.Count; i++)
-                {
-                    target.Rows[rowIndex][source.Columns[i].ColumnName] = "NULL"; // 기본값 설정
-                }
-                rowIndex++;
-            }
-
-            return target;
-        }
-
-        public static DataTable SumMoneyDataByKewords(DataTable modifiedDataTable, DataTable moneyDataTable, DataTable originDataTable)
-        {
-            // 새로운 데이터테이블 생성 (키워드와 합산 금액 열 추가)
-            DataTable resultDataTable = new DataTable();
-            resultDataTable.Columns.Add("키워드", typeof(string));
-            resultDataTable.Columns.Add("합산 금액", typeof(decimal));
-
-            // modifiedDataTable의 0열 (키워드) 값을 기준으로 검색
-            foreach (DataRow modifiedRow in modifiedDataTable.Rows)
-            {
-                string keyword = modifiedRow[0].ToString(); // 키워드 가져오기
-                decimal totalAmount = 0;
-
-                // originDataTable에서 해당 키워드를 가진 행 찾기
-                foreach (DataRow originRow in originDataTable.Rows)
-                {
-                    if (originRow.ItemArray.Contains(keyword))
-                    {
-                        // moneyDataTable에서 동일한 행의 첫 번째 열 값 합산
-                        int rowIndex = originDataTable.Rows.IndexOf(originRow);
-                        if (rowIndex < moneyDataTable.Rows.Count)
-                        {
-                            if (decimal.TryParse(moneyDataTable.Rows[rowIndex][0].ToString(), out decimal moneyValue))
-                            {
-                                totalAmount += moneyValue;
-                            }
-                        }
-                    }
-                }
-
-                // 결과를 resultDataTable에 추가
-                DataRow resultRow = resultDataTable.NewRow();
-                resultRow["키워드"] = keyword;
-                resultRow["합산 금액"] = totalAmount;
-                resultDataTable.Rows.Add(resultRow);
-            }
-
-            return resultDataTable;
-        }
+       
 
         public static DataTable ExtractColumnToNewTable(DataTable inputTable, int index)
         {
