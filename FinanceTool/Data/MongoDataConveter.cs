@@ -31,7 +31,10 @@ namespace FinanceTool
             string fileName = null,
             ProcessProgressForm.UpdateProgressDelegate progressCallback = null)
         {
-            if (!_dbManager.EnsureInitialized())
+            bool ensureResult = await _dbManager.EnsureInitializedAsync();
+
+
+            if (!ensureResult)
             {
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
             }
@@ -237,7 +240,9 @@ namespace FinanceTool
         /// </summary>
         public async Task PrepareProcessDataAsync(IEnumerable<string> selectedColumns)
         {
-            if (!_dbManager.EnsureInitialized())
+            bool ensureResult = await _dbManager.EnsureInitializedAsync();
+
+            if (!ensureResult)
             {
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
             }

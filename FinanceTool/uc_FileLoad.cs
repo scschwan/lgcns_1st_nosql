@@ -728,7 +728,7 @@ namespace FinanceTool
             else
             {
                 // 금액 컬럼 데이터 유효성 검증
-                var (isAllNumeric, nonNumericData) = CheckNumericColumn(dataGridView_process, cmb_money.SelectedItem.ToString());
+                var (isAllNumeric, nonNumericData) = await CheckNumericColumnAsync(cmb_money.SelectedItem.ToString());
                 if (!isAllNumeric)
                 {
                     var firstError = nonNumericData[0];
@@ -780,36 +780,28 @@ namespace FinanceTool
                     // 타겟 컬럼 인덱스 설정 (프로세스 테이블에서는 1)
                     DataHandler.levelList.Add(6);
                     DataHandler.levelName.Add(cmb_target.SelectedItem.ToString());
-                    
 
                     progressForm.UpdateProgressHandler(30);
 
-                    // 변경해야 할 코드
+                    // MongoDB 방식으로 변경
                     MongoDataConverter mongoConverter = new MongoDataConverter();
                     await mongoConverter.PrepareProcessDataAsync(selectedColumns);
 
                     progressForm.UpdateProgressHandler(70);
 
                     // 레거시 코드와의 호환을 위해 DataHandler.processTable 설정
-                    DataHandler.processTable = DBManager.Instance.ExecuteQuery("SELECT * FROM process_data");
+                    // 변경 전: DataHandler.processTable = DBManager.Instance.ExecuteQuery("SELECT * FROM process_data");
+
+                    // 변경 후: MongoDB에서 데이터 가져와 DataTable로 변환
+                    DataHandler.processTable = await DataHandler.GetDataTableFromProcessDataAsync();
 
                     progressForm.UpdateProgressHandler(90);
-
-                    // 숨겨진 행 데이터 처리
-                    /*
-                    if (hiddenRows.Count > 0)
-                    {
-                        foreach (int rowId in hiddenRows)
-                        {
-                            dataConverter.HideRow(rowId, "User hidden");
-                        }
-                    }
-                    */
                     progressForm.UpdateProgressHandler(100);
                 }
 
                 // 다음 단계로 이동
-                userControlHandler.uc_Preprocessing.initUI();
+                await userControlHandler.uc_Preprocessing.initUI();
+
                 if (this.ParentForm is Form1 form)
                 {
                     form.LoadUserControl(userControlHandler.uc_Preprocessing);
@@ -823,7 +815,60 @@ namespace FinanceTool
             }
         }
 
-       
+        // 숫자 컬럼 체크 함수 - MongoDB 버전
+        private async Task<(bool isAllNumeric, List<NonNumericData> nonNumericList)> CheckNumericColumnAsync(string columnName)
+        {
+            var nonNumericList = new List<NonNumericData>();
+
+            try
+            {
+                // MongoDB에서 해당 필드를 가진 모든 문서 조회
+                var filter = Builders<RawDataDocument>.Filter.Ne($"Data.{columnName}", BsonNull.Value);
+
+                // 숨겨진 문서는 제외
+                if (DataHandler.hiddenData)
+                {
+                    filter = Builders<RawDataDocument>.Filter.And(
+                        filter,
+                        Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false)
+                    );
+                }
+
+                var documents = await rawDataRepo.FindDocumentsAsync(filter);
+                int rowIndex = 0;
+
+                foreach (var doc in documents)
+                {
+                    if (doc.Data != null && doc.Data.ContainsKey(columnName) && doc.Data[columnName] != null)
+                    {
+                        var value = doc.Data[columnName];
+                        string strValue = value.ToString().Trim();
+
+                        if (!string.IsNullOrEmpty(strValue))
+                        {
+                            // 숫자로 변환 가능한지 확인
+                            if (!decimal.TryParse(strValue, out _))
+                            {
+                                nonNumericList.Add(new NonNumericData
+                                {
+                                    RowIndex = rowIndex,
+                                    Value = strValue
+                                });
+                            }
+                        }
+                    }
+                    rowIndex++;
+                }
+
+                return (nonNumericList.Count == 0, nonNumericList);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"컬럼 검사 중 오류 발생: {ex.Message}");
+            }
+        }
+
+
 
         private void del_col_list_allcheck_CheckedChanged(object sender, EventArgs e)
         {
@@ -886,13 +931,17 @@ namespace FinanceTool
         }
 
         // 삭제 데이터 그리드 채우기
-        private void PopulateDeleteDataGrid(string columnName)
+        // 삭제 데이터 그리드 채우기 - MongoDB 버전으로 변환
+        private async void PopulateDeleteDataGrid(string columnName)
         {
             try
             {
-                // SQLite에서 고유 값 가져오기
-                string query = $"SELECT DISTINCT {columnName} FROM raw_data WHERE {columnName} IS NOT NULL ORDER BY {columnName}";
-                DataTable distinctValues = DBManager.Instance.ExecuteQuery(query);
+                // MongoDB에서 고유 값 가져오기
+                // 이전 코드: string query = $"SELECT DISTINCT {columnName} FROM raw_data WHERE {columnName} IS NOT NULL ORDER BY {columnName}";
+                // 이전 코드: DataTable distinctValues = DBManager.Instance.ExecuteQuery(query);
+
+                // MongoDB에서 필드의 고유 값 가져오기
+                var distinctValues = await GetDistinctValuesFromMongoAsync(columnName);
 
                 // DataGridView 초기화
                 dataGridView_delete_data.DataSource = null;
@@ -923,13 +972,13 @@ namespace FinanceTool
                 dataGridView_delete_data.Columns.Add(dataColumn);
 
                 // 데이터 리스트의 각 항목을 행으로 추가
-                foreach (DataRow row in distinctValues.Rows)
+                foreach (var value in distinctValues)
                 {
-                    if (row[0] != DBNull.Value && !string.IsNullOrEmpty(row[0].ToString()))
+                    if (value != null && !string.IsNullOrEmpty(value.ToString()))
                     {
                         int rowIndex = dataGridView_delete_data.Rows.Add();
                         dataGridView_delete_data.Rows[rowIndex].Cells["CheckBox"].Value = false;
-                        dataGridView_delete_data.Rows[rowIndex].Cells["Data"].Value = row[0].ToString();
+                        dataGridView_delete_data.Rows[rowIndex].Cells["Data"].Value = value.ToString();
                     }
                 }
 
@@ -946,6 +995,50 @@ namespace FinanceTool
                 MessageBox.Show($"데이터 로드 중 오류 발생: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        // MongoDB에서 필드의 고유값 가져오기
+        private async Task<List<object>> GetDistinctValuesFromMongoAsync(string fieldName)
+        {
+            // 필드가 존재하는 모든 문서에서 고유 값을 가져오기
+            //var filter = Builders<RawDataDocument>.Filter.Ne($"Data.{fieldName}", BsonNull.Value);
+            var filterBuilder = Builders<RawDataDocument>.Filter;
+            var filter = filterBuilder.And(
+                filterBuilder.Exists($"Data.{fieldName}"),
+                filterBuilder.Ne($"Data.{fieldName}", BsonNull.Value)
+            );
+
+            // 숨겨진 문서는 제외
+            if (DataHandler.hiddenData)
+            {
+                filter = Builders<RawDataDocument>.Filter.And(
+                    filter,
+                    Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false)
+                );
+            }
+
+            var distinctValues = new List<object>();
+            var documents = await rawDataRepo.FindDocumentsAsync(filter);
+
+            // 문서에서 해당 필드의 고유 값을 추출
+            var valueSet = new HashSet<string>();
+            foreach (var doc in documents)
+            {
+                if (doc.Data != null && doc.Data.ContainsKey(fieldName) && doc.Data[fieldName] != null)
+                {
+                    string value = doc.Data[fieldName].ToString();
+                    if (!string.IsNullOrEmpty(value) && !valueSet.Contains(value))
+                    {
+                        valueSet.Add(value);
+                        distinctValues.Add(value);
+                    }
+                }
+            }
+
+            // 값을 정렬
+            distinctValues.Sort((a, b) => string.Compare(a.ToString(), b.ToString()));
+
+            return distinctValues;
         }
 
         private async void restore_del_data_btn_Click(object sender, EventArgs e)
@@ -989,13 +1082,7 @@ namespace FinanceTool
 
                     progressForm.UpdateProgressHandler(90);
 
-                    // 페이지 데이터 리로드
-                    /*
-                    Task.Run(async () =>
-                    {
-                        await LoadPagedDataAsync();
-                    }).Wait();
-                    */
+                    // 페이지 데이터 리로드               
                     await LoadMongoPagedDataAsync();
                     progressForm.UpdateProgressHandler(100);
                 }
@@ -1149,7 +1236,7 @@ namespace FinanceTool
           
         }
 
-        private void delete_search_button_Click(object sender, EventArgs e)
+        private async void delete_search_button_Click(object sender, EventArgs e)
         {
             // 현재 선택된 컬럼이 없으면 메시지 표시 후 종료
             if (string.IsNullOrEmpty(selectedStandColumn) || stand_col_combo.SelectedIndex == 0)
@@ -1183,32 +1270,14 @@ namespace FinanceTool
                     return;
                 }
 
-                // SQL LIKE 조건을 위한 쿼리 구성
-                List<string> conditions = new List<string>();
-                Dictionary<string, object> parameters = new Dictionary<string, object>();
-
-                for (int i = 0; i < keywords.Length; i++)
-                {
-                    string paramName = $"keyword{i}";
-                    conditions.Add($"{selectedStandColumn} LIKE @{paramName}");
-                    parameters[paramName] = $"%{keywords[i]}%";
-                }
-
-                // OR 조건으로 각 키워드에 대한 LIKE 절 결합
-                string whereClause = string.Join(" OR ", conditions);
-
-                // SQLite에서 검색 조건에 맞는 값 가져오기
-                string query = $"SELECT DISTINCT {selectedStandColumn} FROM raw_data " +
-                               $"WHERE {selectedStandColumn} IS NOT NULL AND ({whereClause}) " +
-                               $"ORDER BY {selectedStandColumn}";
-
-                DataTable filteredValues = DBManager.Instance.ExecuteQuery(query, parameters);
+                // MongoDB에서 검색 - 정규식 검색 사용
+                var filteredValues = await SearchMongoFieldByKeywordsAsync(selectedStandColumn, keywords);
 
                 // DataGridView 초기화 및 데이터 표시
                 PopulateDeleteDataGridWithResults(filteredValues);
 
                 // 결과 메시지 표시 (선택사항)
-                if (filteredValues.Rows.Count == 0)
+                if (filteredValues.Count == 0)
                 {
                     MessageBox.Show($"검색 결과가 없습니다.", "검색 결과",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1222,8 +1291,55 @@ namespace FinanceTool
             }
         }
 
-        // 필터링된 결과로 DataGridView 채우기
-        private void PopulateDeleteDataGridWithResults(DataTable filteredValues)
+        // MongoDB에서 검색을 위한 새 메서드
+        private async Task<List<string>> SearchMongoFieldByKeywordsAsync(string fieldName, string[] keywords)
+        {
+            var resultValues = new List<string>();
+            var valueSet = new HashSet<string>(); // 중복 방지를 위한 Set
+
+            foreach (string keyword in keywords)
+            {
+                // 정규식 패턴 생성 (대소문자 구분 없이 검색)
+                var regexPattern = new BsonRegularExpression(keyword, "i");
+
+                // 필드 값이 검색 키워드를 포함하는 문서 필터
+                var filter = Builders<RawDataDocument>.Filter.Regex($"Data.{fieldName}", regexPattern);
+
+                // 숨겨진 문서는 제외
+                if (DataHandler.hiddenData)
+                {
+                    filter = Builders<RawDataDocument>.Filter.And(
+                        filter,
+                        Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false)
+                    );
+                }
+
+                // 문서 조회
+                var documents = await rawDataRepo.FindDocumentsAsync(filter);
+
+                // 결과에서 필드 값 추출
+                foreach (var doc in documents)
+                {
+                    if (doc.Data != null && doc.Data.ContainsKey(fieldName) && doc.Data[fieldName] != null)
+                    {
+                        string value = doc.Data[fieldName].ToString();
+                        if (!string.IsNullOrEmpty(value) && !valueSet.Contains(value))
+                        {
+                            valueSet.Add(value);
+                            resultValues.Add(value);
+                        }
+                    }
+                }
+            }
+
+            // 결과 정렬
+            resultValues.Sort();
+
+            return resultValues;
+        }
+
+        // 필터링된 결과로 DataGridView 채우기 - 기존 함수 유지
+        private void PopulateDeleteDataGridWithResults(List<string> filteredValues)
         {
             // DataGridView 초기화
             dataGridView_delete_data.DataSource = null;
@@ -1254,13 +1370,13 @@ namespace FinanceTool
             dataGridView_delete_data.Columns.Add(dataColumn);
 
             // 필터링된 데이터 추가
-            foreach (DataRow row in filteredValues.Rows)
+            foreach (string value in filteredValues)
             {
-                if (row[0] != DBNull.Value && !string.IsNullOrEmpty(row[0].ToString()))
+                if (!string.IsNullOrEmpty(value))
                 {
                     int rowIndex = dataGridView_delete_data.Rows.Add();
                     dataGridView_delete_data.Rows[rowIndex].Cells["CheckBox"].Value = false;
-                    dataGridView_delete_data.Rows[rowIndex].Cells["Data"].Value = row[0].ToString();
+                    dataGridView_delete_data.Rows[rowIndex].Cells["Data"].Value = value;
                 }
             }
 
@@ -1272,6 +1388,9 @@ namespace FinanceTool
             dataGridView_delete_data.Columns["CheckBox"].ReadOnly = false;
             dataGridView_delete_data.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
         }
+
+        // 필터링된 결과로 DataGridView 채우기
+       
 
         private void delete_search_keyword_KeyDown(object sender, KeyEventArgs e)
         {

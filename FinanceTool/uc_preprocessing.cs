@@ -30,7 +30,7 @@ namespace FinanceTool
             InitializeComponent();
         }
 
-        public void initUI()
+        public async Task initUI()
         {
             Debug.WriteLine($"[preprocessing]processTable.Columns.Count : {DataHandler.processTable.Columns.Count}");
             Debug.WriteLine($"[preprocessing]processTable.Rows.Count : {DataHandler.processTable.Rows.Count}");
@@ -38,7 +38,7 @@ namespace FinanceTool
             // 데이터베이스에 전처리 뷰 생성
             //CreatePreprocessingView();
 
-            originKeywordDataTable = DataHandler.CreateDataTableFromColumns(DataHandler.processTable, DataHandler.levelList);
+            originKeywordDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
 
             dataGridView_target.DataSource = originKeywordDataTable;
             _dataLoaded = true;
@@ -49,7 +49,7 @@ namespace FinanceTool
             dataGridView_target.Columns["raw_data_id"].Visible = false;
             dataGridView_target.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            modifiedDataTable = DataHandler.CreateDataTableFromColumns(DataHandler.processTable, DataHandler.levelList);
+            modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
             //DataHandler.moneyDataTable = DataHandler.ExtractColumnToNewTable(modifiedDataTable, 0);
             DataHandler.moneyDataTable = DataHandler.ExtractColumnToNewTable(DataHandler.processTable, DataHandler.levelList[0]);
 
@@ -142,7 +142,7 @@ namespace FinanceTool
             // 키워드 추출이 이미 수행되었다면 데이터 초기화 후 재수행
             if (iskeywordExtractor)
             {
-                modifiedDataTable = DataHandler.CreateDataTableFromColumns(DataHandler.processTable, DataHandler.levelList);
+                modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
             }
 
             // raw_data_id 컬럼 정보 임시 저장
@@ -190,7 +190,7 @@ namespace FinanceTool
         {
             if (iskeywordExtractor)
             {
-                modifiedDataTable = DataHandler.CreateDataTableFromColumns(DataHandler.processTable, DataHandler.levelList);
+                modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
             }
 
 
@@ -251,7 +251,7 @@ namespace FinanceTool
                     // 키워드 추출이 이미 수행되었다면 데이터 초기화 후 재수행
                     if (iskeywordExtractor)
                     {
-                        modifiedDataTable = DataHandler.CreateDataTableFromColumns(DataHandler.processTable, DataHandler.levelList);
+                        modifiedDataTable = await DataHandler.CreateDataTableFromColumnsAsync(DataHandler.processTable, DataHandler.levelList);
                         progressForm.UpdateProgressHandler(20);
                     }
 

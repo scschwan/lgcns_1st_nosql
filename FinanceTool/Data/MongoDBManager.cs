@@ -61,7 +61,7 @@ namespace FinanceTool.Data
         }
 
         // 데이터베이스 초기화 상태 확인 및 필요시 초기화
-        public bool EnsureInitialized()
+        public async Task<bool> EnsureInitializedAsync()
         {
             if (_disposed)
                 return false;
@@ -70,54 +70,49 @@ namespace FinanceTool.Data
             {
                 lock (_lockObj)
                 {
-                    if (!_isInitialized)
+                    if (_isInitialized) return true;
+                }
+
+                try
+                {
+                    await InitializeDatabaseAsync();
+
+                    lock (_lockObj)
                     {
-                        try
-                        {
-                            InitializeDatabase();
-                            _isInitialized = true;
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"MongoDB 초기화 오류: {ex.Message}");
-                            return false;
-                        }
+                        _isInitialized = true;
                     }
                 }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"MongoDB 초기화 오류: {ex.Message}");
+                    return false;
+                }
             }
-            return _isInitialized;
+
+            return true;
         }
 
+
         // 데이터베이스 초기화
-        private async void InitializeDatabase()
+        private async Task InitializeDatabaseAsync()
         {
             try
             {
-                // MongoDB 클라이언트 및 데이터베이스 연결
-                _client = new MongoClient(_connectionString);
+                var settings = new MongoClientSettings
+                {
+                    Server = new MongoServerAddress("localhost", 27017),
+                    ConnectTimeout = TimeSpan.FromSeconds(5),
+                    ServerSelectionTimeout = TimeSpan.FromSeconds(5)
+                };
+
+                _client = new MongoClient(settings);
+                await _client.GetDatabase("admin").RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1));
                 _database = _client.GetDatabase(_databaseName);
-
-                // 기본 컬렉션 생성 (필요한 경우)
-                // 리셋 플래그가 활성화된 경우 데이터베이스 리셋
-                if (_resetDatabaseOnStartup)
-                {
-                    await ResetDatabaseAsync();
-                    Debug.WriteLine("데이터베이스 리셋 모드 활성화: 데이터베이스가 초기화되었습니다.");
-                }
-                else
-                {
-                    // 컬렉션만 확인 (리셋하지 않음)
-                    await EnsureCollectionsExistAsync();
-                    Debug.WriteLine("데이터베이스 영속성 모드 활성화: 기존 데이터가 유지됩니다.");
-                }
-
-
-
-                Debug.WriteLine("MongoDB 데이터베이스 초기화 완료");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"MongoDB 초기화 오류: {ex.Message}\n{ex.StackTrace}");
+                MessageBox.Show($"MongoDB 초기화 중 오류가 발생했습니다.\n\n오류: {ex.Message}", "MongoDB 오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 throw;
             }
         }
@@ -126,36 +121,23 @@ namespace FinanceTool.Data
         // 데이터베이스 리셋 메서드 추가
         public async Task ResetDatabaseAsync()
         {
-            if (!EnsureInitialized())
+            if (!await EnsureInitializedAsync())
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
-            try
-            {
-                // 기존 컬렉션 목록 가져오기
-                var collections = await _database.ListCollectionNames().ToListAsync();
+            var collections = await _database.ListCollectionNames().ToListAsync();
 
-                // 각 컬렉션의 모든 데이터 삭제
-                foreach (var collName in collections)
+            foreach (var collName in collections)
+            {
+                if (!collName.StartsWith("system."))
                 {
-                    // 시스템 컬렉션은 제외
-                    if (!collName.StartsWith("system."))
-                    {
-                        var collection = _database.GetCollection<BsonDocument>(collName);
-                        await collection.DeleteManyAsync(new BsonDocument());
-                        Debug.WriteLine($"컬렉션 '{collName}'의 데이터가 삭제되었습니다.");
-                    }
+                    var collection = _database.GetCollection<BsonDocument>(collName);
+                    await collection.DeleteManyAsync(new BsonDocument());
+                    Debug.WriteLine($"컬렉션 '{collName}'의 데이터가 삭제되었습니다.");
                 }
-
-                // 필요한 컬렉션과 인덱스 생성
-                await EnsureCollectionsExistAsync();
-
-                Debug.WriteLine("데이터베이스 리셋 완료");
             }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"데이터베이스 리셋 오류: {ex.Message}");
-                throw;
-            }
+
+            await EnsureCollectionsExistAsync();
+            Debug.WriteLine("데이터베이스 리셋 완료");
         }
 
         // 비동기 컬렉션 확인 메서드 (기존 메서드 대체)
@@ -163,19 +145,15 @@ namespace FinanceTool.Data
         {
             var collectionNames = await _database.ListCollectionNames().ToListAsync();
 
-            // 컬럼 매핑 컬렉션
             if (!collectionNames.Contains("column_mapping"))
             {
                 await _database.CreateCollectionAsync("column_mapping");
-
-                // 인덱스 생성
                 var collection = _database.GetCollection<BsonDocument>("column_mapping");
                 var indexKeys = Builders<BsonDocument>.IndexKeys.Ascending("original_name");
                 var indexOptions = new CreateIndexOptions { Unique = true };
                 await collection.Indexes.CreateOneAsync(new CreateIndexModel<BsonDocument>(indexKeys, indexOptions));
             }
 
-            // 기타 필요한 컬렉션 확인 및 생성
             string[] requiredCollections = { "raw_data", "process_data" };
             foreach (string collName in requiredCollections)
             {
@@ -186,21 +164,19 @@ namespace FinanceTool.Data
                 }
             }
 
-            // 필요한 인덱스 생성
             await CreateDefaultIndexesAsync();
         }
 
+
         private async Task CreateDefaultIndexesAsync()
         {
-            // raw_data 컬렉션 인덱스
             var rawDataCollection = _database.GetCollection<BsonDocument>("raw_data");
-            var rawDataIndex = Builders<BsonDocument>.IndexKeys.Ascending("import_date");
-            await rawDataCollection.Indexes.CreateOneAsync(new CreateIndexModel<BsonDocument>(rawDataIndex));
+            await rawDataCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<BsonDocument>(Builders<BsonDocument>.IndexKeys.Ascending("import_date")));
 
-            // process_data 컬렉션 인덱스
             var processDataCollection = _database.GetCollection<BsonDocument>("process_data");
-            var processDataIndex = Builders<BsonDocument>.IndexKeys.Ascending("raw_data_id");
-            await processDataCollection.Indexes.CreateOneAsync(new CreateIndexModel<BsonDocument>(processDataIndex));
+            await processDataCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<BsonDocument>(Builders<BsonDocument>.IndexKeys.Ascending("raw_data_id")));
         }
 
         public static void EnableDataPersistence()
@@ -216,9 +192,11 @@ namespace FinanceTool.Data
         }
 
         // 컬렉션 존재 여부 확인
-        public bool CollectionExists(string collectionName)
+        public async Task<bool> CollectionExists(string collectionName)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 return false;
 
             try
@@ -237,7 +215,9 @@ namespace FinanceTool.Data
         // 문서 삽입 - 단일 문서
         public async Task<string> InsertDocumentAsync<T>(string collectionName, T document)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -263,7 +243,9 @@ namespace FinanceTool.Data
         // 문서 삽입 - 다중 문서
         public async Task InsertManyDocumentsAsync<T>(string collectionName, IEnumerable<T> documents)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -281,7 +263,9 @@ namespace FinanceTool.Data
         // 문서 조회 - 단일 문서
         public async Task<T> FindDocumentAsync<T>(string collectionName, FilterDefinition<T> filter)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -299,7 +283,9 @@ namespace FinanceTool.Data
         // 문서 조회 - 다중 문서
         public async Task<List<T>> FindDocumentsAsync<T>(string collectionName, FilterDefinition<T> filter, int? limit = null)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -324,7 +310,9 @@ namespace FinanceTool.Data
         // 문서 업데이트
         public async Task<long> UpdateDocumentsAsync<T>(string collectionName, FilterDefinition<T> filter, UpdateDefinition<T> update)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -343,7 +331,9 @@ namespace FinanceTool.Data
         // 문서 삭제
         public async Task<long> DeleteDocumentsAsync<T>(string collectionName, FilterDefinition<T> filter)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -362,7 +352,9 @@ namespace FinanceTool.Data
         // 컬렉션 삭제
         public async Task DropCollectionAsync(string collectionName)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -385,7 +377,9 @@ namespace FinanceTool.Data
             int pageSize,
             SortDefinition<T> sort = null)
         {
-            if (!EnsureInitialized())
+            bool ensureResult = await EnsureInitializedAsync();
+
+            if (!ensureResult)
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
             try
@@ -429,9 +423,6 @@ namespace FinanceTool.Data
             {
                 if (disposing)
                 {
-                    // MongoDB는 .NET 드라이버에서 자체적으로 리소스 관리를 수행하므로
-                    // 명시적인 리소스 해제는 필요하지 않습니다.
-                    // 단지 연결 상태를 정리하고 플래그를 설정합니다.
                     _client = null;
                     _database = null;
                 }
@@ -447,7 +438,7 @@ namespace FinanceTool.Data
         }
 
         // MongoDBManager.cs에 연결 재시도 로직 추가
-        public IMongoCollection<T> GetCollection<T>(string collectionName)
+        public async Task<IMongoCollection<T>> GetCollectionAsync<T>(string collectionName)
         {
             int retryCount = 0;
             const int maxRetries = 3;
@@ -456,6 +447,10 @@ namespace FinanceTool.Data
             {
                 try
                 {
+                    Debug.WriteLine($"[MongoDBManager] Try GetCollection try count : {retryCount} collectionName : {collectionName}");
+                    if (!await EnsureInitializedAsync())
+                        throw new InvalidOperationException("MongoDB 초기화 실패");
+
                     return _database.GetCollection<T>(collectionName);
                 }
                 catch (Exception ex)
@@ -464,7 +459,7 @@ namespace FinanceTool.Data
                     if (retryCount >= maxRetries)
                         throw new Exception($"MongoDB 연결 실패 (최대 재시도 횟수 초과): {ex.Message}", ex);
 
-                    Thread.Sleep(1000); // 1초 대기 후 재시도
+                    await Task.Delay(1000);
                 }
             }
 
@@ -500,9 +495,6 @@ namespace FinanceTool.Data
         {
             try
             {
-                // MongoDB 드라이버는 자체적으로 연결 풀을 관리하므로
-                // 명시적인 연결 종료는 필요하지 않습니다.
-                // 추가적인 리소스 정리가 필요한 경우 여기에 구현
                 Debug.WriteLine("MongoDB 리소스 정리 완료");
             }
             catch (Exception ex)
@@ -510,5 +502,6 @@ namespace FinanceTool.Data
                 Debug.WriteLine($"MongoDB 리소스 정리 중 오류: {ex.Message}");
             }
         }
+
     }
 }

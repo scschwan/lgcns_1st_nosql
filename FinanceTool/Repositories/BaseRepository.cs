@@ -11,13 +11,18 @@ namespace FinanceTool.Repositories
     /// </summary>
     public class BaseRepository<T> where T : class
     {
-        protected readonly IMongoCollection<T> _collection;
+        protected IMongoCollection<T> _collection;
         protected readonly Data.MongoDBManager _dbManager;
+
+
+        private readonly string _collectionName;
+
 
         public BaseRepository(string collectionName)
         {
             _dbManager = Data.MongoDBManager.Instance;
-            _collection = _dbManager.GetCollection<T>(collectionName);
+            _collectionName = collectionName;
+            InitializeAsync();
         }
 
         /// <summary>
@@ -28,6 +33,11 @@ namespace FinanceTool.Repositories
             await _collection.InsertOneAsync(document);
             // ObjectId는 document에 설정된 것으로 가정 (BsonId 속성)
             return GetDocumentId(document).ToString();
+        }
+
+        public async Task InitializeAsync()
+        {
+            _collection = await _dbManager.GetCollectionAsync<T>(_collectionName);
         }
 
         /// <summary>

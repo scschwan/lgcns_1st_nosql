@@ -172,6 +172,18 @@ namespace FinanceTool.Repositories
             return await query.Skip((page - 1) * pageSize).Limit(pageSize).ToListAsync();
         }
 
+        public async Task<List<RawDataDocument>> FindDocumentsAsync(FilterDefinition<RawDataDocument> filter, int? limit = null)
+        {
+            var query = _collection.Find(filter);
+
+            if (limit.HasValue)
+            {
+                query = query.Limit(limit.Value);
+            }
+
+            return await query.ToListAsync();
+        }
+
 
     }
 }

@@ -57,7 +57,7 @@ namespace FinanceTool
                                MessageBoxIcon.Error);
             }
             // Cleanup 부분 주석 처리 또는 제거 - MongoDBManager에 구현되지 않은 경우
-            
+
             finally
             {
                 try
@@ -71,7 +71,7 @@ namespace FinanceTool
                     Debug.WriteLine($"MongoDB 연결 정리 중 오류: {ex.Message}");
                 }
             }
-            
+
         }
 
         // MongoDB 인덱스 생성 메서드
@@ -80,19 +80,19 @@ namespace FinanceTool
             var mongoManager = Data.MongoDBManager.Instance;
 
             // raw_data 컬렉션에 인덱스 생성
-            var rawDataCollection = mongoManager.GetCollection<MongoModels.RawDataDocument>("raw_data");
+            var rawDataCollection = await mongoManager.GetCollectionAsync<MongoModels.RawDataDocument>("raw_data");
             await rawDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.RawDataDocument>.IndexKeys.Ascending(d => d.ImportDate));
             await rawDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.RawDataDocument>.IndexKeys.Ascending(d => d.IsHidden));
 
             // process_data 컬렉션에 인덱스 생성
-            var processDataCollection = mongoManager.GetCollection<MongoModels.ProcessDataDocument>("process_data");
+            var processDataCollection = await mongoManager.GetCollectionAsync<MongoModels.ProcessDataDocument>("process_data");
             await processDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.ProcessDataDocument>.IndexKeys.Ascending(d => d.RawDataId));
 
             // clustering_results 컬렉션에 인덱스 생성
-            var clusteringCollection = mongoManager.GetCollection<MongoModels.ClusteringResultDocument>("clustering_results");
+            var clusteringCollection = await mongoManager.GetCollectionAsync<MongoModels.ClusteringResultDocument>("clustering_results");
             await clusteringCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.ClusteringResultDocument>.IndexKeys.Ascending(d => d.ClusterId));
 
