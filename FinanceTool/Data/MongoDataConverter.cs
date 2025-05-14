@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -27,12 +28,12 @@ namespace FinanceTool
         /// Excel 데이터를 MongoDB에 저장
         /// </summary>
         public async Task<List<RawDataDocument>> ConvertExcelToMongoDBAsync(
-            DataTable excelData,
-            string fileName = null,
-            ProcessProgressForm.UpdateProgressDelegate progressCallback = null)
+                DataTable excelData,
+                string fileName = null,
+                ProcessProgressForm.UpdateProgressDelegate progressCallback = null,
+                ParallelOptions parallelOptions = null)
         {
             bool ensureResult = await _dbManager.EnsureInitializedAsync();
-
 
             if (!ensureResult)
             {
@@ -47,6 +48,12 @@ namespace FinanceTool
             Stopwatch sw = Stopwatch.StartNew();
             Debug.WriteLine($"Excel → MongoDB 변환 시작: {excelData.Rows.Count}행");
 
+            // 병렬 처리 옵션 설정 (없으면 기본값 사용)
+            parallelOptions = parallelOptions ?? new ParallelOptions
+            {
+                MaxDegreeOfParallelism = Environment.ProcessorCount
+            };
+
             // 진행 상황 업데이트
             await progressCallback?.Invoke(10, "데이터 준비 중...");
 
@@ -54,49 +61,86 @@ namespace FinanceTool
             await SaveColumnMappingAsync(excelData.Columns);
             await progressCallback?.Invoke(20, "컬럼 정보 저장 완료...");
 
-            // 엑셀 데이터를 MongoDB 문서로 변환
-            var rawDataDocuments = new List<RawDataDocument>();
+            // 엑셀 데이터를 MongoDB 문서로 변환 - 병렬 처리
             int rowCount = excelData.Rows.Count;
+            int batchSize = Math.Min(10000, Math.Max(1000, rowCount / 10)); // 적응형 배치 크기
+            int batchCount = (int)Math.Ceiling(rowCount / (double)batchSize);
 
-            for (int i = 0; i < rowCount; i++)
+            // 모든 배치 처리 결과를 저장할 컬렉션
+            List<RawDataDocument> allDocuments = new List<RawDataDocument>();
+
+            for (int batchIndex = 0; batchIndex < batchCount; batchIndex++)
             {
-                DataRow row = excelData.Rows[i];
-                var document = new RawDataDocument
-                {
-                    ImportDate = DateTime.Now,
-                    FileName = fileName,
-                    Data = new Dictionary<string, object>()
-                };
+                int startIndex = batchIndex * batchSize;
+                int endIndex = Math.Min(startIndex + batchSize, rowCount);
+                int currentBatchSize = endIndex - startIndex;
 
-                foreach (DataColumn column in excelData.Columns)
-                {
-                    // null 값 처리
-                    if (row[column] != DBNull.Value)
-                    {
-                        document.Data[column.ColumnName] = ConvertValueToAppropriateType(row[column]);
-                    }
-                }
+                // 현재 배치 정보 표시
+                await progressCallback?.Invoke(
+                    20 + (int)((batchIndex * batchSize) / (double)rowCount * 60),
+                    $"데이터 변환 중... 배치 {batchIndex + 1}/{batchCount} ({startIndex + 1}~{endIndex}/{rowCount})"
+                );
 
-                rawDataDocuments.Add(document);
+                // 병렬로 배치 처리
+                var batchDocuments = new ConcurrentBag<RawDataDocument>();
 
-                // 정기적으로 진행 상황 업데이트 (10행마다)
-                if (i % 10 == 0 || i == rowCount - 1)
+                await Task.Run(() => {
+                    Parallel.For(startIndex, endIndex, parallelOptions, (i) => {
+                        DataRow row = excelData.Rows[i];
+                        var document = new RawDataDocument
+                        {
+                            ImportDate = DateTime.Now,
+                            FileName = fileName,
+                            Data = new Dictionary<string, object>()
+                        };
+
+                        foreach (DataColumn column in excelData.Columns)
+                        {
+                            // null 값 처리
+                            if (row[column] != DBNull.Value)
+                            {
+                                document.Data[column.ColumnName] = ConvertValueToAppropriateType(row[column]);
+                            }
+                        }
+
+                        batchDocuments.Add(document);
+                    });
+                });
+
+                // 배치 문서를 MongoDB에 저장
+                var batchList = batchDocuments.ToList();
+                await progressCallback?.Invoke(
+                    20 + (int)(((batchIndex + 0.5) * batchSize) / (double)rowCount * 60),
+                    $"배치 {batchIndex + 1} MongoDB에 저장 중... ({batchList.Count}개 문서)"
+                );
+
+                await InsertRawDataBatchAsync(batchList);
+
+                // 전체 결과에 배치 결과 추가
+                allDocuments.AddRange(batchList);
+
+                // 메모리 최적화를 위해 배치 목록 해제
+                batchDocuments = null;
+
+                await progressCallback?.Invoke(
+                    20 + (int)(((batchIndex + 1) * batchSize) / (double)rowCount * 60),
+                    $"배치 {batchIndex + 1} 처리 완료"
+                );
+
+                // GC 강제 실행 (대용량 처리 시 메모리 누수 방지)
+                if (rowCount > 100000 && batchIndex % 5 == 0)
                 {
-                    int progressPercentage = 20 + (int)((i + 1) / (double)rowCount * 60);
-                    await progressCallback?.Invoke(progressPercentage, $"데이터 변환 중... ({i + 1}/{rowCount})");
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
                 }
             }
 
-            // 배치 삽입으로 MongoDB에 저장
-            await progressCallback?.Invoke(80, "MongoDB에 데이터 저장 중...");
-            await InsertRawDataBatchAsync(rawDataDocuments);
-
             sw.Stop();
-            Debug.WriteLine($"Excel → MongoDB 변환 완료. 소요 시간: {sw.ElapsedMilliseconds}ms, 저장된 문서 수: {rawDataDocuments.Count}");
+            Debug.WriteLine($"Excel → MongoDB 변환 완료. 소요 시간: {sw.ElapsedMilliseconds}ms, 저장된 문서 수: {allDocuments.Count}");
 
             await progressCallback?.Invoke(100, "변환 완료");
 
-            return rawDataDocuments;
+            return allDocuments;
         }
 
         /// <summary>
@@ -193,16 +237,113 @@ namespace FinanceTool
         /// <summary>
         /// raw_data 문서를 MongoDB에 배치로 삽입
         /// </summary>
+        /// <summary>
+        /// raw_data 문서를 MongoDB에 배치로 삽입 - 리소스 활용도 향상 버전
+        /// </summary>
         private async Task InsertRawDataBatchAsync(List<RawDataDocument> documents)
         {
-            const int batchSize = 1000; // 최적 배치 크기
+            if (documents == null || documents.Count == 0)
+                return;
 
-            for (int i = 0; i < documents.Count; i += batchSize)
+            try
             {
-                var batch = documents.Skip(i).Take(Math.Min(batchSize, documents.Count - i)).ToList();
-                await _dbManager.InsertManyDocumentsAsync("raw_data", batch);
-                Debug.WriteLine($"배치 {i / batchSize + 1} 삽입 완료: {batch.Count}개 문서");
+                // 시스템 리소스에 맞게 최적화
+                int cpuCount = Environment.ProcessorCount;
+                long availableMemoryMB = (long)GetAvailableMemoryInMB();
+
+                // 시스템 메모리에 따라 병렬 처리할 작업 수 조절
+                int parallelTasks = Math.Min(cpuCount * 2, 16); // CPU 코어 수의 2배, 최대 16개까지
+
+                // 적응형 배치 크기 - 메모리와 문서 크기에 따라 조절
+                int optimalBatchSize = CalculateOptimalBatchSize(documents[0], availableMemoryMB);
+
+                // 문서를 여러 배치로 분할
+                var batches = new List<List<RawDataDocument>>();
+                for (int i = 0; i < documents.Count; i += optimalBatchSize)
+                {
+                    batches.Add(documents.Skip(i).Take(Math.Min(optimalBatchSize, documents.Count - i)).ToList());
+                }
+
+                Debug.WriteLine($"총 {batches.Count}개 배치로 분할, 배치당 최대 {optimalBatchSize}개 문서");
+                Debug.WriteLine($"병렬 작업 수: {parallelTasks}, 가용 메모리: {availableMemoryMB}MB");
+
+                // 병렬 처리를 위한 세마포어 (동시 실행 작업 수 제한)
+                using (var semaphore = new SemaphoreSlim(parallelTasks))
+                {
+                    // 모든 배치를 병렬로 삽입하기 위한 작업 목록
+                    var insertTasks = new List<Task>();
+
+                    foreach (var batch in batches)
+                    {
+                        // 세마포어를 사용하여 동시 실행 작업 수 제한
+                        await semaphore.WaitAsync();
+
+                        var task = Task.Run(async () => {
+                            try
+                            {
+                                await _dbManager.InsertManyDocumentsAsync("raw_data", batch);
+                                Debug.WriteLine($"배치 삽입 완료: {batch.Count}개 문서");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"배치 삽입 오류: {ex.Message}");
+                                throw;
+                            }
+                            finally
+                            {
+                                // 작업 완료 후 세마포어 릴리스
+                                semaphore.Release();
+                            }
+                        });
+
+                        insertTasks.Add(task);
+                    }
+
+                    // 모든 작업 완료 대기
+                    await Task.WhenAll(insertTasks);
+                }
+
+                Debug.WriteLine($"총 {documents.Count}개 문서 삽입 완료");
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"문서 삽입 중 오류 발생: {ex.Message}");
+                throw;
+            }
+        }
+
+        // 시스템의 가용 메모리 확인 (MB 단위)
+        private float GetAvailableMemoryInMB()
+        {
+            try
+            {
+                using (var pc = new PerformanceCounter("Memory", "Available MBytes"))
+                {
+                    return pc.NextValue();
+                }
+            }
+            catch
+            {
+                // 기본값 반환 (오류 발생 시)
+                return 4096; // 4GB 가정
+            }
+        }
+
+        // 최적의 배치 크기 계산
+        private int CalculateOptimalBatchSize(RawDataDocument sampleDoc, long availableMemoryMB)
+        {
+            // 문서 크기 추정 (JSON 직렬화 후 길이로 대략적인 크기 계산)
+            string json = Newtonsoft.Json.JsonConvert.SerializeObject(sampleDoc);
+            int docSizeBytes = System.Text.Encoding.UTF8.GetByteCount(json);
+
+            // 사용 가능한 메모리의 일부만 사용 (전체 메모리의 최대 50% 사용)
+            long memoryToUseBytes = Math.Min(availableMemoryMB * 1024 * 1024 / 2, 1024 * 1024 * 1024); // 최대 1GB
+
+            // 메모리에 기반하여 배치 크기 계산 (안전 마진 포함)
+            int calculatedBatchSize = (int)(memoryToUseBytes / (docSizeBytes * 1.5));
+
+            // 배치 크기 제한 (너무 작거나 너무 크지 않도록)
+            return Math.Max(100, Math.Min(calculatedBatchSize, 10000));
         }
 
         /// <summary>

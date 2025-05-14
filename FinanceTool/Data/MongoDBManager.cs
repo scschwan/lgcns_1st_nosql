@@ -119,25 +119,114 @@ namespace FinanceTool.Data
 
         // 필요한 컬렉션 존재 확인 및 생성
         // 데이터베이스 리셋 메서드 추가
-        public async Task ResetDatabaseAsync()
+        // 기존 메서드 대체 - 진행 상황 업데이트 기능 추가
+        public async Task ResetDatabaseAsync(ProcessProgressForm.UpdateProgressDelegate progressCallback = null)
         {
             if (!await EnsureInitializedAsync())
                 throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
 
-            var collections = await _database.ListCollectionNames().ToListAsync();
-
-            foreach (var collName in collections)
+            try
             {
-                if (!collName.StartsWith("system."))
-                {
-                    var collection = _database.GetCollection<BsonDocument>(collName);
-                    await collection.DeleteManyAsync(new BsonDocument());
-                    Debug.WriteLine($"컬렉션 '{collName}'의 데이터가 삭제되었습니다.");
-                }
-            }
+                // 컬렉션 목록 가져오기
+                var collections = await _database.ListCollectionNames().ToListAsync();
+                int totalCollections = collections.Count(c => !c.StartsWith("system."));
+                int processedCollections = 0;
 
-            await EnsureCollectionsExistAsync();
-            Debug.WriteLine("데이터베이스 리셋 완료");
+                await progressCallback?.Invoke(10, "컬렉션 정보 확인 중...");
+
+                // 각 컬렉션의 문서 수를 먼저 계산 (진행 상황 계산용)
+                var collectionStats = new Dictionary<string, long>();
+                long totalDocuments = 0;
+
+                foreach (var collName in collections)
+                {
+                    if (!collName.StartsWith("system."))
+                    {
+                        var collection = _database.GetCollection<BsonDocument>(collName);
+                        long count = await collection.CountDocumentsAsync(new BsonDocument());
+                        collectionStats[collName] = count;
+                        totalDocuments += count;
+
+                        await progressCallback?.Invoke(
+                            10 + (int)((double)processedCollections / totalCollections * 20),
+                            $"컬렉션 '{collName}' 크기 확인 중: {count:N0}개 문서");
+
+                        processedCollections++;
+                    }
+                }
+
+                // 문서 삭제 진행
+                processedCollections = 0;
+                long deletedDocuments = 0;
+
+                foreach (var collName in collections)
+                {
+                    if (!collName.StartsWith("system."))
+                    {
+                        var collection = _database.GetCollection<BsonDocument>(collName);
+
+                        // 컬렉션 크기가 큰 경우(10,000건 이상) 배치 삭제 수행
+                        if (collectionStats[collName] > 10000)
+                        {
+                            const int batchSize = 10000;
+                            long remaining = collectionStats[collName];
+
+                            while (remaining > 0)
+                            {
+                                // 배치 단위로 삭제
+                                var filter = new BsonDocument();
+                                var sort = Builders<BsonDocument>.Sort.Ascending("_id");
+                                var options = new FindOptions<BsonDocument> { Limit = batchSize };
+
+                                var batch = await collection.Find(filter).Sort(sort).Limit(batchSize).ToListAsync();
+                                if (batch.Count == 0) break;
+
+                                var ids = batch.Select(doc => doc["_id"]).ToList();
+                                var deleteFilter = Builders<BsonDocument>.Filter.In("_id", ids);
+                                var result = await collection.DeleteManyAsync(deleteFilter);
+
+                                deletedDocuments += result.DeletedCount;
+                                remaining -= result.DeletedCount;
+
+                                double overallProgress = 30 +
+                                    ((double)deletedDocuments / totalDocuments * 60);
+
+                                await progressCallback?.Invoke(
+                                    (int)overallProgress,
+                                    $"컬렉션 '{collName}' 초기화 중: {(collectionStats[collName] - remaining):N0}/{collectionStats[collName]:N0}");
+                            }
+                        }
+                        else
+                        {
+                            // 작은 컬렉션은 한 번에 삭제
+                            var result = await collection.DeleteManyAsync(new BsonDocument());
+                            deletedDocuments += result.DeletedCount;
+
+                            double overallProgress = 30 +
+                                ((double)deletedDocuments / totalDocuments * 60);
+
+                            await progressCallback?.Invoke(
+                                (int)overallProgress,
+                                $"컬렉션 '{collName}' 초기화 완료: {result.DeletedCount:N0}개 문서 삭제");
+                        }
+
+                        processedCollections++;
+                    }
+                }
+
+                await progressCallback?.Invoke(90, "필수 컬렉션 생성 중...");
+                await EnsureCollectionsExistAsync();
+                await progressCallback?.Invoke(95, "인덱스 생성 중...");
+                await CreateDefaultIndexesAsync();
+                await progressCallback?.Invoke(100, "데이터베이스 초기화 완료");
+
+                Debug.WriteLine("데이터베이스 리셋 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"데이터베이스 리셋 오류: {ex.Message}");
+                throw;
+            }
         }
 
         // 비동기 컬렉션 확인 메서드 (기존 메서드 대체)

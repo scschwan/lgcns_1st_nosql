@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using ClosedXML.Excel;
 
 using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
@@ -17,6 +18,9 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using ClosedXML.Excel;
 using FinanceTool.Data;
+using System.Collections.Concurrent;
+using System.Runtime;
+
 
 namespace FinanceTool
 {
@@ -159,11 +163,22 @@ namespace FinanceTool
                     bool dataExists = documentCount > 0;
                     bool resetRequired = MongoDBManager.ResetDatabaseOnStartup;
 
-                    //파일 최초 load의 경우 바로 초기화
+                    // 파일 최초 load의 경우 바로 초기화
                     if (excelLoadinitFlag && resetRequired)
                     {
-                        // MongoDB 데이터베이스 초기화
-                        await mongoManager.ResetDatabaseAsync();
+                        using (var progressForm = new ProcessProgressForm())
+                        {
+                            progressForm.Show();
+                            progressForm.UpdateProgressHandler(0, "MongoDB 데이터베이스 초기화 준비 중...");
+
+                            // MongoDB 데이터베이스 초기화 - 진행 상황을 표시하면서 초기화
+                            await mongoManager.ResetDatabaseAsync(progressForm.UpdateProgressHandler);
+
+                            // 완료 메시지
+                            await progressForm.UpdateProgressHandler(100, "초기화 완료");
+                            await Task.Delay(500); // 사용자가 완료 메시지를 볼 수 있도록 짧은 지연
+                            progressForm.Close();
+                        }
                         excelLoadinitFlag = false;
                     }
                     // 기존 데이터가 있거나 MongoDB 리셋이 필요한 경우
@@ -184,10 +199,21 @@ namespace FinanceTool
                                 return; // 사용자가 취소함
                             }
                         }
-                        
 
-                        // MongoDB 데이터베이스 초기화
-                        await mongoManager.ResetDatabaseAsync();
+                        // 컬렉션의 문서 수에 따라 프로그레스바 표시
+                        using (var progressForm = new ProcessProgressForm())
+                        {
+                            progressForm.Show();
+                            progressForm.UpdateProgressHandler(0, "MongoDB 데이터베이스 초기화 중...");
+
+                            // MongoDB 데이터베이스 초기화 - 진행 상황을 표시하면서 초기화
+                            await mongoManager.ResetDatabaseAsync(progressForm.UpdateProgressHandler);
+
+                            // 완료 메시지
+                            await progressForm.UpdateProgressHandler(100, "초기화 완료");
+                            await Task.Delay(500); // 사용자가 완료 메시지를 볼 수 있도록 짧은 지연
+                            progressForm.Close();
+                        }
                         Debug.WriteLine("MongoDB 데이터베이스 초기화 완료");
                     }
 
@@ -205,6 +231,8 @@ namespace FinanceTool
             }
         }
 
+        
+
         private async Task LoadExcelDataAsync(string filePath)
         {
             try
@@ -212,72 +240,182 @@ namespace FinanceTool
                 using (var progress = new ProcessProgressForm())
                 {
                     progress.Show();
-                    await Task.Delay(10);
-
                     await progress.UpdateProgressHandler(5, "파일 업로드 준비 중...");
+
+                    // 시스템 정보 확인
+                    int cpuCount = Environment.ProcessorCount;
+                    Debug.WriteLine($"시스템 정보: CPU 코어 {cpuCount}개");
+
+                    // 메모리 효율적인 스트림 방식으로 엑셀 로딩
+                    await progress.UpdateProgressHandler(10, "Excel 파일 스트림 준비 중...");
+
+                    // 데이터 저장용 테이블
+                    var excelData = new DataTable();
+                    long totalRows = 0;
+
+                    await Task.Run(async () => {
+                        try
+                        {
+                            // 파일 크기 확인
+                            var fileInfo = new FileInfo(filePath);
+                            long fileSizeMB = fileInfo.Length / (1024 * 1024);
+                            Debug.WriteLine($"파일 크기: {fileSizeMB}MB");
+                            await progress.UpdateProgressHandler(12, $"파일 크기: {fileSizeMB}MB, 로딩 준비 중...");
+
+                            // 최적화된 파일 스트림 설정
+                            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 65536))
+                            {
+                                Stopwatch sw = Stopwatch.StartNew();
+
+                                await progress.UpdateProgressHandler(15, "헤더 정보 로딩 중...");
+
+                                // 헤더만 먼저 읽기
+                                using (var workbook = new XLWorkbook(fs))
+                                {
+                                    var worksheet = workbook.Worksheets.First();
+
+                                    // 헤더 정보 추출
+                                    var headerRow = worksheet.Row(1);
+                                    foreach (var cell in headerRow.CellsUsed())
+                                    {
+                                        string colName = cell.Value.ToString();
+                                        excelData.Columns.Add(colName);
+                                    }
+
+                                    // 전체 행 수 계산
+                                    totalRows = worksheet.LastRowUsed().RowNumber();
+                                }
+
+                                sw.Stop();
+                                Debug.WriteLine($"헤더 로딩 완료: {sw.ElapsedMilliseconds}ms, 총 {totalRows}행 감지됨");
+                                await progress.UpdateProgressHandler(20, $"총 {totalRows:N0}행 감지됨, 데이터 로딩 준비 중...");
+
+                                // 파일 다시 열기 (스트림 리셋)
+                                fs.Position = 0;
+
+                                // 청크 기반 데이터 로딩
+                                sw.Restart();
+
+                                // 청크 크기 결정
+                                int chunkSize = CalculateOptimalChunkSize(fileSizeMB);
+                                int chunkCount = (int)Math.Ceiling((totalRows - 1) / (double)chunkSize);
+
+                                await progress.UpdateProgressHandler(22, $"청크 기반 로딩 준비: {chunkCount}개 청크 (청크당 {chunkSize}행)");
+
+                                // 데이터 로딩
+                                using (var workbook = new XLWorkbook(fs))
+                                {
+                                    var worksheet = workbook.Worksheets.First();
+
+                                    // 병렬 처리 옵션
+                                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = cpuCount };
+
+                                    // 청크 단위로 데이터 로드
+                                    for (int chunk = 0; chunk < chunkCount; chunk++)
+                                    {
+                                        int startRow = chunk * chunkSize + 2; // 헤더 다음부터
+                                        int endRow = Math.Min(startRow + chunkSize - 1, (int)totalRows);
+
+                                        // 진행 상황 업데이트
+                                        int progressPercentage = 25 + (int)((double)chunk / chunkCount * 30);
+                                        await progress.UpdateProgressHandler(progressPercentage,
+                                            $"청크 {chunk + 1}/{chunkCount} 로딩 중 ({startRow}-{endRow}/{totalRows})");
+
+                                        // 병렬 처리용 컬렉션
+                                        var chunkRows = new ConcurrentBag<DataRow>();
+
+                                        // 병렬 처리로 행 데이터 로드
+                                        await Task.Run(() => {
+                                            Parallel.For(startRow, endRow + 1, parallelOptions, rowIndex => {
+                                                try
+                                                {
+                                                    var xlRow = worksheet.Row(rowIndex);
+                                                    DataRow newRow = excelData.NewRow();
+
+                                                    // 각 셀 데이터 처리
+                                                    foreach (var cell in xlRow.CellsUsed())
+                                                    {
+                                                        int columnIndex = cell.Address.ColumnNumber - 1;
+                                                        if (columnIndex < excelData.Columns.Count)
+                                                        {
+                                                            // 값 추출 및 변환
+                                                            object value = null;
+                                                            if (!cell.IsEmpty())
+                                                            {
+                                                                value = ConvertCellValue(cell);
+                                                            }
+
+                                                            newRow[columnIndex] = value ?? DBNull.Value;
+                                                        }
+                                                    }
+
+                                                    chunkRows.Add(newRow);
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    Debug.WriteLine($"행 {rowIndex} 처리 중 오류: {ex.Message}");
+                                                }
+                                            });
+                                        });
+
+                                        // 처리된 행을 테이블에 추가
+                                        foreach (var row in chunkRows)
+                                        {
+                                            excelData.Rows.Add(row);
+                                        }
+
+                                        // 메모리 관리
+                                        if (totalRows > 500000 && chunk % 5 == 0)
+                                        {
+                                            GC.Collect();
+                                            GC.WaitForPendingFinalizers();
+                                        }
+                                    }
+                                }
+
+                                sw.Stop();
+                                Debug.WriteLine($"데이터 로딩 완료: {sw.ElapsedMilliseconds}ms, 총 {excelData.Rows.Count}행 처리됨");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"엑셀 로딩 오류: {ex.Message}");
+                            throw;
+                        }
+                    });
+
+                    await progress.UpdateProgressHandler(55, "데이터 로딩 완료, MongoDB 저장 준비 중...");
 
                     // MongoDB 데이터 컨버터 생성
                     MongoDataConverter mongoConverter = new MongoDataConverter();
 
-                    // 1. Excel 파일 직접 열기
-                    await progress.UpdateProgressHandler(10, "Excel 파일 로드 중...");
-                    DataTable excelData;
+                    // 병렬 처리로 MongoDB 저장
+                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = cpuCount };
 
-                    using (var workbook = new XLWorkbook(filePath))
-                    {
-                        var worksheet = workbook.Worksheets.First();
-                        var range = worksheet.RangeUsed();
-
-                        // Excel 데이터를 DataTable로 변환
-                        excelData = range.AsTable().AsNativeDataTable();
-
-                    }
-
-                    await progress.UpdateProgressHandler(40, "데이터 전처리 완료...");
-
-                    // 2. DataTable을 MongoDB에 바로 저장
-                    await progress.UpdateProgressHandler(50, "MongoDB에 데이터 저장 중...");
+                    // MongoDB 저장 호출
                     List<RawDataDocument> documents = await mongoConverter.ConvertExcelToMongoDBAsync(
-                        excelData, Path.GetFileName(filePath), progress.UpdateProgressHandler);
+                        excelData, Path.GetFileName(filePath), progress.UpdateProgressHandler, parallelOptions);
 
-                    await progress.UpdateProgressHandler(80, "데이터 처리 중...");
+                    await progress.UpdateProgressHandler(85, "UI 초기화 중...");
 
-                    // 3. UI 초기화 및 데이터 표시 설정
-                    // File load completed - register events if first load
+                    // 나머지 UI 설정 코드...
                     if (!_fileLoaded)
                     {
                         AttachPagingEvents();
                         _fileLoaded = true;
                     }
 
-                    // Enable paging controls
                     EnablePagingControls(true);
-
-                    // 로드된 데이터 설정 - 전역 변수에 저장 (기존 코드 호환성 유지)
                     DataHandler.excelData = excelData;
-
-                    // 4. 페이징 처리 초기화
                     currentPage = 1;
                     pageSize = 1000;
-
-                    // 5. MongoDB에서 데이터 로드하여 DataGridView에 표시
                     await LoadMongoPagedDataAsync(true);
-                    await Task.Delay(10);
-
-                    // 6. 선택 가능한 컬럼 목록 그리드에 추가
                     await AddMongoColumnsToGrid(dataGridView_delete_col, excelData.Columns);
-
-                    await progress.UpdateProgressHandler(90, "컬럼 정보 설정 중...");
-                    await Task.Delay(10);
-
-                    // 7. 컬럼 목록 가져오기
+                    await progress.UpdateProgressHandler(95, "컬럼 정보 설정 중...");
                     GetMongoColumnList(excelData.Columns);
-
-                    // 8. 컬럼 콤보박스 설정
                     SetupColumnLists();
 
                     await progress.UpdateProgressHandler(100, "데이터 로드 완료!");
-                    await Task.Delay(10);
                     progress.Close();
 
                     Debug.WriteLine("File loading completed successfully with MongoDB");
@@ -288,6 +426,61 @@ namespace FinanceTool
                 MessageBox.Show($"엑셀 파일 로드 중 오류 발생: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        // 셀 값 변환 헬퍼 메서드
+        private object ConvertCellValue(IXLCell cell)
+        {
+            try
+            {
+                if (cell.IsEmpty())
+                    return null;
+
+                // 셀 타입에 따른 값 변환
+                switch (cell.DataType)
+                {
+                    case XLDataType.Number:
+                        double numValue = cell.GetValue<double>();
+                        // 정수형으로 변환 가능한지 확인
+                        if (Math.Abs(numValue - Math.Round(numValue)) < double.Epsilon)
+                        {
+                            if (numValue >= long.MinValue && numValue <= long.MaxValue)
+                                return (long)numValue;
+                            else
+                                return numValue;
+                        }
+                        return numValue;
+
+                    case XLDataType.DateTime:
+                        return cell.GetValue<DateTime>();
+
+                    case XLDataType.Boolean:
+                        return cell.GetValue<bool>();
+
+                    case XLDataType.Text:
+                    default:
+                        return cell.GetValue<string>();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"셀 값 변환 오류: {ex.Message}");
+                return cell.Value.ToString();
+            }
+        }
+
+        // 최적의 청크 크기 계산
+        private int CalculateOptimalChunkSize(long fileSizeMB)
+        {
+            // 파일 크기에 따른 청크 크기 최적화
+            if (fileSizeMB > 200)
+                return 2000; // 매우 큰 파일
+            else if (fileSizeMB > 100)
+                return 5000; // 큰 파일
+            else if (fileSizeMB > 50)
+                return 10000; // 중간 크기 파일
+            else
+                return 20000; // 작은 파일
         }
 
         // MongoDB 기반으로 페이징 데이터 로드
