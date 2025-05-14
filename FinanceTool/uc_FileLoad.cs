@@ -244,7 +244,7 @@ namespace FinanceTool
 
                     // 시스템 정보 확인
                     int cpuCount = Environment.ProcessorCount;
-                    Debug.WriteLine($"시스템 정보: CPU 코어 {cpuCount}개");
+                    Debug.WriteLine($"시스템 정보: CPU 코어 {cpuCount}개 ");
 
                     // 메모리 효율적인 스트림 방식으로 엑셀 로딩
                     await progress.UpdateProgressHandler(10, "Excel 파일 스트림 준비 중...");
@@ -308,7 +308,9 @@ namespace FinanceTool
                                     var worksheet = workbook.Worksheets.First();
 
                                     // 병렬 처리 옵션
-                                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = cpuCount };
+
+                                    //var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = cpuCount };
+                                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = cpuCount * 10 };
 
                                     // 청크 단위로 데이터 로드
                                     for (int chunk = 0; chunk < chunkCount; chunk++)

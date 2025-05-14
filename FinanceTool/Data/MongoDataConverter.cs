@@ -252,9 +252,10 @@ namespace FinanceTool
                 long availableMemoryMB = (long)GetAvailableMemoryInMB();
 
                 // 시스템 메모리에 따라 병렬 처리할 작업 수 조절
-                int parallelTasks = Math.Min(cpuCount * 2, 16); // CPU 코어 수의 2배, 최대 16개까지
+                int parallelTasks = Math.Max(cpuCount * 2, 64); // CPU 코어 수의 2배, 최대 16개까지
 
                 // 적응형 배치 크기 - 메모리와 문서 크기에 따라 조절
+                //int optimalBatchSize = Math.Max(CalculateOptimalBatchSize(documents[0], availableMemoryMB), 200000);
                 int optimalBatchSize = CalculateOptimalBatchSize(documents[0], availableMemoryMB);
 
                 // 문서를 여러 배치로 분할
@@ -265,7 +266,7 @@ namespace FinanceTool
                 }
 
                 Debug.WriteLine($"총 {batches.Count}개 배치로 분할, 배치당 최대 {optimalBatchSize}개 문서");
-                Debug.WriteLine($"병렬 작업 수: {parallelTasks}, 가용 메모리: {availableMemoryMB}MB");
+                Debug.WriteLine($"병렬 작업 수: {parallelTasks}, 가용 메모리: {availableMemoryMB}MB , CalculateOptimalBatchSize(documents[0], availableMemoryMB) : {CalculateOptimalBatchSize(documents[0], availableMemoryMB)}");
 
                 // 병렬 처리를 위한 세마포어 (동시 실행 작업 수 제한)
                 using (var semaphore = new SemaphoreSlim(parallelTasks))

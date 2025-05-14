@@ -102,7 +102,11 @@ namespace FinanceTool.Data
                 {
                     Server = new MongoServerAddress("localhost", 27017),
                     ConnectTimeout = TimeSpan.FromSeconds(5),
-                    ServerSelectionTimeout = TimeSpan.FromSeconds(5)
+                    ServerSelectionTimeout = TimeSpan.FromSeconds(5),
+                    MaxConnectionPoolSize = 3000,
+                    MaxConnecting = 1000,
+                    SocketTimeout = TimeSpan.FromMinutes(10)
+
                 };
 
                 _client = new MongoClient(settings);
