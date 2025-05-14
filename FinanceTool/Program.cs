@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
@@ -9,122 +9,128 @@ namespace FinanceTool
     internal static class Program
     {
         /// <summary>
-        /// ÇØ´ç ¾ÖÇÃ¸®ÄÉÀÌ¼ÇÀÇ ÁÖ ÁøÀÔÁ¡ÀÔ´Ï´Ù.
+        /// Ã‡Ã˜Â´Ã§ Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡Ã€Ã‡ ÃÃ– ÃÃ¸Ã€Ã”ÃÂ¡Ã€Ã”Â´ÃÂ´Ã™.
         /// </summary>
         [STAThread]
         static void Main()
         {
             try
             {
-                // MongoDB ¿¬°á ÃÊ±âÈ­
-                // Data.MongoDBManager°¡ ½Ì±ÛÅæ ÆĞÅÏÀÌ¹Ç·Î Instance ¼Ó¼º¿¡ Á¢±ÙÇÏ¸é ÀÚµ¿À¸·Î ÃÊ±âÈ­µÊ
+
+                
+
+                Process currentProcess = Process.GetCurrentProcess();
+                currentProcess.PriorityClass = ProcessPriorityClass.High; // ë˜ëŠ” ProcessPriorityClass.High
+
+                // MongoDB Â¿Â¬Â°Ã¡ ÃƒÃŠÂ±Ã¢ÃˆÂ­
+                // Data.MongoDBManagerÂ°Â¡ Â½ÃŒÂ±Ã›Ã…Ã¦ Ã†ÃÃ…ÃÃ€ÃŒÂ¹Ã‡Â·Ã Instance Â¼Ã“Â¼ÂºÂ¿Â¡ ÃÂ¢Â±Ã™Ã‡ÃÂ¸Ã© Ã€ÃšÂµÂ¿Ã€Â¸Â·Ã ÃƒÃŠÂ±Ã¢ÃˆÂ­ÂµÃŠ
                 Data.MongoDBManager mongoManager = Data.MongoDBManager.Instance;
 
-                // ÇÊ¿ä½Ã µ¥ÀÌÅÍº£ÀÌ½º ¸®¼Â ¿É¼Ç ¼³Á¤
-                // mongoManager.ResetDatabaseOnStartup = false; // ±âº»°ªÀº false, true·Î ¼³Á¤ÇÏ¸é ÃÊ±âÈ­
+                // Ã‡ÃŠÂ¿Ã¤Â½Ãƒ ÂµÂ¥Ã€ÃŒÃ…ÃÂºÂ£Ã€ÃŒÂ½Âº Â¸Â®Â¼Ã‚ Â¿Ã‰Â¼Ã‡ Â¼Â³ÃÂ¤
+                // mongoManager.ResetDatabaseOnStartup = false; // Â±Ã¢ÂºÂ»Â°ÂªÃ€Âº false, trueÂ·Ã Â¼Â³ÃÂ¤Ã‡ÃÂ¸Ã© ÃƒÃŠÂ±Ã¢ÃˆÂ­
 
-                // MongoDB ÀÎµ¦½º »ı¼º (ÇÊ¿äÇÑ °æ¿ì)
+                // MongoDB Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº (Ã‡ÃŠÂ¿Ã¤Ã‡Ã‘ Â°Ã¦Â¿Ã¬)
                 Task.Run(async () =>
                 {
                     try
                     {
-                        // ÀÎµ¦½º »ı¼ºÀº ¸ù°íDB ¿¬°á ÈÄ ºñµ¿±â·Î ½ÇÇà
+                        // Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼ÂºÃ€Âº Â¸Ã¹Â°Ã­DB Â¿Â¬Â°Ã¡ ÃˆÃ„ ÂºÃ±ÂµÂ¿Â±Ã¢Â·Ã Â½Ã‡Ã‡Ã 
                         await CreateMongoDBIndexesAsync();
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"MongoDB ÀÎµ¦½º »ı¼º Áß ¿À·ù: {ex.Message}");
-                        // ÀÎµ¦½º »ı¼º ½ÇÆĞ´Â ¾ÖÇÃ¸®ÄÉÀÌ¼Ç ½ÇÇà¿¡ Ä¡¸íÀûÀÌÁö ¾ÊÀ¸¹Ç·Î °è¼Ó ÁøÇà
+                        Debug.WriteLine($"MongoDB Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº ÃÃŸ Â¿Ã€Â·Ã¹: {ex.Message}");
+                        // Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº Â½Ã‡Ã†ÃÂ´Ã‚ Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡ Â½Ã‡Ã‡Ã Â¿Â¡ Ã„Â¡Â¸Ã­Ã€Ã»Ã€ÃŒÃÃ¶ Â¾ÃŠÃ€Â¸Â¹Ã‡Â·Ã Â°Ã¨Â¼Ã“ ÃÃ¸Ã‡Ã 
                     }
                 });
 
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
-                // ¾ÖÇÃ¸®ÄÉÀÌ¼Ç ¿¹¿Ü Ã³¸® µî·Ï
+                // Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡ Â¿Â¹Â¿Ãœ ÃƒÂ³Â¸Â® ÂµÃ®Â·Ã
                 Application.ThreadException += Application_ThreadException;
                 AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
-                // ¸ŞÀÎ Æû Ç¥½Ã
+                // Â¸ÃÃ€Ã Ã†Ã» Ã‡Â¥Â½Ãƒ
                 Application.Run(new Form1());
             }
             catch (Exception ex)
             {
-                // ÃÊ±âÈ­ Áß Ä¡¸íÀû ¿À·ù ¹ß»ı ½Ã »ç¿ëÀÚ¿¡°Ô ¾Ë¸²
-                MessageBox.Show($"¾ÖÇÃ¸®ÄÉÀÌ¼Ç ÃÊ±âÈ­ Áß ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù:\n\n{ex.Message}\n\n¾ÖÇÃ¸®ÄÉÀÌ¼ÇÀ» Á¾·áÇÕ´Ï´Ù.",
-                               "Ä¡¸íÀû ¿À·ù",
+                // ÃƒÃŠÂ±Ã¢ÃˆÂ­ ÃÃŸ Ã„Â¡Â¸Ã­Ã€Ã» Â¿Ã€Â·Ã¹ Â¹ÃŸÂ»Ã½ Â½Ãƒ Â»Ã§Â¿Ã«Ã€ÃšÂ¿Â¡Â°Ã” Â¾Ã‹Â¸Â²
+                MessageBox.Show($"Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡ ÃƒÃŠÂ±Ã¢ÃˆÂ­ ÃÃŸ Â¿Ã€Â·Ã¹Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ½Ã€Â´ÃÂ´Ã™:\n\n{ex.Message}\n\nÂ¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡Ã€Â» ÃÂ¾Â·Ã¡Ã‡Ã•Â´ÃÂ´Ã™.",
+                               "Ã„Â¡Â¸Ã­Ã€Ã» Â¿Ã€Â·Ã¹",
                                MessageBoxButtons.OK,
                                MessageBoxIcon.Error);
             }
-            // Cleanup ºÎºĞ ÁÖ¼® Ã³¸® ¶Ç´Â Á¦°Å - MongoDBManager¿¡ ±¸ÇöµÇÁö ¾ÊÀº °æ¿ì
+            // Cleanup ÂºÃÂºÃ ÃÃ–Â¼Â® ÃƒÂ³Â¸Â® Â¶Ã‡Â´Ã‚ ÃÂ¦Â°Ã… - MongoDBManagerÂ¿Â¡ Â±Â¸Ã‡Ã¶ÂµÃ‡ÃÃ¶ Â¾ÃŠÃ€Âº Â°Ã¦Â¿Ã¬
 
             finally
             {
                 try
                 {
-                    // ¾ÖÇÃ¸®ÄÉÀÌ¼Ç Á¾·á ½Ã ¸®¼Ò½º Á¤¸®
+                    // Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡ ÃÂ¾Â·Ã¡ Â½Ãƒ Â¸Â®Â¼Ã’Â½Âº ÃÂ¤Â¸Â®
                     Data.MongoDBManager.Instance.Cleanup();
                 }
                 catch (Exception ex)
                 {
-                    // ¸®¼Ò½º Á¤¸® Áß ¿À·ù´Â ·Î±×¸¸ ³²±â°í ¹«½Ã
-                    Debug.WriteLine($"MongoDB ¿¬°á Á¤¸® Áß ¿À·ù: {ex.Message}");
+                    // Â¸Â®Â¼Ã’Â½Âº ÃÂ¤Â¸Â® ÃÃŸ Â¿Ã€Â·Ã¹Â´Ã‚ Â·ÃÂ±Ã—Â¸Â¸ Â³Â²Â±Ã¢Â°Ã­ Â¹Â«Â½Ãƒ
+                    Debug.WriteLine($"MongoDB Â¿Â¬Â°Ã¡ ÃÂ¤Â¸Â® ÃÃŸ Â¿Ã€Â·Ã¹: {ex.Message}");
                 }
             }
 
         }
 
-        // MongoDB ÀÎµ¦½º »ı¼º ¸Ş¼­µå
+        // MongoDB Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº Â¸ÃÂ¼Â­ÂµÃ¥
         private static async Task CreateMongoDBIndexesAsync()
         {
             var mongoManager = Data.MongoDBManager.Instance;
 
-            // raw_data ÄÃ·º¼Ç¿¡ ÀÎµ¦½º »ı¼º
+            // raw_data Ã„ÃƒÂ·ÂºÂ¼Ã‡Â¿Â¡ Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº
             var rawDataCollection = await mongoManager.GetCollectionAsync<MongoModels.RawDataDocument>("raw_data");
             await rawDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.RawDataDocument>.IndexKeys.Ascending(d => d.ImportDate));
             await rawDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.RawDataDocument>.IndexKeys.Ascending(d => d.IsHidden));
 
-            // process_data ÄÃ·º¼Ç¿¡ ÀÎµ¦½º »ı¼º
+            // process_data Ã„ÃƒÂ·ÂºÂ¼Ã‡Â¿Â¡ Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº
             var processDataCollection = await mongoManager.GetCollectionAsync<MongoModels.ProcessDataDocument>("process_data");
             await processDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.ProcessDataDocument>.IndexKeys.Ascending(d => d.RawDataId));
 
-            // clustering_results ÄÃ·º¼Ç¿¡ ÀÎµ¦½º »ı¼º
+            // clustering_results Ã„ÃƒÂ·ÂºÂ¼Ã‡Â¿Â¡ Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº
             var clusteringCollection = await mongoManager.GetCollectionAsync<MongoModels.ClusteringResultDocument>("clustering_results");
             await clusteringCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.ClusteringResultDocument>.IndexKeys.Ascending(d => d.ClusterId));
 
-            // ÀüÃ¼ ÅØ½ºÆ® °Ë»ö ÀÎµ¦½º »ı¼º (MongoDB 4.0 ÀÌ»ó¿¡¼­ Áö¿ø)
+            // Ã€Ã¼ÃƒÂ¼ Ã…Ã˜Â½ÂºÃ†Â® Â°Ã‹Â»Ã¶ Ã€ÃÂµÂ¦Â½Âº Â»Ã½Â¼Âº (MongoDB 4.0 Ã€ÃŒÂ»Ã³Â¿Â¡Â¼Â­ ÃÃ¶Â¿Ã¸)
             await rawDataCollection.Indexes.CreateOneAsync(
                 MongoDB.Driver.Builders<MongoModels.RawDataDocument>.IndexKeys.Text("$**"));
 
-            Debug.WriteLine("MongoDB ÀÎµ¦½º°¡ ¼º°øÀûÀ¸·Î »ı¼ºµÇ¾ú½À´Ï´Ù.");
+            Debug.WriteLine("MongoDB Ã€ÃÂµÂ¦Â½ÂºÂ°Â¡ Â¼ÂºÂ°Ã¸Ã€Ã»Ã€Â¸Â·Ã Â»Ã½Â¼ÂºÂµÃ‡Â¾ÃºÂ½Ã€Â´ÃÂ´Ã™.");
         }
 
-        // UI ½º·¹µå ¿¹¿Ü Ã³¸®
+        // UI Â½ÂºÂ·Â¹ÂµÃ¥ Â¿Â¹Â¿Ãœ ÃƒÂ³Â¸Â®
         private static void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
         {
             HandleUnhandledException(e.Exception);
         }
 
-        // ºñ UI ½º·¹µå ¿¹¿Ü Ã³¸®
+        // ÂºÃ± UI Â½ÂºÂ·Â¹ÂµÃ¥ Â¿Â¹Â¿Ãœ ÃƒÂ³Â¸Â®
         private static void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             HandleUnhandledException(e.ExceptionObject as Exception);
         }
 
-        // °øÅë ¿¹¿Ü Ã³¸® ·ÎÁ÷
+        // Â°Ã¸Ã…Ã« Â¿Â¹Â¿Ãœ ÃƒÂ³Â¸Â® Â·ÃÃÃ·
         private static void HandleUnhandledException(Exception ex)
         {
             try
             {
-                // ¿¹¿Ü Á¤º¸ ·Î±ë (ÆÄÀÏ ¶Ç´Â µ¥ÀÌÅÍº£ÀÌ½º¿¡ ÀúÀåÇÒ ¼ö ÀÖÀ½)
-                string errorMessage = $"¿À·ù ¹ß»ı ½Ã°£: {DateTime.Now}\n¿À·ù ¸Ş½ÃÁö: {ex.Message}\n½ºÅÃ Æ®·¹ÀÌ½º: {ex.StackTrace}";
+                // Â¿Â¹Â¿Ãœ ÃÂ¤ÂºÂ¸ Â·ÃÂ±Ã« (Ã†Ã„Ã€Ã Â¶Ã‡Â´Ã‚ ÂµÂ¥Ã€ÃŒÃ…ÃÂºÂ£Ã€ÃŒÂ½ÂºÂ¿Â¡ Ã€ÃºÃ€Ã¥Ã‡Ã’ Â¼Ã¶ Ã€Ã–Ã€Â½)
+                string errorMessage = $"Â¿Ã€Â·Ã¹ Â¹ÃŸÂ»Ã½ Â½ÃƒÂ°Â£: {DateTime.Now}\nÂ¿Ã€Â·Ã¹ Â¸ÃÂ½ÃƒÃÃ¶: {ex.Message}\nÂ½ÂºÃ…Ãƒ Ã†Â®Â·Â¹Ã€ÃŒÂ½Âº: {ex.StackTrace}";
                 Debug.WriteLine(errorMessage);
 
-                // ·Î±× ÆÄÀÏ¿¡ ÀúÀå (¼±ÅÃ»çÇ×)
+                // Â·ÃÂ±Ã— Ã†Ã„Ã€ÃÂ¿Â¡ Ã€ÃºÃ€Ã¥ (Â¼Â±Ã…ÃƒÂ»Ã§Ã‡Ã—)
                 string logPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "FinanceTool", "error_log.txt");
@@ -132,17 +138,17 @@ namespace FinanceTool
                 Directory.CreateDirectory(Path.GetDirectoryName(logPath));
                 File.AppendAllText(logPath, errorMessage + "\n\n");
 
-                // »ç¿ëÀÚ¿¡°Ô ¾Ë¸²
-                MessageBox.Show($"¾ÖÇÃ¸®ÄÉÀÌ¼Ç¿¡¼­ ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù.\n\n{ex.Message}\n\nÀÚ¼¼ÇÑ Á¤º¸´Â ¿À·ù ·Î±×¸¦ È®ÀÎÇÏ¼¼¿ä: {logPath}",
-                               "¾ÖÇÃ¸®ÄÉÀÌ¼Ç ¿À·ù",
+                // Â»Ã§Â¿Ã«Ã€ÃšÂ¿Â¡Â°Ã” Â¾Ã‹Â¸Â²
+                MessageBox.Show($"Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡Â¿Â¡Â¼Â­ Â¿Ã€Â·Ã¹Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ½Ã€Â´ÃÂ´Ã™.\n\n{ex.Message}\n\nÃ€ÃšÂ¼Â¼Ã‡Ã‘ ÃÂ¤ÂºÂ¸Â´Ã‚ Â¿Ã€Â·Ã¹ Â·ÃÂ±Ã—Â¸Â¦ ÃˆÂ®Ã€ÃÃ‡ÃÂ¼Â¼Â¿Ã¤: {logPath}",
+                               "Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡ Â¿Ã€Â·Ã¹",
                                MessageBoxButtons.OK,
                                MessageBoxIcon.Error);
             }
             catch
             {
-                // ¿¹¿Ü Ã³¸® Áß ¶Ç ´Ù¸¥ ¿¹¿Ü°¡ ¹ß»ıÇÏ¸é ±âº» ¸Ş½ÃÁö¸¸ Ç¥½Ã
-                MessageBox.Show("¾ÖÇÃ¸®ÄÉÀÌ¼Ç¿¡¼­ Ã³¸®µÇÁö ¾ÊÀº ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù.",
-                               "Ä¡¸íÀû ¿À·ù",
+                // Â¿Â¹Â¿Ãœ ÃƒÂ³Â¸Â® ÃÃŸ Â¶Ã‡ Â´Ã™Â¸Â¥ Â¿Â¹Â¿ÃœÂ°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃÂ¸Ã© Â±Ã¢ÂºÂ» Â¸ÃÂ½ÃƒÃÃ¶Â¸Â¸ Ã‡Â¥Â½Ãƒ
+                MessageBox.Show("Â¾Ã–Ã‡ÃƒÂ¸Â®Ã„Ã‰Ã€ÃŒÂ¼Ã‡Â¿Â¡Â¼Â­ ÃƒÂ³Â¸Â®ÂµÃ‡ÃÃ¶ Â¾ÃŠÃ€Âº Â¿Ã€Â·Ã¹Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ½Ã€Â´ÃÂ´Ã™.",
+                               "Ã„Â¡Â¸Ã­Ã€Ã» Â¿Ã€Â·Ã¹",
                                MessageBoxButtons.OK,
                                MessageBoxIcon.Error);
             }
