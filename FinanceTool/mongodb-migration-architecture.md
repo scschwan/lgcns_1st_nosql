@@ -165,6 +165,61 @@ FinanceTool/
 }
 ```
 
+### 3. column_mapping  컬렉션
+```json
+{
+  "_id": ObjectId("..."),
+  "original_name": "column1",
+  "display_name": "사용자 정의 이름",
+  "data_type": "text",
+  "is_visible": true,
+  "sequence": 1
+}
+```
+
+### 4. clustering_results  컬렉션
+```json
+{
+  "_id": ObjectId("..."),
+  "process_data_id": ObjectId("..."),
+  "cluster_id": 3,
+  "cluster_name": "클러스터_3",
+  "cluster_center": {
+    "feature1": 0.75,
+    "feature2": 0.25
+  },
+  "distance_to_center": 0.15,
+  "silhouette_score": 0.82,
+  "created_date": ISODate("2025-05-14T14:30:00Z"),
+  "model_parameters": {
+    "algorithm": "kmeans",
+    "n_clusters": 5,
+    "random_state": 42
+  }
+}
+```
+
+### 5. process_view_data  컬렉션
+```json
+{
+  "_id": ObjectId("..."),
+  "process_data_id": ObjectId("..."),
+  "keywords": {
+    "original_text": "원본 텍스트 내용",
+    "extracted_keywords": ["키워드1", "키워드2", "키워드3"],
+    "removed_keywords": ["제거된키워드1"],
+    "final_keywords": ["키워드1", "키워드3"]
+  },
+  "processing_info": {
+    "processing_type": "separator", // separator, model 등 처리 방식
+    "separator": ";",               // 구분자 처리 시 사용된 구분자
+    "model_name": "keyword_extraction_v1" // 모델 처리 시 사용된 모델
+  },
+  "processed_date": ISODate("2025-05-14T12:45:00Z"),
+  "user_modified": false,           // 사용자가 수정했는지 여부
+  "last_modified_date": ISODate("2025-05-14T12:45:00Z")
+}
+```
 ## 주요 변경 사항
 
 ### 데이터 숨김 처리
@@ -292,7 +347,7 @@ uc_preprocessing.cs 파일의 데이터 처리 함수들에 대한 병렬 처리
 
 데이터 크기와 시스템 리소스에 따라 최적의 작업 분할 전략을 적용합니다.
 
-```csharp
+csharp
 // 데이터 크기에 따른 적응형 배치 크기 설정
 private int DetermineBatchSize(int totalItems)
 {
