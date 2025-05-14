@@ -247,17 +247,20 @@ namespace FinanceTool
 
             try
             {
+                // 시스템 환경에 맞게 동시성 수준 조정
                 int cpuCount = Environment.ProcessorCount;
-                int maxConcurrency = cpuCount * 4; // 동시 작업 수 조정
-                int batchSize = 1000; // 작게 쪼개서 많은 병렬 요청 유도
+                int maxConcurrency = Math.Min(cpuCount * 2, 16); // 동시 작업 수 제한
+                int batchSize = 1000; // 더 작은 배치 크기로 안정성 향상
 
+                // 문서를 배치로 분할
                 var batches = documents
                     .Select((doc, index) => new { doc, index })
                     .GroupBy(x => x.index / batchSize)
                     .Select(g => g.Select(x => x.doc).ToList())
                     .ToList();
 
-                //Debug.WriteLine($"[최적화] 총 {batches.Count}개 배치로 분할, 배치당 {batchSize}개 문서");
+                // 실패한 배치를 저장할 목록
+                var failedBatches = new ConcurrentBag<(List<RawDataDocument>, Exception)>();
 
                 using var throttler = new SemaphoreSlim(maxConcurrency);
                 var tasks = new List<Task>();
@@ -270,11 +273,16 @@ namespace FinanceTool
                     {
                         try
                         {
-                            await _dbManager.InsertManyDocumentsAsync("raw_data", batch);
-                            //Debug.WriteLine($"[삽입 완료] {batch.Count}개 문서");
+                            // 재시도 로직 구현
+                            await ExecuteWithRetryAsync(async () =>
+                            {
+                                await _dbManager.InsertManyDocumentsAsync("raw_data", batch);
+                            }, maxRetries: 3);
                         }
                         catch (Exception ex)
                         {
+                            // 실패한 배치 기록
+                            failedBatches.Add((batch, ex));
                             Debug.WriteLine($"[삽입 오류] {ex.Message}");
                         }
                         finally
@@ -286,23 +294,111 @@ namespace FinanceTool
 
                 await Task.WhenAll(tasks);
 
-                //Debug.WriteLine($"[완료] 총 {documents.Count}개 문서 삽입 완료");
+                // 실패한 배치가 있으면 처리
+                if (!failedBatches.IsEmpty)
+                {
+                    int totalFailedDocs = failedBatches.Sum(fb => fb.Item1.Count);
+                    Debug.WriteLine($"[경고] 총 {totalFailedDocs}개 문서 삽입 실패!");
+
+                    // 사용자에게 알림 (선택적)
+                    // MessageBox.Show($"{totalFailedDocs}개 데이터 행이 데이터베이스에 저장되지 않았습니다. 로그를 확인하세요.", "데이터 저장 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                    // 실패 로그 저장
+                    await LogFailedDocuments(failedBatches);
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[오류] 문서 삽입 중 오류 발생: {ex.Message}");
-                throw;
+                Debug.WriteLine($"[심각한 오류] 문서 배치 삽입 중 처리되지 않은 오류 발생: {ex.Message}");
+                throw; // 상위 호출자에게 오류 전파
             }
         }
 
-       
-        /// <summary>
-        /// 저장된 raw_data 문서를 가져옴
-        /// </summary>
-        public async Task<List<RawDataDocument>> GetRawDataAsync(int limit = 1000)
+        // 재시도 로직을 위한 도우미 메서드
+        private async Task ExecuteWithRetryAsync(Func<Task> action, int maxRetries = 3)
         {
-            var filter = Builders<RawDataDocument>.Filter.Empty;
-            return await _dbManager.FindDocumentsAsync("raw_data", filter, limit);
+            int attempt = 0;
+            Exception lastException = null;
+
+            while (attempt < maxRetries)
+            {
+                try
+                {
+                    attempt++;
+                    await action();
+                    return; // 성공하면 종료
+                }
+                catch (Exception ex)
+                {
+                    lastException = ex;
+
+                    // 특정 예외 유형 체크 없이 단순 로깅 및 재시도
+                    int delayMs = (int)Math.Pow(2, attempt) * 100; // 지수 백오프
+                    Debug.WriteLine($"[재시도] 오류 발생, {delayMs}ms 후 {attempt}/{maxRetries} 재시도: {ex.Message}");
+
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay(delayMs);
+                    }
+                }
+            }
+
+            // 모든 재시도 실패 시 마지막 예외 던지기
+            if (lastException != null)
+            {
+                Debug.WriteLine($"[실패] 최대 재시도 횟수({maxRetries}) 초과: {lastException.Message}");
+                throw lastException;
+            }
+        }
+
+        // 실패한 문서 로깅
+        private async Task LogFailedDocuments(ConcurrentBag<(List<RawDataDocument>, Exception)> failedBatches)
+        {
+            try
+            {
+                // 실패 로그 컬렉션 확인
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                bool collectionExists = await mongoManager.CollectionExists("insert_errors");
+
+                if (!collectionExists)
+                {
+                    // 컬렉션이 없으면 생성
+                    var database = mongoManager.GetCollectionAsync<BsonDocument>("insert_errors");
+                }
+
+                // 실패 정보를 로깅할 문서 생성
+                var errorLogs = new List<BsonDocument>();
+
+                foreach (var (batch, exception) in failedBatches)
+                {
+                    // 각 실패한 문서에 대한 로그 생성
+                    foreach (var doc in batch)
+                    {
+                        var errorDoc = new BsonDocument
+                {
+                    { "timestamp", DateTime.Now },
+                    { "error_message", exception.Message },
+                    { "error_type", exception.GetType().Name },
+                    { "document_data", doc.ToBsonDocument() }
+                };
+
+                        errorLogs.Add(errorDoc);
+                    }
+                }
+
+                // 로그 저장
+                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("insert_errors");
+                if (errorLogs.Count > 0)
+                {
+                    await collection.InsertManyAsync(errorLogs);
+                    Debug.WriteLine($"[로그] {errorLogs.Count}개 실패 문서 로그가 insert_errors 컬렉션에 저장됨");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[오류] 실패 로그 저장 중 오류 발생: {ex.Message}");
+                // 로깅 실패는 주요 프로세스에 영향을 주지 않도록 예외를 전파하지 않음
+            }
         }
 
         /// <summary>
@@ -335,27 +431,19 @@ namespace FinanceTool
         // MongoDataConverter.cs에 있는 PrepareProcessDataAsync 메서드 수정
         public async Task PrepareProcessDataAsync(IEnumerable<string> selectedColumns)
         {
-            bool ensureResult = await _dbManager.EnsureInitializedAsync();
-
-            if (!ensureResult)
-            {
-                throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
-            }
-
+           
             // raw_data에서 숨겨지지 않은 모든 문서 조회
             var filter = Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false);
             var rawDataDocuments = await _dbManager.FindDocumentsAsync("raw_data", filter);
 
             // process_data 컬렉션을 비우고 다시 생성
-            await _dbManager.DropCollectionAsync("process_data");
+            //await _dbManager.DropCollectionAsync("process_data");
 
-            // process_data 문서 생성 및 저장
+            // process_data 문서 생성
             var processDataDocuments = new List<ProcessDataDocument>();
 
             foreach (var rawDoc in rawDataDocuments)
             {
-                // ObjectId 형식으로 직접 설정
-                // 이 부분이 중요! 문자열이 아닌 ObjectId로 설정합니다.
                 var processDoc = new ProcessDataDocument
                 {
                     RawDataId = rawDoc.Id, // MongoDB 문서 ID 할당
@@ -376,20 +464,113 @@ namespace FinanceTool
                 processDataDocuments.Add(processDoc);
             }
 
-            // 배치 삽입
-            if (processDataDocuments.Count > 0)
-            {
-                const int batchSize = 1000;
-                for (int i = 0; i < processDataDocuments.Count; i += batchSize)
-                {
-                    var batch = processDataDocuments.Skip(i).Take(Math.Min(batchSize, processDataDocuments.Count - i)).ToList();
-                    await _dbManager.InsertManyDocumentsAsync("process_data", batch);
-                }
-            }
+            // 병렬 배치 삽입 처리
+            await InsertProcessDataBatchesAsync(processDataDocuments);
 
             Debug.WriteLine($"process_data 준비 완료: {processDataDocuments.Count}개 문서 생성");
         }
 
+        // 병렬 배치 삽입 메서드
+        private async Task InsertProcessDataBatchesAsync(List<ProcessDataDocument> documents)
+        {
+            if (documents == null || documents.Count == 0)
+                return;
+
+            try
+            {
+                // 시스템 환경에 맞게 동시성 수준 조정
+                int cpuCount = Environment.ProcessorCount;
+                int maxConcurrency = Math.Min(cpuCount * 2, 16); // 동시 작업 수 제한
+                int batchSize = 1000; // 적절한 배치 크기 설정
+
+                Debug.WriteLine($"[process_data] InsertProcessDataBatchesAsync start");
+
+                // 문서를 배치로 분할
+                var batches = new List<List<ProcessDataDocument>>();
+                for (int i = 0; i < documents.Count; i += batchSize)
+                {
+                    batches.Add(documents.Skip(i).Take(Math.Min(batchSize, documents.Count - i)).ToList());
+                }
+
+                Debug.WriteLine($"process_data를 {batches.Count}개 배치로 분할 (배치당 최대 {batchSize}개 문서)");
+
+                // 실패한 배치를 저장할 목록
+                var failedBatches = new ConcurrentBag<(List<ProcessDataDocument>, Exception)>();
+
+                using var throttler = new SemaphoreSlim(maxConcurrency);
+                var tasks = new List<Task>();
+
+                foreach (var batch in batches)
+                {
+                    await throttler.WaitAsync();
+
+                    tasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // 재시도 로직 구현
+                            int attempt = 0;
+                            const int maxRetries = 3;
+                            Exception lastException = null;
+
+                            while (attempt < maxRetries)
+                            {
+                                try
+                                {
+                                    attempt++;
+                                    await _dbManager.InsertManyDocumentsAsync("process_data", batch);
+                                    break; // 성공하면 루프 종료
+                                }
+                                catch (Exception ex)
+                                {
+                                    lastException = ex;
+
+                                    if (attempt < maxRetries)
+                                    {
+                                        int delayMs = (int)Math.Pow(2, attempt) * 100; // 지수 백오프
+                                        Debug.WriteLine($"[재시도] process_data 배치 삽입 오류, {delayMs}ms 후 {attempt}/{maxRetries} 재시도: {ex.Message}");
+                                        await Task.Delay(delayMs);
+                                    }
+                                    else
+                                    {
+                                        // 모든 재시도 실패
+                                        failedBatches.Add((batch, ex));
+                                        Debug.WriteLine($"[삽입 실패] process_data 배치 최대 재시도 후 실패: {ex.Message}");
+                                    }
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            throttler.Release();
+                        }
+                    }));
+                }
+
+                await Task.WhenAll(tasks);
+
+                // 실패한 배치가 있으면 처리
+                if (!failedBatches.IsEmpty)
+                {
+                    int totalFailedDocs = failedBatches.Sum(fb => fb.Item1.Count);
+                    Debug.WriteLine($"[경고] process_data 변환 중 총 {totalFailedDocs}개 문서 삽입 실패!");
+
+                    // 필요하다면 실패 로그 저장
+                    // await LogFailedProcessDocuments(failedBatches);
+
+                    // 사용자에게 알림 (필요시)
+                    // MessageBox.Show($"{totalFailedDocs}개 프로세스 데이터 행이 데이터베이스에 저장되지 않았습니다.", 
+                    //     "데이터 변환 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[심각한 오류] process_data 문서 배치 삽입 중 처리되지 않은 오류 발생: {ex.Message}");
+                throw; // 상위 호출자에게 오류 전파
+            }
+        }
+
+       
         /// <summary>
         /// 행 숨기기
         /// </summary>

@@ -794,47 +794,6 @@ namespace FinanceTool
             public string Value { get; set; }
         }
 
-        //금액 컬럼 검증 로직
-        //숫자 데이터가 아닌 데이터가 있다면 false return
-        private (bool isAllNumeric, List<NonNumericData> nonNumericList) CheckNumericColumn(DataGridView dgv, string columnName)
-        {
-            var nonNumericList = new List<NonNumericData>();
-
-            try
-            {
-                if (!dgv.Columns.Contains(columnName))
-                {
-                    throw new ArgumentException($"컬럼 '{columnName}'이 존재하지 않습니다.");
-                }
-
-                foreach (DataGridViewRow row in dgv.Rows)
-                {
-                    if (row.IsNewRow) continue;
-
-                    var cellValue = row.Cells[columnName].Value;
-
-                    if (cellValue == null || cellValue == DBNull.Value || string.IsNullOrWhiteSpace(cellValue.ToString()))
-                        continue;
-
-                    string strValue = cellValue.ToString().Trim();
-
-                    if (!decimal.TryParse(strValue, out _))
-                    {
-                        nonNumericList.Add(new NonNumericData
-                        {
-                            RowIndex = row.Index,
-                            Value = strValue
-                        });
-                    }
-                }
-
-                return (nonNumericList.Count == 0, nonNumericList);
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"컬럼 검사 중 오류 발생: {ex.Message}");
-            }
-        }
 
         private async void btn_complete_Click(object sender, EventArgs e)
         {
@@ -927,6 +886,8 @@ namespace FinanceTool
                     DataHandler.levelName.Add(cmb_target.SelectedItem.ToString());
 
                     progressForm.UpdateProgressHandler(30);
+                    Debug.WriteLine($"[file load] btn_complete_Click processing...");
+                    Debug.WriteLine($"[file load] PrepareProcessDataAsync start");
 
                     // MongoDB 방식으로 변경
                     MongoDataConverter mongoConverter = new MongoDataConverter();
