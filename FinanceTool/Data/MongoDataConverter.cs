@@ -247,106 +247,55 @@ namespace FinanceTool
 
             try
             {
-                // 시스템 리소스에 맞게 최적화
                 int cpuCount = Environment.ProcessorCount;
-                long availableMemoryMB = (long)GetAvailableMemoryInMB();
+                int maxConcurrency = cpuCount * 4; // 동시 작업 수 조정
+                int batchSize = 1000; // 작게 쪼개서 많은 병렬 요청 유도
 
-                // 시스템 메모리에 따라 병렬 처리할 작업 수 조절
-                int parallelTasks = Math.Max(cpuCount * 2, 64); // CPU 코어 수의 2배, 최대 16개까지
+                var batches = documents
+                    .Select((doc, index) => new { doc, index })
+                    .GroupBy(x => x.index / batchSize)
+                    .Select(g => g.Select(x => x.doc).ToList())
+                    .ToList();
 
-                // 적응형 배치 크기 - 메모리와 문서 크기에 따라 조절
-                //int optimalBatchSize = Math.Max(CalculateOptimalBatchSize(documents[0], availableMemoryMB), 200000);
-                int optimalBatchSize = CalculateOptimalBatchSize(documents[0], availableMemoryMB);
+                //Debug.WriteLine($"[최적화] 총 {batches.Count}개 배치로 분할, 배치당 {batchSize}개 문서");
 
-                // 문서를 여러 배치로 분할
-                var batches = new List<List<RawDataDocument>>();
-                for (int i = 0; i < documents.Count; i += optimalBatchSize)
+                using var throttler = new SemaphoreSlim(maxConcurrency);
+                var tasks = new List<Task>();
+
+                foreach (var batch in batches)
                 {
-                    batches.Add(documents.Skip(i).Take(Math.Min(optimalBatchSize, documents.Count - i)).ToList());
-                }
+                    await throttler.WaitAsync();
 
-                Debug.WriteLine($"총 {batches.Count}개 배치로 분할, 배치당 최대 {optimalBatchSize}개 문서");
-                Debug.WriteLine($"병렬 작업 수: {parallelTasks}, 가용 메모리: {availableMemoryMB}MB , CalculateOptimalBatchSize(documents[0], availableMemoryMB) : {CalculateOptimalBatchSize(documents[0], availableMemoryMB)}");
-
-                // 병렬 처리를 위한 세마포어 (동시 실행 작업 수 제한)
-                using (var semaphore = new SemaphoreSlim(parallelTasks))
-                {
-                    // 모든 배치를 병렬로 삽입하기 위한 작업 목록
-                    var insertTasks = new List<Task>();
-
-                    foreach (var batch in batches)
+                    tasks.Add(Task.Run(async () =>
                     {
-                        // 세마포어를 사용하여 동시 실행 작업 수 제한
-                        await semaphore.WaitAsync();
-
-                        var task = Task.Run(async () => {
-                            try
-                            {
-                                await _dbManager.InsertManyDocumentsAsync("raw_data", batch);
-                                Debug.WriteLine($"배치 삽입 완료: {batch.Count}개 문서");
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"배치 삽입 오류: {ex.Message}");
-                                throw;
-                            }
-                            finally
-                            {
-                                // 작업 완료 후 세마포어 릴리스
-                                semaphore.Release();
-                            }
-                        });
-
-                        insertTasks.Add(task);
-                    }
-
-                    // 모든 작업 완료 대기
-                    await Task.WhenAll(insertTasks);
+                        try
+                        {
+                            await _dbManager.InsertManyDocumentsAsync("raw_data", batch);
+                            //Debug.WriteLine($"[삽입 완료] {batch.Count}개 문서");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[삽입 오류] {ex.Message}");
+                        }
+                        finally
+                        {
+                            throttler.Release();
+                        }
+                    }));
                 }
 
-                Debug.WriteLine($"총 {documents.Count}개 문서 삽입 완료");
+                await Task.WhenAll(tasks);
+
+                //Debug.WriteLine($"[완료] 총 {documents.Count}개 문서 삽입 완료");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"문서 삽입 중 오류 발생: {ex.Message}");
+                Debug.WriteLine($"[오류] 문서 삽입 중 오류 발생: {ex.Message}");
                 throw;
             }
         }
 
-        // 시스템의 가용 메모리 확인 (MB 단위)
-        private float GetAvailableMemoryInMB()
-        {
-            try
-            {
-                using (var pc = new PerformanceCounter("Memory", "Available MBytes"))
-                {
-                    return pc.NextValue();
-                }
-            }
-            catch
-            {
-                // 기본값 반환 (오류 발생 시)
-                return 4096; // 4GB 가정
-            }
-        }
-
-        // 최적의 배치 크기 계산
-        private int CalculateOptimalBatchSize(RawDataDocument sampleDoc, long availableMemoryMB)
-        {
-            // 문서 크기 추정 (JSON 직렬화 후 길이로 대략적인 크기 계산)
-            string json = Newtonsoft.Json.JsonConvert.SerializeObject(sampleDoc);
-            int docSizeBytes = System.Text.Encoding.UTF8.GetByteCount(json);
-
-            // 사용 가능한 메모리의 일부만 사용 (전체 메모리의 최대 50% 사용)
-            long memoryToUseBytes = Math.Min(availableMemoryMB * 1024 * 1024 / 2, 1024 * 1024 * 1024); // 최대 1GB
-
-            // 메모리에 기반하여 배치 크기 계산 (안전 마진 포함)
-            int calculatedBatchSize = (int)(memoryToUseBytes / (docSizeBytes * 1.5));
-
-            // 배치 크기 제한 (너무 작거나 너무 크지 않도록)
-            return Math.Max(100, Math.Min(calculatedBatchSize, 10000));
-        }
-
+       
         /// <summary>
         /// 저장된 raw_data 문서를 가져옴
         /// </summary>
