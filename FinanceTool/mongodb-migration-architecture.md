@@ -59,7 +59,7 @@ SQLite 기반의 데이터 처리 애플리케이션을 MongoDB로 마이그레�
 
 4. **병렬 처리 구현**:
    - 고성능 CPU를 활용한 병렬 데이터 처리 구현
-   - `Parallel.ForEach`와 `Task.WhenAll` 활용
+   - file_load.cs 의 LoadExcelDataAsync 함수와 InsertRawDataBatchAsync,InsertProcessDataBatchesAsync 함수처럼 반드시 구현할 것
    - 데이터 처리 파이프라인 구축
 
 #### 인덱스 전략
@@ -214,13 +214,102 @@ FinanceTool/
 
 
 
-## 다음 세션 준비 사항
-- `uc_preprocessing.cs` 파일의 컬럼 매핑 및 데이터 처리 로직 검토
-- 대용량 데이터 처리 최적화 방안 구체화
-- MongoDB 콜렉션 스키마 정규화 및 인덱스 최적화
+## 2025-05-14 (3차 업데이트) - Preprocessing 모듈 병렬 처리 최적화 계획
 
-### 다음 단계 추천 작업
-1. MongoDB 쿼리 최적화 및 인덱스 설계 세부화
-2. 데이터 처리 파이프라인 구현 및 병렬 처리 확대
-3. 메모리 사용량 모니터링 및 최적화 도구 도입
-4. 대용량 데이터 테스트 시나리오 수립 및 성능 테스트
+uc_preprocessing.cs 파일의 데이터 처리 함수들에 대한 병렬 처리 및 MongoDB 마이그레이션 계획을 수립했습니다. 주요 목표는 대용량 데이터(80MB+) 처리 시 발생하는 성능 문제와 데이터 누락 현상을 해결하는 것입니다.
+
+#### 데이터 누락 문제 해결
+- MongoDB 삽입 작업 중 발생하는 데이터 누락 문제를 재시도 로직 구현으로 해결
+- 병렬 처리에서의 자원 경합 문제를 적절한 동시성 제한으로 해결
+- 실패 로깅 메커니즘 추가로 문제 추적 개선
+
+## 2025-05-15 달성 목표
+1.keyword_seper_split_Click 함수의 병렬 처리 적용 및 progressbar 추가 
+2.remove_1key_Click 함수의 병렬 처리 적용 및 progressbar 추가 
+3.btn_apply_Click 함수의 병렬 처리 적용 및 progressbar 추가 
+4.remove_apply_btn_Click 함수의 병렬 처리 적용 및 progressbar 추가 
+5.keyword_model_split_Click함수의 병렬 처리 적용 및 progressbar 추가
+ -  특히 여기는 python 프로그램을 호출하는 구간이라서 병렬 처리가 적용이 되어 있지만 현재 리소스(cpu,ram)을 최대한 활용하는 방법으로 더 개선
+6.btn_complete_Click 함수의 병렬처리 
+  -  기존 sqlite에서 process_view_data 데이터에 저장하던걸 collection 을 신규로 생성하여 nosql에 저장 
+  - 관련된 클래스 및 래포지토리 소스 개발이 필요함 > 신규 생성된 collection 에 데이터 insert 시 raw_data,process_data insert 방식과 동일한 구성으로 병렬 처리 
+7.userControlHandler.uc_dataTransform.initUI(); 에서 기존sqlite 조회 로직을 collection 조회 기능으로 변경해야 함 
+  - 또한 이후 데이터 처리도 변경된 항목에 맞게 마이그레이션 필요.
+
+#### 병렬 처리 개선 대상 함수
+1. **keyword_seper_split_Click**
+   - 구분자 기반 키워드 분리 작업을 병렬 처리로 전환
+   - 동적 배치 크기 적용으로 처리 효율성 향상
+   - 진행 상황 표시 기능 추가
+
+2. **remove_1key_Click**
+   - 키워드 제거 작업을 병렬 처리로 최적화
+   - 진행 상황 표시 기능 추가
+
+3. **btn_apply_Click**
+   - 사용자 정의 필터 적용 로직을 병렬 처리로 전환
+   - MongoDB 업데이트 연산을 배치 처리로 구현
+   - 진행 상황 표시 기능 추가
+
+4. **remove_apply_btn_Click**
+   - 필터 제거 작업을 병렬 처리로 최적화
+   - 진행 상황 표시 기능 추가
+
+5. **keyword_model_split_Click**
+   - Python 프로세스 호출 부분의 병렬 처리 최적화
+   - 현재 시스템 리소스(CPU, RAM)를 최대한 활용하도록 작업 분할
+   - 멀티프로세싱을 통한 Python 스크립트 성능 향상
+   - 데이터 전송 오버헤드 최소화
+
+6. **btn_complete_Click**
+   - `process_view_data` 데이터를 저장할 새 MongoDB 컬렉션 설계
+   - 새 컬렉션을 위한 모델 클래스 및 저장소 구현
+   - 병렬 삽입 처리 구현 (raw_data, process_data와 동일한 방식)
+
+7. **userControlHandler.uc_dataTransform.initUI**
+   - SQLite 조회 로직을 MongoDB 쿼리로 대체
+   - 이후 데이터 처리 로직을 MongoDB 구조에 맞게 조정
+
+#### 새로운 MongoDB 모델 및 저장소 구현
+
+// 새로 추가될 ProcessViewDocument.cs 모델 예시
+{
+  "_id": ObjectId("..."),
+  "process_data_id": ObjectId("..."),
+  "keyword_data": {
+    "original_text": "원본 텍스트",
+    "extracted_keywords": ["키워드1", "키워드2", "..."]
+  },
+  "processed_date": ISODate("2025-05-14T10:30:00Z"),
+  "processing_type": "separator"
+}
+
+## 병렬 처리 구현 전략
+
+대용량 데이터 처리를 위한 병렬 처리 구현 전략을 다음과 같이 수립했습니다. 이 전략은 특히 80MB 이상의 대용량 데이터 처리 시 성능과 안정성을 확보하기 위한 방안입니다.
+
+### 1. 적응형 작업 분할
+
+데이터 크기와 시스템 리소스에 따라 최적의 작업 분할 전략을 적용합니다.
+
+```csharp
+// 데이터 크기에 따른 적응형 배치 크기 설정
+private int DetermineBatchSize(int totalItems)
+{
+    // 작은 데이터셋 (10만 건 이하)
+    if (totalItems < 100000)
+        return 10000;
+    // 중간 데이터셋 (10만~50만 건)
+    else if (totalItems < 500000)
+        return 5000;
+    // 대용량 데이터셋 (50만 건 이상)
+    else
+        return 2000;
+}
+
+// 배치로 데이터 분할
+var batches = documents
+    .Select((doc, index) => new { doc, index })
+    .GroupBy(x => x.index / batchSize)
+    .Select(g => g.Select(x => x.doc).ToList())
+    .ToList();
