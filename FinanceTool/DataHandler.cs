@@ -305,7 +305,7 @@ namespace FinanceTool
             {
                 var extractor = new KeywordExtractor(1); // exe 파일 사용
                                                          //var extractor = new KeywordExtractor(0); // python_code 파일 사용
-                resultTable = await extractor.ExtractKeywordsFromDataTable(inputTable, 0, limit, 1000,
+                resultTable = await extractor.ExtractKeywordsFromDataTable(inputTable, 0, limit, 10000,
                                     new Progress<int>(async value => await progress.UpdateProgress(value)));
             });
 

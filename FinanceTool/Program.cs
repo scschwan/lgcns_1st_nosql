@@ -51,6 +51,9 @@ namespace FinanceTool
                 Application.ThreadException += Application_ThreadException;
                 AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
 
+
+                SetupJavaEnvironment();
+
                 // ¸ÞÀÎ Æû Ç¥½Ã
                 Application.Run(new Form1());
             }
@@ -78,6 +81,44 @@ namespace FinanceTool
                 }
             }
 
+        }
+
+        private static void SetupJavaEnvironment()
+        {
+            try
+            {
+                // JRE 경로 설정
+                string javaPath = Path.Combine(Application.StartupPath, "java");
+
+                // java 폴더 존재 확인
+                if (Directory.Exists(javaPath))
+                {
+                    // JAVA_HOME 환경 변수 설정
+                    Environment.SetEnvironmentVariable("JAVA_HOME", javaPath);
+
+                    // PATH 환경 변수에 Java 경로 추가
+                    string binPath = Path.Combine(javaPath, "bin");
+                    string pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+                    Environment.SetEnvironmentVariable("PATH", $"{binPath};{pathEnv}");
+
+                    Debug.WriteLine($"Java 환경 설정 완료: {javaPath}");
+                }
+                else
+                {
+                    Debug.WriteLine($"Java 폴더를 찾을 수 없음: {javaPath}");
+                }
+
+                // 선택 사항: CLASSPATH 설정 (일부 경우 필요)
+                string libPath = Path.Combine(javaPath, "lib");
+                if (Directory.Exists(libPath))
+                {
+                    Environment.SetEnvironmentVariable("CLASSPATH", libPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Java 환경 설정 중 오류: {ex.Message}");
+            }
         }
 
         // MongoDB ÀÎµ¦½º »ý¼º ¸Þ¼­µå
