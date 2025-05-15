@@ -137,6 +137,7 @@ namespace FinanceTool.Data
             "clustering_results",
             "column_mapping",
             "process_data",
+            "process_view_data",
             "raw_data"
         };
 

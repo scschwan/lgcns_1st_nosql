@@ -105,6 +105,13 @@ namespace FinanceTool.Repositories
             await _collection.InsertManyAsync(documents, new InsertManyOptions { IsOrdered = false });
         }
 
+        // ProcessViewRepository.cs 파일에 다음 메서드 추가
+        public async Task<long> CountDocumentsAsync(FilterDefinition<ProcessViewDocument> filter = null)
+        {
+            filter = filter ?? Builders<ProcessViewDocument>.Filter.Empty;
+            return await _collection.CountDocumentsAsync(filter);
+        }
+
         /// <summary>
         /// ProcessData 컬렉션에서 데이터를 가져와 ProcessView 생성
         /// </summary>

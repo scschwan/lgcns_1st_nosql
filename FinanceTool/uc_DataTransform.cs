@@ -1,5 +1,7 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.VisualBasic.Devices;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -51,91 +53,176 @@ namespace FinanceTool
         {
             try
             {
-                Debug.WriteLine("data Transform initUI->select Query Start");
+                Debug.WriteLine("data Transform initUI -> MongoDB 데이터 로드 시작");
 
-                // 데이터 로딩은 이미 백그라운드 스레드에서 실행 중이므로 직접 실행
-                string query = "SELECT * FROM process_view_data";
-                DataTable viewData = dbmanager.Instance.ExecuteQuery(query);
-                Debug.WriteLine("data Transform initUI->select Query End");
-
-                // DataTable 설정
-                originDataTable = viewData;
-                transformDataTable = viewData.Copy();
-                
-                Debug.WriteLine("data Transform initUI->transformDataTable Setting complete");
-
-                // 메인 UI 스레드로 돌아가서 UI 컨트롤 업데이트
-                await Task.Run(() =>
+                using (var progressForm = new ProcessProgressForm())
                 {
-                    if (Application.OpenForms.Count > 0)
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "MongoDB 연결 확인 중...");
+
+                    // MongoDB 연결 확인
+                    bool mongoConnected = await Data.MongoDBManager.Instance.EnsureInitializedAsync();
+                    if (!mongoConnected)
                     {
-                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                        {
-                            dataGridView_2nd.DataSource = originDataTable;
-                            if (dataGridView_2nd.Columns["raw_data_id"] != null)
-                            {
-                                dataGridView_2nd.Columns["raw_data_id"].Visible = false;
-                            }
-
-                            if (dataGridView_2nd.Columns["id"] != null)
-                            {
-                                dataGridView_2nd.Columns["id"].Visible = false;
-                            }
-
-                            if (dataGridView_2nd.Columns["import_date"] != null)
-                            {
-                                dataGridView_2nd.Columns["import_date"].Visible = false;
-                            }
-
-
-
-                            //sorting 기준 변환
-                            //dataGridView_modified.SortCompare -= DataHandler.DataGridView1_SortCompare;
-                            //match_keyword_table.SortCompare -= DataHandler.DataGridView1_SortCompare;
-
-                            sum_keyword_table.SortCompare += DataHandler.money_SortCompare;
-                            match_keyword_table.SortCompare += DataHandler.money_SortCompare;
-                        });
+                        throw new Exception("MongoDB 연결에 실패했습니다.");
                     }
-                });
 
-                // 데이터 변환 (이미 비동기 메서드)
-                viewTransformDataTable = await EnrichTransformDataWithRawData(transformDataTable);
+                    await progressForm.UpdateProgressHandler(20, "ProcessView 데이터 로드 중...");
 
-                Debug.WriteLine("data Transform initUI->DataGridView Bind Setting complete");
+                    // ProcessView 저장소 인스턴스 생성
+                    var processViewRepo = new Repositories.ProcessViewRepository();
 
-                // 나머지 초기화 로직
-                await Task.Run(() => create_merge_keyword_list());
-                Debug.WriteLine("data Transform initUI->create_merge_keyword_list complete");
+                    // MongoDB에서 process_view_data 컬렉션의 문서 조회
+                    var filter = Builders<MongoModels.ProcessViewDocument>.Filter.Empty;
+                    var sort = Builders<MongoModels.ProcessViewDocument>.Sort.Descending(d => d.ProcessedDate);
 
-                await Task.Run(() => set_keyword_combo_list());
-                Debug.WriteLine("data Transform initUI->set_keyword_combo_list Setting complete");
+                    // 페이징 처리로 데이터 로드 (대용량 데이터 처리를 위해)
+                    const int pageSize = 1000;
+                    int pageNumber = 1;
 
+                    var (processViewDocs, totalCount) = await processViewRepo.GetPagedAsync(pageNumber, pageSize, filter);
+                    Debug.WriteLine($"ProcessView 문서 조회 결과: {processViewDocs.Count}개 문서, 총 {totalCount}개");
 
-                // 메인 UI 스레드로 돌아가서 DataHandler 등록
-                await Task.Run(() =>
-                {
-                    if (Application.OpenForms.Count > 0)
+                    await progressForm.UpdateProgressHandler(30, $"ProcessView 데이터 변환 중...");
+
+                    // ProcessView 문서를 DataTable로 변환 - 원본 구조(Column0, Column1, ...)와 일치시킴
+                    DataTable viewData = new DataTable();
+
+                    // 필요한 메타데이터 컬럼 추가
+                    viewData.Columns.Add("id", typeof(string));
+                    viewData.Columns.Add("process_data_id", typeof(string));
+                    viewData.Columns.Add("raw_data_id", typeof(string));
+
+                    // 컬럼명을 원본과 일치하도록 설정 - Column0(금액), Column1(원본 텍스트)
+                    viewData.Columns.Add("Column0", typeof(string)); // 금액
+                    viewData.Columns.Add("Column1", typeof(string)); // 원본 텍스트
+
+                    // 키워드 컬럼들 추가 - 최대 개수는 필요에 따라 조정
+                    int maxKeywordColumns = 0;
+
+                    // 전처리: 먼저 최대 키워드 컬럼 수를 결정
+                    foreach (var doc in processViewDocs)
                     {
-                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                        {
-                            Debug.WriteLine("RegisterDataGridView->match_keyword_table ");
-                            DataHandler.RegisterDataGridView(match_keyword_table);
-                            // 이벤트 핸들러 중복 등록 방지
-                            decimal_combo.SelectedIndexChanged -= decimal_combo_SelectedIndexChanged; // 기존 핸들러 제거
-
-                            decimal_combo.SelectedIndex = 0;
-
-                            decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
-                        });
+                        int keywordCount = doc.Keywords?.FinalKeywords?.Count ?? 0;
+                        maxKeywordColumns = Math.Max(maxKeywordColumns, keywordCount);
                     }
-                });
-                
-                
+
+                    // 키워드 컬럼 생성 (Column2부터 시작)
+                    for (int i = 0; i < maxKeywordColumns; i++)
+                    {
+                        viewData.Columns.Add($"Column{i + 2}", typeof(string));
+                    }
+
+                    Debug.WriteLine($"생성된 컬럼 구조: {string.Join(", ", viewData.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
+
+                    // 문서를 DataTable로 변환
+                    await Task.Run(() => {
+                        foreach (var doc in processViewDocs)
+                        {
+                            DataRow row = viewData.NewRow();
+                            row["id"] = doc.Id;
+                            row["process_data_id"] = doc.ProcessDataId;
+
+                            // ProcessData ID를 raw_data_id로 임시 사용
+                            // 실제로는 이 관계를 정확히 설정해야 함
+                            row["raw_data_id"] = doc.ProcessDataId;
+
+                            // 금액 컬럼은 나중에 보강 예정(LoadMoneyDataFromMongoDB에서)
+                            row["Column0"] = DBNull.Value;
+
+                            // 원본 텍스트
+                            row["Column1"] = doc.Keywords?.OriginalText ?? string.Empty;
+
+                            // 키워드들을 개별 컬럼에 배치
+                            var keywords = doc.Keywords?.FinalKeywords ?? new List<string>();
+                            for (int i = 0; i < keywords.Count && i < maxKeywordColumns; i++)
+                            {
+                                row[$"Column{i + 2}"] = keywords[i];
+                            }
+
+                            viewData.Rows.Add(row);
+                        }
+                    });
+
+                    await progressForm.UpdateProgressHandler(40, "데이터 설정 중...");
+
+                    // DataTable 설정
+                    originDataTable = viewData;
+                    transformDataTable = viewData.Copy();
+
+                    Debug.WriteLine("data Transform initUI -> transformDataTable 설정 완료");
+
+                    // 메인 UI 스레드로 돌아가서 UI 컨트롤 업데이트
+                    await Task.Run(() =>
+                    {
+                        if (Application.OpenForms.Count > 0)
+                        {
+                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                            {
+                                dataGridView_2nd.DataSource = originDataTable;
+
+                                // 필요한 컬럼 숨김 처리
+                                if (dataGridView_2nd.Columns["raw_data_id"] != null)
+                                    dataGridView_2nd.Columns["raw_data_id"].Visible = false;
+
+                                if (dataGridView_2nd.Columns["id"] != null)
+                                    dataGridView_2nd.Columns["id"].Visible = false;
+
+                                if (dataGridView_2nd.Columns["process_data_id"] != null)
+                                    dataGridView_2nd.Columns["process_data_id"].Visible = false;
+
+                                // 정렬 처리 설정
+                                sum_keyword_table.SortCompare += DataHandler.money_SortCompare;
+                                match_keyword_table.SortCompare += DataHandler.money_SortCompare;
+                            });
+                        }
+                    });
+
+                    // 금액 데이터 로드
+                    await progressForm.UpdateProgressHandler(50, "금액 데이터 로드 중...");
+                    await LoadMoneyDataFromMongoDB();
+
+                    // 원본 데이터로 뷰 데이터 보강
+                    await progressForm.UpdateProgressHandler(60, "원본 데이터 보강 중...");
+                    viewTransformDataTable = await EnrichTransformDataWithMongoData(transformDataTable);
+
+                    Debug.WriteLine("data Transform initUI -> DataGridView 바인딩 설정 완료");
+
+                    // 나머지 초기화 로직
+                    await progressForm.UpdateProgressHandler(70, "키워드 병합 리스트 생성 중...");
+
+                    // create_merge_keyword_list 함수 호출 - 새로운 ProcessMergeKeywordListWithProgress 호출
+                    await create_merge_keyword_list();
+                    Debug.WriteLine("data Transform initUI -> create_merge_keyword_list 완료");
+
+                    // 키워드 콤보박스 설정
+                    await set_keyword_combo_list();
+                    Debug.WriteLine("data Transform initUI -> set_keyword_combo_list 설정 완료");
+
+                    // 메인 UI 스레드로 돌아가서 DataHandler 등록
+                    await Task.Run(() =>
+                    {
+                        if (Application.OpenForms.Count > 0)
+                        {
+                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                            {
+                                Debug.WriteLine("RegisterDataGridView -> match_keyword_table");
+                                DataHandler.RegisterDataGridView(match_keyword_table);
+
+                                // 이벤트 핸들러 중복 등록 방지
+                                decimal_combo.SelectedIndexChanged -= decimal_combo_SelectedIndexChanged; // 기존 핸들러 제거
+                                decimal_combo.SelectedIndex = 0;
+                                decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
+                            });
+                        }
+                    });
+
+                    await progressForm.UpdateProgressHandler(100, "데이터 로드 완료");
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"initUI 오류: {ex.Message}");
+                Debug.WriteLine($"initUI 오류: {ex.Message}\n{ex.StackTrace}");
                 await Task.Run(() =>
                 {
                     MessageBox.Show($"데이터 로드 중 오류가 발생했습니다: {ex.Message}",
@@ -144,64 +231,321 @@ namespace FinanceTool
             }
         }
 
-
-        private void SyncDataGridViewSelections(DataGridView dataGridView1, DataGridView dataGridView2)
+        // MongoDB에서 금액 데이터 로드
+        // MongoDB에서 금액 데이터 로드하는 새로운 함수
+        private async Task LoadMoneyDataFromMongoDB()
         {
-            // 첫 번째 DataGridView의 SelectionChanged 이벤트 핸들러
-            dataGridView1.SelectionChanged += (sender, e) =>
+            try
             {
-                if (isProcessingSelection) return;  // 재귀적 호출 방지
+                Debug.WriteLine("LoadMoneyDataFromMongoDB 시작");
 
-                try
+                // ProcessData 저장소와 RawData 저장소 생성
+                var processDataRepo = new Repositories.ProcessDataRepository();
+                var rawDataRepo = new Repositories.RawDataRepository();
+
+                // ProcessData 문서 로드 - 이 문서들에서 raw_data_id와 금액 정보 추출
+                var processDatas = await processDataRepo.GetAllAsync();
+                Debug.WriteLine($"ProcessData 문서 로드 완료: {processDatas.Count}개");
+
+                // 이미 준비된 raw_data_id 목록 (transformDataTable에서)
+                HashSet<string> neededRawDataIds = new HashSet<string>();
+                foreach (DataRow row in transformDataTable.Rows)
                 {
-                    isProcessingSelection = true;
-
-                    if (dataGridView1.CurrentRow != null)
+                    if (row["raw_data_id"] != DBNull.Value)
                     {
-                        int selectedIndex = dataGridView1.CurrentRow.Index;
-
-                        // 두 번째 DataGridView에 같은 행 인덱스가 있는지 확인
-                        if (selectedIndex < dataGridView2.Rows.Count)
+                        string id = row["raw_data_id"].ToString();
+                        if (!string.IsNullOrEmpty(id))
                         {
-                            dataGridView2.ClearSelection();
-                            dataGridView2.Rows[selectedIndex].Selected = true;
-                            dataGridView2.CurrentCell = dataGridView2.Rows[selectedIndex].Cells[0];
+                            neededRawDataIds.Add(id);
                         }
                     }
                 }
-                finally
+
+                Debug.WriteLine($"금액 데이터 필요한 raw_data_id 수: {neededRawDataIds.Count}개");
+
+                // 금액 데이터 테이블 생성
+                DataTable moneyTable = new DataTable();
+                moneyTable.Columns.Add("raw_data_id", typeof(string));
+                moneyTable.Columns.Add("amount", typeof(decimal));
+
+                // RawData에서 금액 정보 추출
+                int loadedCount = 0;
+
+                foreach (var processData in processDatas)
                 {
-                    isProcessingSelection = false;
-                }
-            };
-
-            // 두 번째 DataGridView의 SelectionChanged 이벤트 핸들러
-            dataGridView2.SelectionChanged += (sender, e) =>
-            {
-                if (isProcessingSelection) return;  // 재귀적 호출 방지
-
-                try
-                {
-                    isProcessingSelection = true;
-
-                    if (dataGridView2.CurrentRow != null)
+                    // 필요한 ID인지 확인
+                    if (!string.IsNullOrEmpty(processData.RawDataId) && neededRawDataIds.Contains(processData.RawDataId))
                     {
-                        int selectedIndex = dataGridView2.CurrentRow.Index;
+                        DataRow row = moneyTable.NewRow();
+                        row["raw_data_id"] = processData.RawDataId;
 
-                        // 첫 번째 DataGridView에 같은 행 인덱스가 있는지 확인
-                        if (selectedIndex < dataGridView1.Rows.Count)
+                        // 금액 추출 - 원래 Column0에 있었음
+                        decimal amount = 0;
+                        if (processData.Data != null)
                         {
-                            dataGridView1.ClearSelection();
-                            dataGridView1.Rows[selectedIndex].Selected = true;
-                            dataGridView1.CurrentCell = dataGridView1.Rows[selectedIndex].Cells[0];
+                            // 다양한 키 이름 시도 (Data가 다양한 형태로 저장될 수 있음)
+                            string[] possibleKeys = { "Column0", "column0", "0", "금액" };
+                            foreach (var key in possibleKeys)
+                            {
+                                if (processData.Data.ContainsKey(key) && processData.Data[key] != null)
+                                {
+                                    string amountStr = processData.Data[key].ToString();
+                                    if (decimal.TryParse(amountStr, out amount))
+                                    {
+                                        break; // 금액 추출 성공
+                                    }
+                                }
+                            }
+                        }
+
+                        row["amount"] = amount;
+                        moneyTable.Rows.Add(row);
+                        loadedCount++;
+
+                        // 로깅 (100건마다)
+                        if (loadedCount % 100 == 0)
+                        {
+                            Debug.WriteLine($"금액 데이터 로드 중: {loadedCount}개 처리됨");
                         }
                     }
                 }
-                finally
+
+                // 결과가 너무 적으면 RawData에서 직접 검색
+                if (loadedCount < neededRawDataIds.Count / 2)
                 {
-                    isProcessingSelection = false;
+                    Debug.WriteLine("ProcessData에서 충분한 금액 정보를 찾지 못함. RawData에서 직접 검색 시도");
+
+                    // RawData에서 금액 정보 직접 추출
+                    foreach (string rawDataId in neededRawDataIds)
+                    {
+                        // 이미 로드된 ID는 건너뜀
+                        if (moneyTable.AsEnumerable().Any(r => r["raw_data_id"].ToString() == rawDataId))
+                            continue;
+
+                        // RawData 문서 로드
+                        var rawData = await rawDataRepo.GetByIdAsync(rawDataId);
+                        if (rawData != null && rawData.Data != null)
+                        {
+                            DataRow row = moneyTable.NewRow();
+                            row["raw_data_id"] = rawDataId;
+
+                            // 금액 추출 시도
+                            decimal amount = 0;
+                            string[] possibleKeys = { "Column0", "column0", "0", "금액" };
+                            foreach (var key in possibleKeys)
+                            {
+                                if (rawData.Data.ContainsKey(key) && rawData.Data[key] != null)
+                                {
+                                    string amountStr = rawData.Data[key].ToString();
+                                    if (decimal.TryParse(amountStr, out amount))
+                                    {
+                                        break; // 금액 추출 성공
+                                    }
+                                }
+                            }
+
+                            row["amount"] = amount;
+                            moneyTable.Rows.Add(row);
+                            loadedCount++;
+                        }
+                    }
                 }
-            };
+
+                // transformDataTable에도 금액 정보 적용
+                foreach (DataRow row in transformDataTable.Rows)
+                {
+                    if (row["raw_data_id"] != DBNull.Value)
+                    {
+                        string rawDataId = row["raw_data_id"].ToString();
+
+                        // 금액 찾기
+                        var moneyRow = moneyTable.AsEnumerable()
+                            .FirstOrDefault(r => r["raw_data_id"].ToString() == rawDataId);
+
+                        if (moneyRow != null)
+                        {
+                            row["Column0"] = moneyRow["amount"];
+                        }
+                    }
+                }
+
+                // DataHandler.moneyDataTable 설정
+                DataHandler.moneyDataTable = moneyTable;
+                Debug.WriteLine($"금액 데이터 로드 완료: {moneyTable.Rows.Count}개 행");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"금액 데이터 로드 중 오류: {ex.Message}\n{ex.StackTrace}");
+                // 빈 테이블 생성하여 에러 방지
+                DataTable emptyTable = new DataTable();
+                emptyTable.Columns.Add("raw_data_id", typeof(string));
+                emptyTable.Columns.Add("amount", typeof(decimal));
+                DataHandler.moneyDataTable = emptyTable;
+            }
+        }
+
+        // MongoDB 데이터를 사용하여 TransformData 보강
+        public async Task<DataTable> EnrichTransformDataWithMongoData(DataTable transformDataTable)
+        {
+            try
+            {
+                Debug.WriteLine("EnrichTransformDataWithMongoData 시작");
+
+                // 원본 데이터를 수정하지 않도록 복사본 생성
+                DataTable resultTable = new DataTable();
+
+                // MongoDB 연결 확인
+                await Data.MongoDBManager.Instance.EnsureInitializedAsync();
+
+                // ColumnMapping 저장소 생성 (또는 직접 MongoDB 액세스)
+                var columnMappingFilter = Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("is_visible", true);
+                var columnMappingsResult = await Data.MongoDBManager.Instance.FindDocumentsAsync<MongoDB.Bson.BsonDocument>(
+                    "column_mapping",
+                    columnMappingFilter);
+
+                // 시각화될 컬럼명 추출
+                List<string> visibleColumns = new List<string>();
+                foreach (var doc in columnMappingsResult)
+                {
+                    if (doc.Contains("original_name"))
+                    {
+                        string originalName = doc["original_name"].AsString;
+                        visibleColumns.Add(originalName);
+                    }
+                }
+
+                Debug.WriteLine($"시각화될 컬럼: {string.Join(", ", visibleColumns)}");
+
+                if (visibleColumns.Count == 0)
+                {
+                    Debug.WriteLine("표시할 컬럼이 없습니다. column_mapping 컬렉션의 is_visible 속성을 확인하세요.");
+                    return transformDataTable.Copy();
+                }
+
+                // 1. 먼저 시각화 컬럼 추가
+                foreach (string column in visibleColumns)
+                {
+                    resultTable.Columns.Add(column, typeof(string));
+                }
+
+                // 2. 그 다음 원본 transformDataTable의 컬럼 추가 (중복 제외)
+                foreach (DataColumn column in transformDataTable.Columns)
+                {
+                    if (!resultTable.Columns.Contains(column.ColumnName))
+                    {
+                        resultTable.Columns.Add(column.ColumnName, column.DataType);
+                    }
+                }
+
+                // 3. 원본 데이터의 모든 행 복사
+                foreach (DataRow originalRow in transformDataTable.Rows)
+                {
+                    DataRow newRow = resultTable.NewRow();
+
+                    // 원본 테이블의 모든 컬럼 값을 새 행에 복사
+                    foreach (DataColumn column in transformDataTable.Columns)
+                    {
+                        if (resultTable.Columns.Contains(column.ColumnName))
+                        {
+                            newRow[column.ColumnName] = originalRow[column.ColumnName];
+                        }
+                    }
+
+                    resultTable.Rows.Add(newRow);
+                }
+
+                // 4. raw_data_id 컬럼이 있는지 확인
+                if (!resultTable.Columns.Contains("raw_data_id"))
+                {
+                    Debug.WriteLine("transformDataTable에 raw_data_id 컬럼이 없습니다.");
+                    return resultTable;
+                }
+
+                // 5. RawData 저장소 생성
+                var rawDataRepo = new Repositories.RawDataRepository();
+
+                // 6. 모든 행의 raw_data_id 목록 수집
+                HashSet<string> rawDataIds = new HashSet<string>();
+                Dictionary<string, List<DataRow>> idToRowsMap = new Dictionary<string, List<DataRow>>();
+
+                foreach (DataRow row in resultTable.Rows)
+                {
+                    if (row["raw_data_id"] != DBNull.Value)
+                    {
+                        string rawDataId = row["raw_data_id"].ToString();
+                        if (!string.IsNullOrEmpty(rawDataId))
+                        {
+                            rawDataIds.Add(rawDataId);
+
+                            if (!idToRowsMap.ContainsKey(rawDataId))
+                            {
+                                idToRowsMap[rawDataId] = new List<DataRow>();
+                            }
+                            idToRowsMap[rawDataId].Add(row);
+                        }
+                    }
+                }
+
+                if (rawDataIds.Count == 0)
+                {
+                    Debug.WriteLine("유효한 raw_data_id가 없습니다.");
+                    return resultTable;
+                }
+
+                Debug.WriteLine($"보강할 raw_data_id: {rawDataIds.Count}개");
+
+                // 7. 배치 처리로 원본 데이터 가져오기
+                const int batchSize = 100;
+                List<string> idList = rawDataIds.ToList();
+
+                // 안전한 배치 처리
+                for (int i = 0; i < idList.Count; i += batchSize)
+                {
+                    int currentBatchSize = Math.Min(batchSize, idList.Count - i);
+                    if (i >= idList.Count || currentBatchSize <= 0)
+                        continue;
+
+                    List<string> batchIds = idList.GetRange(i, currentBatchSize);
+
+                    // MongoDB ID 형식으로 필터 생성
+                    var batchFilter = Builders<MongoModels.RawDataDocument>.Filter.In(d => d.Id, batchIds);
+                    var batchRawDatas = await rawDataRepo.FindDocumentsAsync(batchFilter);
+
+                    Debug.WriteLine($"배치 조회 결과: {batchRawDatas.Count}개 문서 ({i + 1}-{i + currentBatchSize}배치)");
+
+                    // 조회된 데이터를 매핑
+                    foreach (var rawData in batchRawDatas)
+                    {
+                        string id = rawData.Id;
+
+                        if (idToRowsMap.ContainsKey(id) && rawData.Data != null)
+                        {
+                            foreach (DataRow resultRow in idToRowsMap[id])
+                            {
+                                foreach (string column in visibleColumns)
+                                {
+                                    if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
+                                    {
+                                        resultRow[column] = rawData.Data[column]?.ToString() ?? string.Empty;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Debug.WriteLine($"배치 처리 완료: {batchIds.Count}개 ID, 처리된 ID: {batchRawDatas.Count}");
+                }
+
+                // 이미 필요한 메타데이터 컬럼만 있을테니 더 이상 제거할 필요 없음
+                Debug.WriteLine("EnrichTransformDataWithMongoData 완료");
+                return resultTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 데이터 보강 중 오류 발생: {ex.Message}\n{ex.StackTrace}");
+                // 예외 발생 시 원본 데이터 테이블의 복사본 반환
+                return transformDataTable.Copy();
+            }
         }
 
 
@@ -211,6 +555,7 @@ namespace FinanceTool
             try
             {
                 searchYN = true;
+
                 if (progressYN)
                 {
                     using (var progressForm = new ProcessProgressForm())
@@ -218,520 +563,274 @@ namespace FinanceTool
                         Debug.WriteLine("create_merge_keyword_list start ");
                         progressForm.Show();
                         await progressForm.UpdateProgressHandler(10, "키워드 요약 테이블 생성 중...");
-                        await Task.Delay(10);
 
-                        Debug.WriteLine("progressForm start");
+                        await ProcessMergeKeywordListWithProgress(progressForm.UpdateProgressHandler);
 
-                        // 1~4 단계는 동일 (테이블 생성 및 정보 가져오기)
-                        //컬럼종류가 다르다면 테이블 다시 생성
-                        if (transformDataTable.Columns.Count != keywordColumnsCount)
-                        {
-                            dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_transform_data");
-                        }
-
-                        Debug.WriteLine("DROP TABLE IF EXISTS temp_transform_data complete");
-
-                        CreateTempTableFromDataTable("temp_transform_data", transformDataTable);
-                        CreateTempTableFromDataTable("temp_money_data", DataHandler.moneyDataTable, true);
-
-                        List<string> columns = transformDataTable.Columns.Cast<DataColumn>()
-                        .Select(col => $"{col.ColumnName} {GetSQLiteType(col.DataType)}")
-                        .ToList();
-
-                        
-                        Debug.WriteLine($"  transformDataTable.Columns : {string.Join(",", columns)}");
-
-                        // 데이터베이스 최적화 설정 추가
-                        dbmanager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
-                        dbmanager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
-                        dbmanager.Instance.ExecuteNonQuery("PRAGMA cache_size = 10000");
-                        dbmanager.Instance.ExecuteNonQuery("PRAGMA temp_store = MEMORY");
-
-                        // 임시 테이블에 인덱스 생성
-                        dbmanager.Instance.ExecuteNonQuery("CREATE INDEX IF NOT EXISTS idx_temp_transform_value ON temp_transform_data(raw_data_id)");
-
-                        // 컬럼 정보 가져오기 (기존 코드와 동일)
-                        string tableInfoQuery = "PRAGMA table_info(temp_transform_data)";
-                        DataTable columnInfo = dbmanager.Instance.ExecuteQuery(tableInfoQuery);
-
-                        await progressForm.UpdateProgressHandler(40, "키워드 요약 테이블 생성 중...");
-                        await Task.Delay(10);
-                        Debug.WriteLine("PRAGMA TABLE complete");
-
-                        List<string> columnNames = new List<string>();
-                        foreach (DataRow row in columnInfo.Rows)
-                        {
-                            string colName = row["name"].ToString();
-                            if (colName.ToLower() != "rowid" && colName.ToLower() != "id"
-                                && colName.ToLower() != "raw_data_id" && colName.ToLower() != "import_date")
-                            {
-                                columnNames.Add(colName);
-                            }
-                        }
-
-                        // json_array 생성 (기존 코드와 동일)
-                        StringBuilder jsonArrayBuilder = new StringBuilder();
-                        for (int i = 0; i < columnNames.Count; i++)
-                        {
-                            if (i > 0) jsonArrayBuilder.Append(", ");
-                            jsonArrayBuilder.Append($"CAST(t.{columnNames[i]} AS TEXT)");
-                        }
-
-                        string moneyColumnName = DataHandler.moneyDataTable.Columns[0].ColumnName;
-
-                        // 5. 키워드 분할 전략 적용
-                        // 5.1 먼저 키워드 추출 및 카운팅 임시 테이블 생성
-                        string extractQuery = $@"
-                    DROP TABLE IF EXISTS temp_keywords;
-                    CREATE TABLE temp_keywords AS
-                    WITH split_data AS (
-                        SELECT t.raw_data_id as row_id, j.value
-                        FROM temp_transform_data t, 
-                             json_each(json_array(
-                                {jsonArrayBuilder.ToString()}
-                             )) j
-                        WHERE j.value IS NOT NULL AND TRIM(j.value) != ''
-                    )
-                    SELECT 
-                        TRIM(value) as keyword,
-                        COUNT(*) as occurrence_count
-                    FROM split_data
-                    GROUP BY TRIM(value)
-                    ORDER BY occurrence_count DESC, keyword ASC;";
-
-                        dbmanager.Instance.ExecuteNonQuery(extractQuery);
-                        dbmanager.Instance.ExecuteNonQuery("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword)");
-
-                        Debug.WriteLine("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword) complete");
-
-                        // 5.2 전체 키워드 수 확인
-                        int totalKeywords = Convert.ToInt32(dbmanager.Instance.ExecuteScalar("SELECT COUNT(*) FROM temp_keywords"));
-                        Debug.WriteLine($"총 키워드 수: {totalKeywords}");
-
-                        // 5.3 페이징 처리를 위한 설정
-                        int pageSize = 1000; // 한 번에 처리할 키워드 수
-                        int totalPages = (int)Math.Ceiling(totalKeywords / (double)pageSize);
-
-                        // 결과를 저장할 DataTable 생성
-                        DataTable sumMoneyTable = new DataTable();
-                        sumMoneyTable.Columns.Add("keyword", typeof(string));
-                        sumMoneyTable.Columns.Add("occurrence_count", typeof(int));
-                        sumMoneyTable.Columns.Add("total_money", typeof(decimal));
-
-                        
-
-
-                        await progressForm.UpdateProgressHandler(70, "키워드 요약 정보 산출 중...");
-                        await Task.Delay(10);
-
-
-                        // 5.4 병렬 페이지 처리
-                        List<Task<DataTable>> pageTasks = new List<Task<DataTable>>();
-
-                        for (int page = 0; page < totalPages; page++)
-                        {
-                            int offset = page * pageSize;
-                            int currentPage = page; // 클로저를 위해 복사
-
-                            Task<DataTable> pageTask = Task.Run(() =>
-                            {
-                                string pageQuery = $@"
-                    WITH page_keywords AS (
-                        SELECT keyword, occurrence_count
-                        FROM temp_keywords
-                        LIMIT {pageSize} OFFSET {offset}
-                    ),
-                    split_data AS (
-                        SELECT t.raw_data_id as row_id, TRIM(j.value) as value
-                        FROM temp_transform_data t, 
-                             json_each(json_array(
-                                {jsonArrayBuilder.ToString()}
-                             )) j
-                        WHERE j.value IS NOT NULL AND TRIM(j.value) != ''
-                    )
-                    SELECT 
-                        k.keyword,
-                        k.occurrence_count,
-                        COALESCE(SUM(CAST(m.'{moneyColumnName}' AS DECIMAL)), 0) as total_money
-                    FROM page_keywords k
-                    LEFT JOIN split_data s ON k.keyword = s.value
-                    LEFT JOIN temp_money_data m ON s.row_id = m.raw_data_id
-                    GROUP BY k.keyword, k.occurrence_count
-                    ORDER BY k.occurrence_count DESC, k.keyword ASC;";
-
-                                Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 시작");
-                                DataTable pageResult = dbmanager.Instance.ExecuteQuery(pageQuery);
-                                Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 완료: {pageResult.Rows.Count}개 행");
-
-                                return pageResult;
-                            });
-
-                            pageTasks.Add(pageTask);
-                        }
-
-                        // 모든 페이지 작업 대기
-                        Debug.WriteLine($"총 {pageTasks.Count}개 페이지 작업 시작");
-                        DataTable[] results = await Task.WhenAll(pageTasks);
-                        Debug.WriteLine("모든 페이지 작업 완료");
-
-                        // 결과 병합
-                        foreach (DataTable pageResult in results)
-                        {
-                            foreach (DataRow row in pageResult.Rows)
-                            {
-                                sumMoneyTable.Rows.Add(
-                                    row["keyword"],
-                                    row["occurrence_count"],
-                                    row["total_money"]
-                                );
-                            }
-                        }
-
-                        Debug.WriteLine($"병합된 결과: {sumMoneyTable.Rows.Count}개 행");
-
-                        // 이하 기존 코드와 동일
-                        modifiedDataTable = new DataTable();
-                        modifiedDataTable.Columns.Add("Value", typeof(string));
-                        modifiedDataTable.Columns.Add("Count", typeof(int));
-                        modifiedDataTable.Columns.Add("합산금액", typeof(string));
-                        foreach (DataRow row in sumMoneyTable.Rows)
-                        {
-                            //modifiedDataTable.Rows.Add(row["keyword"], row["occurrence_count"], row["total_money"]);
-                            modifiedDataTable.Rows.Add(row["keyword"], row["occurrence_count"], FormatToKoreanUnit(Convert.ToDecimal(row["total_money"].ToString())));
-
-                        }
-
-                      
-                        await progressForm.UpdateProgressHandler(90, "테이블 생성 마무리 중...");
-                        await Task.Delay(10);
-
-
-                        // UI 업데이트 부분만 UI 스레드에서 실행
-                        await Task.Run(() =>
-                        {
-                            if (Application.OpenForms.Count > 0)
-                            {
-                                Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                                {
-
-                                  
-
-                                    if (sum_keyword_table.Rows.Count > 0)
-                                    {
-                                        sum_keyword_table.Rows.Clear();
-                                        sum_keyword_table.Columns.Clear();
-                                    }
-
-                                    // 원본 DataTable의 컬럼들 추가
-                                    foreach (DataColumn col in modifiedDataTable.Columns)
-                                    {
-                                        sum_keyword_table.Columns.Add(col.ColumnName, col.ColumnName);
-                                    }
-
-
-                                    // 데이터 필터링 및 추가
-                                    foreach (DataRow row in modifiedDataTable.Rows)
-                                    {
-                                        int rowIndex = sum_keyword_table.Rows.Add();
-
-                                        // 데이터 채우기
-                                        for (int i = 0; i < modifiedDataTable.Columns.Count; i++)
-                                        {
-                                            sum_keyword_table.Rows[rowIndex].Cells[i].Value = row[i];  // +1은 체크박스 컬럼 때문
-                                        }
-
-
-                                    }
-
-                                    // DataGridView 속성 설정
-                                    sum_keyword_table.AllowUserToAddRows = false;
-                                    sum_keyword_table.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                                    sum_keyword_table.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                                    sum_keyword_table.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-                                   
-
-                                    // 나머지 컬럼들은 읽기 전용으로 설정
-                                    for (int i = 1; i < sum_keyword_table.Columns.Count; i++)
-                                    {
-                                        sum_keyword_table.Columns[i].ReadOnly = true;
-                                    }
-
-                                });
-                            }
-                        });
-
-
-                        // 임시 테이블 정리
-                        //CleanupTempTables();
-                        dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_keywords");
-
-                       
-
-                        await progressForm.UpdateProgressHandler(100);
-                        await Task.Delay(10);
-                        progressForm.Close();
-
+                        await progressForm.UpdateProgressHandler(100, "완료");
                     }
                 }
                 else
                 {
-                    // 1~4 단계는 동일 (테이블 생성 및 정보 가져오기)
-                    //컬럼종류가 다르다면 테이블 다시 생성
-                    if (transformDataTable.Columns.Count != keywordColumnsCount)
-                    {
-                        dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_transform_data");
-                    }
-
-
-                    CreateTempTableFromDataTable("temp_transform_data", transformDataTable);
-                    CreateTempTableFromDataTable("temp_money_data", DataHandler.moneyDataTable, true);
-
-                    List<string> columns = transformDataTable.Columns.Cast<DataColumn>()
-                    .Select(col => $"{col.ColumnName} {GetSQLiteType(col.DataType)}")
-                    .ToList();
-
-                    Debug.WriteLine(string.Join(",", columns));
-
-                    // 데이터베이스 최적화 설정 추가
-                    dbmanager.Instance.ExecuteNonQuery("PRAGMA journal_mode = MEMORY");
-                    dbmanager.Instance.ExecuteNonQuery("PRAGMA synchronous = OFF");
-                    dbmanager.Instance.ExecuteNonQuery("PRAGMA cache_size = 10000");
-                    dbmanager.Instance.ExecuteNonQuery("PRAGMA temp_store = MEMORY");
-
-                    // 임시 테이블에 인덱스 생성
-                    dbmanager.Instance.ExecuteNonQuery("CREATE INDEX IF NOT EXISTS idx_temp_transform_value ON temp_transform_data(raw_data_id)");
-
-                    // 컬럼 정보 가져오기 (기존 코드와 동일)
-                    string tableInfoQuery = "PRAGMA table_info(temp_transform_data)";
-                    DataTable columnInfo = dbmanager.Instance.ExecuteQuery(tableInfoQuery);
-
-                    List<string> columnNames = new List<string>();
-                    foreach (DataRow row in columnInfo.Rows)
-                    {
-                        string colName = row["name"].ToString();
-                        if (colName.ToLower() != "rowid" && colName.ToLower() != "id"
-                            && colName.ToLower() != "raw_data_id" && colName.ToLower() != "import_date")
-                        {
-                            columnNames.Add(colName);
-                        }
-                    }
-
-                    // json_array 생성 (기존 코드와 동일)
-                    StringBuilder jsonArrayBuilder = new StringBuilder();
-                    for (int i = 0; i < columnNames.Count; i++)
-                    {
-                        if (i > 0) jsonArrayBuilder.Append(", ");
-                        jsonArrayBuilder.Append($"CAST(t.{columnNames[i]} AS TEXT)");
-                    }
-
-                    string moneyColumnName = DataHandler.moneyDataTable.Columns[0].ColumnName;
-
-                    // 5. 키워드 분할 전략 적용
-                    // 5.1 먼저 키워드 추출 및 카운팅 임시 테이블 생성
-                    string extractQuery = $@"
-                    DROP TABLE IF EXISTS temp_keywords;
-                    CREATE TABLE temp_keywords AS
-                    WITH split_data AS (
-                        SELECT t.raw_data_id as row_id, j.value
-                        FROM temp_transform_data t, 
-                             json_each(json_array(
-                                {jsonArrayBuilder.ToString()}
-                             )) j
-                        WHERE j.value IS NOT NULL AND TRIM(j.value) != ''
-                    )
-                    SELECT 
-                        TRIM(value) as keyword,
-                        COUNT(*) as occurrence_count
-                    FROM split_data
-                    GROUP BY TRIM(value)
-                    ORDER BY occurrence_count DESC, keyword ASC;";
-
-                    dbmanager.Instance.ExecuteNonQuery(extractQuery);
-                    dbmanager.Instance.ExecuteNonQuery("CREATE INDEX idx_temp_keywords ON temp_keywords(keyword)");
-
-                    // 5.2 전체 키워드 수 확인
-                    int totalKeywords = Convert.ToInt32(dbmanager.Instance.ExecuteScalar("SELECT COUNT(*) FROM temp_keywords"));
-                    Debug.WriteLine($"총 키워드 수: {totalKeywords}");
-
-                    // 5.3 페이징 처리를 위한 설정
-                    int pageSize = 1000; // 한 번에 처리할 키워드 수
-                    int totalPages = (int)Math.Ceiling(totalKeywords / (double)pageSize);
-
-                    // 결과를 저장할 DataTable 생성
-                    DataTable sumMoneyTable = new DataTable();
-                    sumMoneyTable.Columns.Add("keyword", typeof(string));
-                    sumMoneyTable.Columns.Add("occurrence_count", typeof(int));
-                    sumMoneyTable.Columns.Add("total_money", typeof(decimal));
-
-                    // 5.4 병렬 페이지 처리
-                    List<Task<DataTable>> pageTasks = new List<Task<DataTable>>();
-
-                    for (int page = 0; page < totalPages; page++)
-                    {
-                        int offset = page * pageSize;
-                        int currentPage = page; // 클로저를 위해 복사
-
-                        Task<DataTable> pageTask = Task.Run(() =>
-                        {
-                            string pageQuery = $@"
-                    WITH page_keywords AS (
-                        SELECT keyword, occurrence_count
-                        FROM temp_keywords
-                        LIMIT {pageSize} OFFSET {offset}
-                    ),
-                    split_data AS (
-                        SELECT t.raw_data_id as row_id, TRIM(j.value) as value
-                        FROM temp_transform_data t, 
-                             json_each(json_array(
-                                {jsonArrayBuilder.ToString()}
-                             )) j
-                        WHERE j.value IS NOT NULL AND TRIM(j.value) != ''
-                    )
-                    SELECT 
-                        k.keyword,
-                        k.occurrence_count,
-                        COALESCE(SUM(CAST(m.'{moneyColumnName}' AS DECIMAL)), 0) as total_money
-                    FROM page_keywords k
-                    LEFT JOIN split_data s ON k.keyword = s.value
-                    LEFT JOIN temp_money_data m ON s.row_id = m.raw_data_id
-                    GROUP BY k.keyword, k.occurrence_count
-                    ORDER BY k.occurrence_count DESC, k.keyword ASC;";
-
-                            Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 시작");
-                            DataTable pageResult = dbmanager.Instance.ExecuteQuery(pageQuery);
-                            Debug.WriteLine($"페이지 {currentPage + 1}/{totalPages} 처리 완료: {pageResult.Rows.Count}개 행");
-
-                            return pageResult;
-                        });
-
-                        pageTasks.Add(pageTask);
-                    }
-
-                    // 모든 페이지 작업 대기
-                    Debug.WriteLine($"총 {pageTasks.Count}개 페이지 작업 시작");
-                    DataTable[] results = await Task.WhenAll(pageTasks);
-                    Debug.WriteLine("모든 페이지 작업 완료");
-
-                    // 결과 병합
-                    foreach (DataTable pageResult in results)
-                    {
-                        foreach (DataRow row in pageResult.Rows)
-                        {
-                            sumMoneyTable.Rows.Add(
-                                row["keyword"],
-                                row["occurrence_count"],
-                                row["total_money"]
-                            );
-                        }
-                    }
-
-                    Debug.WriteLine($"병합된 결과: {sumMoneyTable.Rows.Count}개 행");
-
-                    // 이하 기존 코드와 동일
-                    modifiedDataTable = new DataTable();
-                    modifiedDataTable.Columns.Add("Value", typeof(string));
-                    modifiedDataTable.Columns.Add("Count", typeof(int));
-                    modifiedDataTable.Columns.Add("합산금액", typeof(string));
-                    foreach (DataRow row in sumMoneyTable.Rows)
-                    {
-                        //modifiedDataTable.Rows.Add(row["keyword"], row["occurrence_count"], row["total_money"]);
-                        modifiedDataTable.Rows.Add(row["keyword"], row["occurrence_count"], FormatToKoreanUnit(Convert.ToDecimal(row["total_money"].ToString())));
-
-                    }
-
-                    // 금액 데이터만 추출
-                    //DataTable onlyMoneyValue = DataHandler.ExtractColumnToNewTable(sumMoneyTable, 2);
-
-                    // 결과 병합
-                    //modifiedDataTable = DataHandler.AddColumnsFromBToA(modifiedDataTable, onlyMoneyValue);
-
-                    // 단위 환산 컬럼 추가
-                    //modifiedDataTable = AddKoreanUnitColumn(modifiedDataTable);
-
-                    // UI 업데이트 부분만 UI 스레드에서 실행
-                    await Task.Run(() =>
-                    {
-                        if (Application.OpenForms.Count > 0)
-                        {
-                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                            {
-
-                                // UI 컨트롤 접근은 이 블록 내부에서만 수행
-                                /*
-                                sum_keyword_table.DataSource = modifiedDataTable;
-                                sum_keyword_table.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                                //dataGridView_modified.Columns[1].HeaderText = "Count";
-                                sum_keyword_table.Columns[1].DefaultCellStyle.Format = "N0";
-                                //dataGridView_modified.Columns[2].HeaderText = "합산금액";
-                                //dataGridView_modified.Columns[2].DefaultCellStyle.Format = "N0";
-                                */
-                                //dataGridview 직접 생성
-
-                                if (sum_keyword_table.Rows.Count > 0)
-                                {
-                                    sum_keyword_table.Rows.Clear();
-                                    sum_keyword_table.Columns.Clear();
-                                }
-
-                                // 원본 DataTable의 컬럼들 추가
-                                foreach (DataColumn col in modifiedDataTable.Columns)
-                                {
-                                    sum_keyword_table.Columns.Add(col.ColumnName, col.ColumnName);
-                                }
-
-
-                                // 데이터 필터링 및 추가
-                                foreach (DataRow row in modifiedDataTable.Rows)
-                                {
-                                    int rowIndex = sum_keyword_table.Rows.Add();
-
-                                    // 데이터 채우기
-                                    for (int i = 0; i < modifiedDataTable.Columns.Count; i++)
-                                    {
-                                        sum_keyword_table.Rows[rowIndex].Cells[i].Value = row[i];  // +1은 체크박스 컬럼 때문
-                                    }
-
-
-                                }
-
-                                // DataGridView 속성 설정
-                                sum_keyword_table.AllowUserToAddRows = false;
-                                sum_keyword_table.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                                sum_keyword_table.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                                sum_keyword_table.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-                                //dgv.Columns[2].DefaultCellStyle.Format = "N0";
-                                //dgv.Columns[3].DefaultCellStyle.Format = "N0";
-
-                                //Debug.WriteLine($"dgv.Columns[1] : {dgv.Columns[1].Name}");
-                                //Debug.WriteLine($"dgv.Columns[2] : {dgv.Columns[2].Name}");
-
-                                // 나머지 컬럼들은 읽기 전용으로 설정
-                                for (int i = 1; i < sum_keyword_table.Columns.Count; i++)
-                                {
-                                    sum_keyword_table.Columns[i].ReadOnly = true;
-                                }
-
-                            });
-                        }
-                    });
-
-
-                    // 임시 테이블 정리
-                    //CleanupTempTables();
-                    dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_keywords");
+                    // 프로그레스 없이 진행
+                    await ProcessMergeKeywordListWithProgress(null);
                 }
-               
-                
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"키워드 리스트 생성 오류: {ex.Message}");
+                Debug.WriteLine($"키워드 리스트 생성 오류: {ex.Message}\n{ex.StackTrace}");
                 throw;
             }
             finally
             {
                 Debug.WriteLine($"create_merge_keyword_list complete");
                 searchYN = false;
+            }
+        }
+
+        // 키워드 병합 처리 함수
+        private async Task ProcessMergeKeywordListWithProgress(ProcessProgressForm.UpdateProgressDelegate progress)
+        {
+            try
+            {
+                // 진행 상황 업데이트 래퍼 함수
+                async Task UpdateProgress(int percentage, string message = null)
+                {
+                    if (progress != null)
+                    {
+                        await progress(percentage, message);
+                    }
+                }
+
+                await UpdateProgress(15, "키워드 데이터 로딩 중...");
+
+                // 1. 키워드 데이터 확인
+                if (transformDataTable == null || transformDataTable.Rows.Count == 0)
+                {
+                    Debug.WriteLine("데이터 테이블이 비어 있습니다.");
+                    return;
+                }
+
+                // 2. 키워드 컬럼 식별 (Column2부터 시작하는 컬럼들)
+                List<string> keywordColumns = new List<string>();
+                foreach (DataColumn column in transformDataTable.Columns)
+                {
+                    if (column.ColumnName.StartsWith("Column") &&
+                        int.TryParse(column.ColumnName.Substring(6), out int colIndex) &&
+                        colIndex >= 2)
+                    {
+                        keywordColumns.Add(column.ColumnName);
+                    }
+                }
+
+                Debug.WriteLine($"키워드 컬럼: {string.Join(", ", keywordColumns)}");
+
+                if (keywordColumns.Count == 0)
+                {
+                    Debug.WriteLine("키워드 컬럼을 찾을 수 없습니다.");
+                    return;
+                }
+
+                await UpdateProgress(20, "키워드 추출 중...");
+
+                // 3. 모든 키워드 추출 및 빈도 계산
+                // 병렬 처리 위한 ConcurrentDictionary 사용
+                ConcurrentDictionary<string, int> concurrentFrequency = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                ConcurrentDictionary<string, ConcurrentBag<string>> concurrentKeywordToRawDataIds =
+                    new ConcurrentDictionary<string, ConcurrentBag<string>>(StringComparer.OrdinalIgnoreCase);
+
+                // 시스템 리소스에 맞게 병렬 처리 최적화
+                int cpuCount = Environment.ProcessorCount;
+                int maxDegreeOfParallelism = Math.Max(1, cpuCount - 1); // 시스템에 하나의 코어는 남겨둠
+
+                // 행 병렬 처리로 키워드 추출 및 빈도 계산
+                await Task.Run(() => {
+                    Parallel.ForEach(transformDataTable.AsEnumerable(),
+                        new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism },
+                        row => {
+                            string rawDataId = row["raw_data_id"]?.ToString();
+                            if (string.IsNullOrEmpty(rawDataId)) return;
+
+                            // 각 키워드 컬럼에서 키워드 추출
+                            foreach (string colName in keywordColumns)
+                            {
+                                string keyword = row[colName]?.ToString();
+                                if (string.IsNullOrWhiteSpace(keyword)) continue;
+
+                                // 키워드 표준화
+                                keyword = keyword.Trim();
+
+                                // 키워드 빈도 증가
+                                concurrentFrequency.AddOrUpdate(keyword, 1, (k, v) => v + 1);
+
+                                // 키워드에 해당하는 raw_data_id 추가
+                                concurrentKeywordToRawDataIds.AddOrUpdate(
+                                    keyword,
+                                    new ConcurrentBag<string> { rawDataId },
+                                    (k, bag) => {
+                                        bag.Add(rawDataId);
+                                        return bag;
+                                    });
+                            }
+                        });
+                });
+
+                // 일반 Dictionary로 변환 및 중복 제거
+                Dictionary<string, int> keywordFrequency = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                Dictionary<string, List<string>> keywordToRawDataIds = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var pair in concurrentFrequency)
+                {
+                    keywordFrequency[pair.Key] = pair.Value;
+                }
+
+                foreach (var pair in concurrentKeywordToRawDataIds)
+                {
+                    keywordToRawDataIds[pair.Key] = pair.Value.Distinct().ToList();
+                }
+
+                await UpdateProgress(40, $"키워드별 금액 합산 중... ({keywordFrequency.Count}개 키워드)");
+
+                // 4. 키워드별 금액 합산
+                Dictionary<string, decimal> keywordTotalMoney = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+
+                // 금액 데이터가 로드되었는지 확인
+                if (DataHandler.moneyDataTable == null || DataHandler.moneyDataTable.Rows.Count == 0)
+                {
+                    Debug.WriteLine("금액 데이터가 로드되지 않았습니다. 금액 데이터를 로드합니다.");
+                    try
+                    {
+                        await LoadMoneyDataFromMongoDB();
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"금액 데이터 로드 오류: {ex.Message}");
+                        // 금액 데이터 없이 계속 진행 (0으로 처리)
+                    }
+                }
+
+                // 금액 데이터를 Dictionary에 캐싱 (raw_data_id -> 금액)
+                Dictionary<string, decimal> rawDataToMoney = new Dictionary<string, decimal>();
+
+                if (DataHandler.moneyDataTable != null)
+                {
+                    foreach (DataRow row in DataHandler.moneyDataTable.Rows)
+                    {
+                        string rawDataId = row["raw_data_id"]?.ToString();
+                        if (!string.IsNullOrEmpty(rawDataId) && row["amount"] != DBNull.Value)
+                        {
+                            decimal amount = Convert.ToDecimal(row["amount"]);
+                            rawDataToMoney[rawDataId] = amount;
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"금액 정보가 로드된 raw_data_id: {rawDataToMoney.Count}개");
+
+                // 키워드별 금액 합산 (병렬 처리)
+                await Task.Run(() => {
+                    Parallel.ForEach(keywordToRawDataIds,
+                        new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism },
+                        pair => {
+                            string keyword = pair.Key;
+                            List<string> rawDataIds = pair.Value;
+
+                            decimal totalAmount = 0;
+                            foreach (string rawDataId in rawDataIds)
+                            {
+                                if (rawDataToMoney.TryGetValue(rawDataId, out decimal amount))
+                                {
+                                    totalAmount += amount;
+                                }
+                            }
+
+                            // 결과에 저장
+                            keywordTotalMoney[keyword] = totalAmount;
+                        });
+                });
+
+                await UpdateProgress(60, "요약 데이터 생성 중...");
+
+                // 5. 결과 DataTable 생성
+                modifiedDataTable = new DataTable();
+                modifiedDataTable.Columns.Add("Value", typeof(string));
+                modifiedDataTable.Columns.Add("Count", typeof(int));
+                modifiedDataTable.Columns.Add("합산금액", typeof(string));
+
+                // 키워드 빈도 기준으로 정렬 (내림차순)
+                var sortedKeywords = keywordFrequency.OrderByDescending(pair => pair.Value)
+                                                      .ThenBy(pair => pair.Key);
+
+                foreach (var pair in sortedKeywords)
+                {
+                    string keyword = pair.Key;
+                    int count = pair.Value;
+                    decimal totalMoney = keywordTotalMoney.ContainsKey(keyword) ? keywordTotalMoney[keyword] : 0;
+
+                    // 금액 포맷팅
+                    string formattedMoney = FormatToKoreanUnit(totalMoney);
+
+                    // 디버깅용 로깅 (첫 10개)
+                    if (modifiedDataTable.Rows.Count < 10)
+                    {
+                        Debug.WriteLine($"키워드: {keyword}, 빈도: {count}, 금액: {totalMoney} -> {formattedMoney}");
+                    }
+
+                    modifiedDataTable.Rows.Add(keyword, count, formattedMoney);
+                }
+
+                await UpdateProgress(80, "UI 업데이트 중...");
+
+                // 6. UI 업데이트 (GridView에 표시)
+                await Task.Run(() => {
+                    if (Application.OpenForms.Count > 0)
+                    {
+                        Application.OpenForms[0].Invoke((MethodInvoker)delegate {
+                            if (sum_keyword_table.Rows.Count > 0)
+                            {
+                                sum_keyword_table.Rows.Clear();
+                                sum_keyword_table.Columns.Clear();
+                            }
+
+                            // 원본 DataTable의 컬럼들 추가
+                            foreach (DataColumn col in modifiedDataTable.Columns)
+                            {
+                                sum_keyword_table.Columns.Add(col.ColumnName, col.ColumnName);
+                            }
+
+                            // 데이터 추가
+                            foreach (DataRow row in modifiedDataTable.Rows)
+                            {
+                                int rowIndex = sum_keyword_table.Rows.Add();
+
+                                // 데이터 채우기
+                                for (int i = 0; i < modifiedDataTable.Columns.Count; i++)
+                                {
+                                    sum_keyword_table.Rows[rowIndex].Cells[i].Value = row[i];
+                                }
+                            }
+
+                            // DataGridView 속성 설정
+                            sum_keyword_table.AllowUserToAddRows = false;
+                            sum_keyword_table.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                            sum_keyword_table.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                            sum_keyword_table.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+
+                            // 나머지 컬럼들은 읽기 전용으로 설정
+                            for (int i = 1; i < sum_keyword_table.Columns.Count; i++)
+                            {
+                                sum_keyword_table.Columns[i].ReadOnly = true;
+                            }
+                        });
+                    }
+                });
+
+                await UpdateProgress(90, "완료된 결과: " + modifiedDataTable.Rows.Count + "개 키워드");
+                Debug.WriteLine($"키워드 요약 테이블 생성 완료: {modifiedDataTable.Rows.Count}개 키워드");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"키워드 분석 중 오류 발생: {ex.Message}\n{ex.StackTrace}");
+                throw;
             }
         }
 
@@ -1036,30 +1135,56 @@ namespace FinanceTool
             return "TEXT";
         }
 
-        private async void set_keyword_combo_list()
+        private async Task set_keyword_combo_list()
         {
-            await Task.Run(() =>
+            try
             {
-                if (Application.OpenForms.Count > 0)
+                await Task.Run(() =>
                 {
-                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                    if (Application.OpenForms.Count > 0)
                     {
-                        // UI 컨트롤 접근은 이 블록 내부에서만 수행
-                        keyword_search_combo.Items.Clear();
-                        keyword_search_combo.Items.Add("키워드 선택");
-
-                        foreach (DataRow row in modifiedDataTable.Rows)
+                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
                         {
-                            keyword_search_combo.Items.Add(row[0].ToString());
-                        }
+                            // UI 컨트롤 접근은 이 블록 내부에서만 수행
+                            keyword_search_combo.Items.Clear();
+                            keyword_search_combo.Items.Add("키워드 선택");
 
-                        if (keyword_search_combo.Items.Count > 0)
-                            keyword_search_combo.SelectedIndex = 0; // 첫 번째 열 선택
-                    });
-                }
-            });
+                            // modifiedDataTable이 생성됐는지 확인
+                            if (modifiedDataTable != null && modifiedDataTable.Rows.Count > 0)
+                            {
+                                // 키워드 추가 (정렬된 상태 유지)
+                                foreach (DataRow row in modifiedDataTable.Rows)
+                                {
+                                    if (row[0] != null && row[0] != DBNull.Value)
+                                    {
+                                        string keyword = row[0].ToString();
+                                        if (!string.IsNullOrWhiteSpace(keyword))
+                                        {
+                                            keyword_search_combo.Items.Add(keyword);
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                Debug.WriteLine("키워드 데이터가 없습니다.");
+                            }
 
+                            // 첫 번째 항목 선택 (최소 1개 항목이 존재)
+                            if (keyword_search_combo.Items.Count > 0)
+                            {
+                                keyword_search_combo.SelectedIndex = 0;
+                            }
+                        });
+                    }
+                });
 
+                Debug.WriteLine($"키워드 콤보박스 설정 완료: {(keyword_search_combo.Items.Count - 1)}개 항목");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"키워드 콤보박스 설정 중 오류: {ex.Message}");
+            }
         }
 
         public void CreateFilteredDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords)
