@@ -292,36 +292,28 @@ uc_preprocessing.cs 파일의 데이터 처리 함수들에 대한 병렬 처리
   - 또한 이후 데이터 처리도 변경된 항목에 맞게 마이그레이션 필요.
 
 #### 병렬 처리 개선 대상 함수
-1. **keyword_seper_split_Click**
-   - 구분자 기반 키워드 분리 작업을 병렬 처리로 전환
-   - 동적 배치 크기 적용으로 처리 효율성 향상
-   - 진행 상황 표시 기능 추가
 
-2. **remove_1key_Click**
-   - 키워드 제거 작업을 병렬 처리로 최적화
-   - 진행 상황 표시 기능 추가
-
-3. **btn_apply_Click**
+1. **btn_apply_Click**
    - 사용자 정의 필터 적용 로직을 병렬 처리로 전환
    - MongoDB 업데이트 연산을 배치 처리로 구현
    - 진행 상황 표시 기능 추가
 
-4. **remove_apply_btn_Click**
+2. **remove_apply_btn_Click**
    - 필터 제거 작업을 병렬 처리로 최적화
    - 진행 상황 표시 기능 추가
 
-5. **keyword_model_split_Click**
+3. **keyword_model_split_Click**
    - Python 프로세스 호출 부분의 병렬 처리 최적화
    - 현재 시스템 리소스(CPU, RAM)를 최대한 활용하도록 작업 분할
    - 멀티프로세싱을 통한 Python 스크립트 성능 향상
    - 데이터 전송 오버헤드 최소화
 
-6. **btn_complete_Click**
+4. **btn_complete_Click**
    - `process_view_data` 데이터를 저장할 새 MongoDB 컬렉션 설계
    - 새 컬렉션을 위한 모델 클래스 및 저장소 구현
    - 병렬 삽입 처리 구현 (raw_data, process_data와 동일한 방식)
 
-7. **userControlHandler.uc_dataTransform.initUI**
+5. **userControlHandler.uc_dataTransform.initUI**
    - SQLite 조회 로직을 MongoDB 쿼리로 대체
    - 이후 데이터 처리 로직을 MongoDB 구조에 맞게 조정
 
