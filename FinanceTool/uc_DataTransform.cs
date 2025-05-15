@@ -588,6 +588,7 @@ namespace FinanceTool
         }
 
         // 키워드 병합 처리 함수
+        // 키워드 병합 처리 함수
         private async Task ProcessMergeKeywordListWithProgress(ProcessProgressForm.UpdateProgressDelegate progress)
         {
             try
@@ -691,7 +692,9 @@ namespace FinanceTool
                 await UpdateProgress(40, $"키워드별 금액 합산 중... ({keywordFrequency.Count}개 키워드)");
 
                 // 4. 키워드별 금액 합산
-                Dictionary<string, decimal> keywordTotalMoney = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                // Dictionary 대신 ConcurrentDictionary 사용
+                ConcurrentDictionary<string, decimal> concurrentKeywordTotalMoney =
+                    new ConcurrentDictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
                 // 금액 데이터가 로드되었는지 확인
                 if (DataHandler.moneyDataTable == null || DataHandler.moneyDataTable.Rows.Count == 0)
@@ -726,29 +729,54 @@ namespace FinanceTool
 
                 Debug.WriteLine($"금액 정보가 로드된 raw_data_id: {rawDataToMoney.Count}개");
 
-                // 키워드별 금액 합산 (병렬 처리)
+                // 키워드별 금액 합산 (병렬 처리) - 수정된 부분
                 await Task.Run(() => {
-                    Parallel.ForEach(keywordToRawDataIds,
-                        new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism },
-                        pair => {
-                            string keyword = pair.Key;
-                            List<string> rawDataIds = pair.Value;
-
-                            decimal totalAmount = 0;
-                            foreach (string rawDataId in rawDataIds)
-                            {
-                                if (rawDataToMoney.TryGetValue(rawDataId, out decimal amount))
+                    try
+                    {
+                        Parallel.ForEach(keywordToRawDataIds,
+                            new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism },
+                            pair => {
+                                try
                                 {
-                                    totalAmount += amount;
-                                }
-                            }
+                                    string keyword = pair.Key;
+                                    List<string> rawDataIds = pair.Value;
 
-                            // 결과에 저장
-                            keywordTotalMoney[keyword] = totalAmount;
-                        });
+                                    decimal totalAmount = 0;
+                                    foreach (string rawDataId in rawDataIds)
+                                    {
+                                        if (rawDataToMoney.TryGetValue(rawDataId, out decimal amount))
+                                        {
+                                            totalAmount += amount;
+                                        }
+                                    }
+
+                                    // 스레드 안전한 방식으로 결과 저장
+                                    concurrentKeywordTotalMoney.AddOrUpdate(
+                                        keyword,
+                                        totalAmount,
+                                        (k, oldValue) => totalAmount
+                                    );
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"키워드 처리 중 오류: {ex.Message}");
+                                }
+                            });
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"병렬 처리 중 오류: {ex.Message}");
+                        throw;
+                    }
                 });
 
                 await UpdateProgress(60, "요약 데이터 생성 중...");
+
+                // 결과를 일반 Dictionary로 변환
+                Dictionary<string, decimal> keywordTotalMoney = new Dictionary<string, decimal>(
+                    concurrentKeywordTotalMoney,
+                    StringComparer.OrdinalIgnoreCase
+                );
 
                 // 5. 결과 DataTable 생성
                 modifiedDataTable = new DataTable();

@@ -278,17 +278,15 @@ uc_preprocessing.cs 파일의 데이터 처리 함수들에 대한 병렬 처리
 - 병렬 처리에서의 자원 경합 문제를 적절한 동시성 제한으로 해결
 - 실패 로깅 메커니즘 추가로 문제 추적 개선
 
-## 2025-05-15 달성 목표
+## 2025-05-15 업데이트
 1.keyword_seper_split_Click 함수의 병렬 처리 적용 및 progressbar 추가 
 2.remove_1key_Click 함수의 병렬 처리 적용 및 progressbar 추가 
-3.btn_apply_Click 함수의 병렬 처리 적용 및 progressbar 추가 
-4.remove_apply_btn_Click 함수의 병렬 처리 적용 및 progressbar 추가 
-5.keyword_model_split_Click함수의 병렬 처리 적용 및 progressbar 추가
+3.keyword_model_split_Click함수의 병렬 처리 적용 및 progressbar 추가
  -  특히 여기는 python 프로그램을 호출하는 구간이라서 병렬 처리가 적용이 되어 있지만 현재 리소스(cpu,ram)을 최대한 활용하는 방법으로 더 개선
-6.btn_complete_Click 함수의 병렬처리 
+4.btn_complete_Click 함수의 병렬처리 
   -  기존 sqlite에서 process_view_data 데이터에 저장하던걸 collection 을 신규로 생성하여 nosql에 저장 
   - 관련된 클래스 및 래포지토리 소스 개발이 필요함 > 신규 생성된 collection 에 데이터 insert 시 raw_data,process_data insert 방식과 동일한 구성으로 병렬 처리 
-7.userControlHandler.uc_dataTransform.initUI(); 에서 기존sqlite 조회 로직을 collection 조회 기능으로 변경해야 함 
+5.userControlHandler.uc_dataTransform.initUI(); 에서 기존sqlite 조회 로직을 collection 조회 기능으로 변경해야 함 
   - 또한 이후 데이터 처리도 변경된 항목에 맞게 마이그레이션 필요.
 
 #### 병렬 처리 개선 대상 함수
@@ -360,3 +358,13 @@ var batches = documents
     .GroupBy(x => x.index / batchSize)
     .Select(g => g.Select(x => x.doc).ToList())
     .ToList();
+
+    
+## 2025-05-16 달성 목표
+1.preprocessing -> datatransfom 데이터 이동시 로직 개선 필요
+ > process_data table에서 금액 데이터를 제대로 가져오지 못함(금액 컬럼으로 지정한 컬럼 데이터를 제대로 확보하지 못하는 듯)
+ > 분할된 키워드가 제대로 등록되지 않음
+ > raw_data 컬렉션의 id값을 가져와서 raw_data와 정확한 동기화가 필요
+
+
+  
