@@ -204,19 +204,11 @@ FinanceTool/
 {
   "_id": ObjectId("..."),
   "process_data_id": ObjectId("..."),
+  "raw_data_id": ObjectId("..."),
   "keywords": {
-    "original_text": "원본 텍스트 내용",
-    "extracted_keywords": ["키워드1", "키워드2", "키워드3"],
-    "removed_keywords": ["제거된키워드1"],
     "final_keywords": ["키워드1", "키워드3"]
   },
-  "processing_info": {
-    "processing_type": "separator", // separator, model 등 처리 방식
-    "separator": ";",               // 구분자 처리 시 사용된 구분자
-    "model_name": "keyword_extraction_v1" // 모델 처리 시 사용된 모델
-  },
-  "processed_date": ISODate("2025-05-14T12:45:00Z"),
-  "user_modified": false,           // 사용자가 수정했는지 여부
+  "money": <금액 데이터>,
   "last_modified_date": ISODate("2025-05-14T12:45:00Z")
 }
 ```
@@ -314,20 +306,6 @@ uc_preprocessing.cs 파일의 데이터 처리 함수들에 대한 병렬 처리
 5. **userControlHandler.uc_dataTransform.initUI**
    - SQLite 조회 로직을 MongoDB 쿼리로 대체
    - 이후 데이터 처리 로직을 MongoDB 구조에 맞게 조정
-
-#### 새로운 MongoDB 모델 및 저장소 구현
-
-// 새로 추가될 ProcessViewDocument.cs 모델 예시
-{
-  "_id": ObjectId("..."),
-  "process_data_id": ObjectId("..."),
-  "keyword_data": {
-    "original_text": "원본 텍스트",
-    "extracted_keywords": ["키워드1", "키워드2", "..."]
-  },
-  "processed_date": ISODate("2025-05-14T10:30:00Z"),
-  "processing_type": "separator"
-}
 
 ## 병렬 처리 구현 전략
 

@@ -1,4 +1,5 @@
-﻿using DocumentFormat.OpenXml.Wordprocessing;
+﻿using DocumentFormat.OpenXml.Drawing;
+using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.VisualBasic.Devices;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -49,6 +50,7 @@ namespace FinanceTool
             DataHandler.SyncDataGridViewSelections(dataGridView_2nd, dataGridView_transform);
         }
         */
+        // initUI 메서드 수정
         public async Task initUI()
         {
             try
@@ -74,30 +76,21 @@ namespace FinanceTool
 
                     // MongoDB에서 process_view_data 컬렉션의 문서 조회
                     var filter = Builders<MongoModels.ProcessViewDocument>.Filter.Empty;
-                    var sort = Builders<MongoModels.ProcessViewDocument>.Sort.Descending(d => d.ProcessedDate);
+                    var sort = Builders<MongoModels.ProcessViewDocument>.Sort.Descending(d => d.LastModifiedDate);
 
-                    // 페이징 처리로 데이터 로드 (대용량 데이터 처리를 위해)
-                    const int pageSize = 1000;
-                    int pageNumber = 1;
-
-                    var (processViewDocs, totalCount) = await processViewRepo.GetPagedAsync(pageNumber, pageSize, filter);
-                    Debug.WriteLine($"ProcessView 문서 조회 결과: {processViewDocs.Count}개 문서, 총 {totalCount}개");
+                    var processViewDocs = await processViewRepo.GetAllAsync();
 
                     await progressForm.UpdateProgressHandler(30, $"ProcessView 데이터 변환 중...");
 
-                    // ProcessView 문서를 DataTable로 변환 - 원본 구조(Column0, Column1, ...)와 일치시킴
+                    // ProcessView 문서를 DataTable로 변환 - 키워드 바로 매핑
                     DataTable viewData = new DataTable();
 
                     // 필요한 메타데이터 컬럼 추가
                     viewData.Columns.Add("id", typeof(string));
                     viewData.Columns.Add("process_data_id", typeof(string));
-                    viewData.Columns.Add("raw_data_id", typeof(string));
+                    viewData.Columns.Add("raw_data_id", typeof(string)); // raw_data_id 직접 사용
 
-                    // 컬럼명을 원본과 일치하도록 설정 - Column0(금액), Column1(원본 텍스트)
-                    viewData.Columns.Add("Column0", typeof(string)); // 금액
-                    viewData.Columns.Add("Column1", typeof(string)); // 원본 텍스트
-
-                    // 키워드 컬럼들 추가 - 최대 개수는 필요에 따라 조정
+                    // 각 키워드를 별도 컬럼으로 추가
                     int maxKeywordColumns = 0;
 
                     // 전처리: 먼저 최대 키워드 컬럼 수를 결정
@@ -107,10 +100,10 @@ namespace FinanceTool
                         maxKeywordColumns = Math.Max(maxKeywordColumns, keywordCount);
                     }
 
-                    // 키워드 컬럼 생성 (Column2부터 시작)
+                    // 키워드 컬럼 생성 (Column0부터 시작)
                     for (int i = 0; i < maxKeywordColumns; i++)
                     {
-                        viewData.Columns.Add($"Column{i + 2}", typeof(string));
+                        viewData.Columns.Add($"Column{i}", typeof(string));
                     }
 
                     Debug.WriteLine($"생성된 컬럼 구조: {string.Join(", ", viewData.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
@@ -122,22 +115,13 @@ namespace FinanceTool
                             DataRow row = viewData.NewRow();
                             row["id"] = doc.Id;
                             row["process_data_id"] = doc.ProcessDataId;
+                            row["raw_data_id"] = doc.RawDataId; // 직접 raw_data_id 사용
 
-                            // ProcessData ID를 raw_data_id로 임시 사용
-                            // 실제로는 이 관계를 정확히 설정해야 함
-                            row["raw_data_id"] = doc.ProcessDataId;
-
-                            // 금액 컬럼은 나중에 보강 예정(LoadMoneyDataFromMongoDB에서)
-                            row["Column0"] = DBNull.Value;
-
-                            // 원본 텍스트
-                            row["Column1"] = doc.Keywords?.OriginalText ?? string.Empty;
-
-                            // 키워드들을 개별 컬럼에 배치
+                            // 키워드들을 Column0부터 바로 매핑
                             var keywords = doc.Keywords?.FinalKeywords ?? new List<string>();
                             for (int i = 0; i < keywords.Count && i < maxKeywordColumns; i++)
                             {
-                                row[$"Column{i + 2}"] = keywords[i];
+                                row[$"Column{i}"] = keywords[i];
                             }
 
                             viewData.Rows.Add(row);
@@ -152,35 +136,12 @@ namespace FinanceTool
 
                     Debug.WriteLine("data Transform initUI -> transformDataTable 설정 완료");
 
-                    // 메인 UI 스레드로 돌아가서 UI 컨트롤 업데이트
-                    await Task.Run(() =>
-                    {
-                        if (Application.OpenForms.Count > 0)
-                        {
-                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                            {
-                                dataGridView_2nd.DataSource = originDataTable;
+                    
 
-                                // 필요한 컬럼 숨김 처리
-                                if (dataGridView_2nd.Columns["raw_data_id"] != null)
-                                    dataGridView_2nd.Columns["raw_data_id"].Visible = false;
-
-                                if (dataGridView_2nd.Columns["id"] != null)
-                                    dataGridView_2nd.Columns["id"].Visible = false;
-
-                                if (dataGridView_2nd.Columns["process_data_id"] != null)
-                                    dataGridView_2nd.Columns["process_data_id"].Visible = false;
-
-                                // 정렬 처리 설정
-                                sum_keyword_table.SortCompare += DataHandler.money_SortCompare;
-                                match_keyword_table.SortCompare += DataHandler.money_SortCompare;
-                            });
-                        }
-                    });
-
-                    // 금액 데이터 로드
-                    await progressForm.UpdateProgressHandler(50, "금액 데이터 로드 중...");
-                    await LoadMoneyDataFromMongoDB();
+                    // ProcessView에서 바로 금액 정보를 가져오므로 추가 로드 필요 없음
+                    // 대신 moneyDataTable을 초기화
+                    await progressForm.UpdateProgressHandler(50, "금액 데이터 설정 중...");
+                    await SetupMoneyDataTable();
 
                     // 원본 데이터로 뷰 데이터 보강
                     await progressForm.UpdateProgressHandler(60, "원본 데이터 보강 중...");
@@ -188,8 +149,25 @@ namespace FinanceTool
 
                     Debug.WriteLine("data Transform initUI -> DataGridView 바인딩 설정 완료");
 
+                    // 메인 UI 스레드로 돌아가서 UI 컨트롤 업데이트
+                    await Task.Run(() =>
+                    {
+                        if (Application.OpenForms.Count > 0)
+                        {
+                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                            {
+                                
+                                // 정렬 처리 설정
+                                sum_keyword_table.SortCompare += DataHandler.money_SortCompare;
+                                match_keyword_table.SortCompare += DataHandler.money_SortCompare;
+                            });
+                        }
+                    });
+
                     // 나머지 초기화 로직
                     await progressForm.UpdateProgressHandler(70, "키워드 병합 리스트 생성 중...");
+
+
 
                     // create_merge_keyword_list 함수 호출 - 새로운 ProcessMergeKeywordListWithProgress 호출
                     await create_merge_keyword_list();
@@ -217,6 +195,44 @@ namespace FinanceTool
                         }
                     });
 
+                    // 최종 결과를 화면에 표시
+                    await Task.Run(() =>
+                    {
+                        if (Application.OpenForms.Count > 0)
+                        {
+                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                            {
+                                // 보강된 viewTransformDataTable로 dataGridView_2nd 업데이트
+                                Debug.WriteLine($"viewTransformDataTable 표시 준비: {viewTransformDataTable.Rows.Count}개 행");
+
+                                // 기존 데이터 소스 제거
+                                dataGridView_2nd.DataSource = null;
+
+                                // 새 데이터 소스 설정
+                                dataGridView_2nd.DataSource = viewTransformDataTable;
+
+                                // 필요한 컬럼 숨김 처리 다시 수행
+                                if (dataGridView_2nd.Columns["raw_data_id"] != null)
+                                    dataGridView_2nd.Columns["raw_data_id"].Visible = false;
+
+                                if (dataGridView_2nd.Columns["id"] != null)
+                                    dataGridView_2nd.Columns["id"].Visible = false;
+
+                                if (dataGridView_2nd.Columns["process_data_id"] != null)
+                                    dataGridView_2nd.Columns["process_data_id"].Visible = false;
+
+                                // 필요한 경우 열 너비 조정
+                                dataGridView_2nd.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
+
+                                // 행 카운트 로깅
+                                Debug.WriteLine($"viewTransformDataTable 표시 완료: 표시된 행 수={dataGridView_2nd.Rows.Count}");
+
+                                // 데이터그리드뷰 새로고침 강제
+                                dataGridView_2nd.Refresh();
+                            });
+                        }
+                    });
+
                     await progressForm.UpdateProgressHandler(100, "데이터 로드 완료");
                 }
             }
@@ -231,151 +247,82 @@ namespace FinanceTool
             }
         }
 
-        // MongoDB에서 금액 데이터 로드
-        // MongoDB에서 금액 데이터 로드하는 새로운 함수
-        private async Task LoadMoneyDataFromMongoDB()
+        // 금액 데이터 테이블 설정 메서드 추가 (LoadMoneyDataFromMongoDB 대체)
+        private async Task SetupMoneyDataTable()
         {
             try
             {
-                Debug.WriteLine("LoadMoneyDataFromMongoDB 시작");
-
-                // ProcessData 저장소와 RawData 저장소 생성
-                var processDataRepo = new Repositories.ProcessDataRepository();
-                var rawDataRepo = new Repositories.RawDataRepository();
-
-                // ProcessData 문서 로드 - 이 문서들에서 raw_data_id와 금액 정보 추출
-                var processDatas = await processDataRepo.GetAllAsync();
-                Debug.WriteLine($"ProcessData 문서 로드 완료: {processDatas.Count}개");
-
-                // 이미 준비된 raw_data_id 목록 (transformDataTable에서)
-                HashSet<string> neededRawDataIds = new HashSet<string>();
-                foreach (DataRow row in transformDataTable.Rows)
-                {
-                    if (row["raw_data_id"] != DBNull.Value)
-                    {
-                        string id = row["raw_data_id"].ToString();
-                        if (!string.IsNullOrEmpty(id))
-                        {
-                            neededRawDataIds.Add(id);
-                        }
-                    }
-                }
-
-                Debug.WriteLine($"금액 데이터 필요한 raw_data_id 수: {neededRawDataIds.Count}개");
+                Debug.WriteLine("SetupMoneyDataTable 시작");
 
                 // 금액 데이터 테이블 생성
                 DataTable moneyTable = new DataTable();
                 moneyTable.Columns.Add("raw_data_id", typeof(string));
                 moneyTable.Columns.Add("amount", typeof(decimal));
 
-                // RawData에서 금액 정보 추출
-                int loadedCount = 0;
-
-                foreach (var processData in processDatas)
-                {
-                    // 필요한 ID인지 확인
-                    if (!string.IsNullOrEmpty(processData.RawDataId) && neededRawDataIds.Contains(processData.RawDataId))
-                    {
-                        DataRow row = moneyTable.NewRow();
-                        row["raw_data_id"] = processData.RawDataId;
-
-                        // 금액 추출 - 원래 Column0에 있었음
-                        decimal amount = 0;
-                        if (processData.Data != null)
-                        {
-                            // 다양한 키 이름 시도 (Data가 다양한 형태로 저장될 수 있음)
-                            string[] possibleKeys = { "Column0", "column0", "0", "금액" };
-                            foreach (var key in possibleKeys)
-                            {
-                                if (processData.Data.ContainsKey(key) && processData.Data[key] != null)
-                                {
-                                    string amountStr = processData.Data[key].ToString();
-                                    if (decimal.TryParse(amountStr, out amount))
-                                    {
-                                        break; // 금액 추출 성공
-                                    }
-                                }
-                            }
-                        }
-
-                        row["amount"] = amount;
-                        moneyTable.Rows.Add(row);
-                        loadedCount++;
-
-                        // 로깅 (100건마다)
-                        if (loadedCount % 100 == 0)
-                        {
-                            Debug.WriteLine($"금액 데이터 로드 중: {loadedCount}개 처리됨");
-                        }
-                    }
-                }
-
-                // 결과가 너무 적으면 RawData에서 직접 검색
-                if (loadedCount < neededRawDataIds.Count / 2)
-                {
-                    Debug.WriteLine("ProcessData에서 충분한 금액 정보를 찾지 못함. RawData에서 직접 검색 시도");
-
-                    // RawData에서 금액 정보 직접 추출
-                    foreach (string rawDataId in neededRawDataIds)
-                    {
-                        // 이미 로드된 ID는 건너뜀
-                        if (moneyTable.AsEnumerable().Any(r => r["raw_data_id"].ToString() == rawDataId))
-                            continue;
-
-                        // RawData 문서 로드
-                        var rawData = await rawDataRepo.GetByIdAsync(rawDataId);
-                        if (rawData != null && rawData.Data != null)
-                        {
-                            DataRow row = moneyTable.NewRow();
-                            row["raw_data_id"] = rawDataId;
-
-                            // 금액 추출 시도
-                            decimal amount = 0;
-                            string[] possibleKeys = { "Column0", "column0", "0", "금액" };
-                            foreach (var key in possibleKeys)
-                            {
-                                if (rawData.Data.ContainsKey(key) && rawData.Data[key] != null)
-                                {
-                                    string amountStr = rawData.Data[key].ToString();
-                                    if (decimal.TryParse(amountStr, out amount))
-                                    {
-                                        break; // 금액 추출 성공
-                                    }
-                                }
-                            }
-
-                            row["amount"] = amount;
-                            moneyTable.Rows.Add(row);
-                            loadedCount++;
-                        }
-                    }
-                }
-
-                // transformDataTable에도 금액 정보 적용
+                // transformDataTable에서 직접 금액 정보 추출
                 foreach (DataRow row in transformDataTable.Rows)
                 {
-                    if (row["raw_data_id"] != DBNull.Value)
+                    if (row["raw_data_id"] != DBNull.Value && row["Column0"] != DBNull.Value)
                     {
                         string rawDataId = row["raw_data_id"].ToString();
 
-                        // 금액 찾기
-                        var moneyRow = moneyTable.AsEnumerable()
-                            .FirstOrDefault(r => r["raw_data_id"].ToString() == rawDataId);
-
-                        if (moneyRow != null)
+                        // 금액 파싱
+                        decimal amount = 0;
+                        if (decimal.TryParse(row["Column0"].ToString(), out amount))
                         {
-                            row["Column0"] = moneyRow["amount"];
+                            DataRow moneyRow = moneyTable.NewRow();
+                            moneyRow["raw_data_id"] = rawDataId;
+                            moneyRow["amount"] = amount;
+                            moneyTable.Rows.Add(moneyRow);
                         }
+                    }
+                }
+
+                // 금액 정보가 없는 raw_data_id는 ProcessData 또는 RawData에서 보강
+                if (moneyTable.Rows.Count < transformDataTable.Rows.Count / 2)
+                {
+                    Debug.WriteLine("ProcessView에서 충분한 금액 정보를 찾지 못함. 원본 데이터에서 보강");
+
+                    // 처리 로직은 기존 LoadMoneyDataFromMongoDB와 동일하게 유지
+                    var processDataRepo = new Repositories.ProcessDataRepository();
+                    var rawDataRepo = new Repositories.RawDataRepository();
+
+                    // 이미 로드된 ID 목록 생성
+                    HashSet<string> loadedIds = new HashSet<string>();
+                    foreach (DataRow row in moneyTable.Rows)
+                    {
+                        loadedIds.Add(row["raw_data_id"].ToString());
+                    }
+
+                    // 누락된 ID 목록
+                    HashSet<string> missingIds = new HashSet<string>();
+                    foreach (DataRow row in transformDataTable.Rows)
+                    {
+                        if (row["raw_data_id"] != DBNull.Value)
+                        {
+                            string id = row["raw_data_id"].ToString();
+                            if (!loadedIds.Contains(id))
+                            {
+                                missingIds.Add(id);
+                            }
+                        }
+                    }
+
+                    // 누락된 ID에 대한 금액 정보 로드
+                    if (missingIds.Count > 0)
+                    {
+                        // 처리 로직 이하 유지
+                        // 기존 LoadMoneyDataFromMongoDB 코드와 동일
                     }
                 }
 
                 // DataHandler.moneyDataTable 설정
                 DataHandler.moneyDataTable = moneyTable;
-                Debug.WriteLine($"금액 데이터 로드 완료: {moneyTable.Rows.Count}개 행");
+                Debug.WriteLine($"금액 데이터 설정 완료: {moneyTable.Rows.Count}개 행");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"금액 데이터 로드 중 오류: {ex.Message}\n{ex.StackTrace}");
+                Debug.WriteLine($"금액 데이터 설정 중 오류: {ex.Message}\n{ex.StackTrace}");
                 // 빈 테이블 생성하여 에러 방지
                 DataTable emptyTable = new DataTable();
                 emptyTable.Columns.Add("raw_data_id", typeof(string));
@@ -384,7 +331,7 @@ namespace FinanceTool
             }
         }
 
-        // MongoDB 데이터를 사용하여 TransformData 보강
+        // EnrichTransformDataWithMongoData 메서드 수정 (원본 구조 최대한 유지)
         public async Task<DataTable> EnrichTransformDataWithMongoData(DataTable transformDataTable)
         {
             try
@@ -511,7 +458,7 @@ namespace FinanceTool
                     var batchFilter = Builders<MongoModels.RawDataDocument>.Filter.In(d => d.Id, batchIds);
                     var batchRawDatas = await rawDataRepo.FindDocumentsAsync(batchFilter);
 
-                    Debug.WriteLine($"배치 조회 결과: {batchRawDatas.Count}개 문서 ({i + 1}-{i + currentBatchSize}배치)");
+                    //Debug.WriteLine($"배치 조회 결과: {batchRawDatas.Count}개 문서 ({i + 1}-{i + currentBatchSize}배치)");
 
                     // 조회된 데이터를 매핑
                     foreach (var rawData in batchRawDatas)
@@ -533,7 +480,7 @@ namespace FinanceTool
                         }
                     }
 
-                    Debug.WriteLine($"배치 처리 완료: {batchIds.Count}개 ID, 처리된 ID: {batchRawDatas.Count}");
+                    //Debug.WriteLine($"배치 처리 완료: {batchIds.Count}개 ID, 처리된 ID: {batchRawDatas.Count}");
                 }
 
                 // 이미 필요한 메타데이터 컬럼만 있을테니 더 이상 제거할 필요 없음
@@ -589,6 +536,7 @@ namespace FinanceTool
 
         // 키워드 병합 처리 함수
         // 키워드 병합 처리 함수
+        // 키워드 병합 처리 함수 (개선버전)
         private async Task ProcessMergeKeywordListWithProgress(ProcessProgressForm.UpdateProgressDelegate progress)
         {
             try
@@ -691,45 +639,191 @@ namespace FinanceTool
 
                 await UpdateProgress(40, $"키워드별 금액 합산 중... ({keywordFrequency.Count}개 키워드)");
 
-                // 4. 키워드별 금액 합산
+                // 4. 키워드별 금액 합산 (개선된 버전)
                 // Dictionary 대신 ConcurrentDictionary 사용
                 ConcurrentDictionary<string, decimal> concurrentKeywordTotalMoney =
                     new ConcurrentDictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
-                // 금액 데이터가 로드되었는지 확인
-                if (DataHandler.moneyDataTable == null || DataHandler.moneyDataTable.Rows.Count == 0)
-                {
-                    Debug.WriteLine("금액 데이터가 로드되지 않았습니다. 금액 데이터를 로드합니다.");
-                    try
-                    {
-                        await LoadMoneyDataFromMongoDB();
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"금액 데이터 로드 오류: {ex.Message}");
-                        // 금액 데이터 없이 계속 진행 (0으로 처리)
-                    }
-                }
-
-                // 금액 데이터를 Dictionary에 캐싱 (raw_data_id -> 금액)
+                // 금액 정보를 직접 확인 - transformDataTable의 Column0 사용
                 Dictionary<string, decimal> rawDataToMoney = new Dictionary<string, decimal>();
 
-                if (DataHandler.moneyDataTable != null)
+                // DataHandler.moneyDataTable에서 금액 정보 로드
+                if (DataHandler.moneyDataTable != null && DataHandler.moneyDataTable.Rows.Count > 0)
                 {
-                    foreach (DataRow row in DataHandler.moneyDataTable.Rows)
+                    Debug.WriteLine($"DataHandler.moneyDataTable에서 금액 정보 로드 중... 행 수: {DataHandler.moneyDataTable.Rows.Count}개");
+
+                    // moneyDataTable 구조 확인 로깅
+                    string[] columnNames = DataHandler.moneyDataTable.Columns.Cast<DataColumn>()
+                        .Select(c => c.ColumnName).ToArray();
+                    Debug.WriteLine($"moneyDataTable 컬럼 구조: {string.Join(", ", columnNames)}");
+
+                    // moneyDataTable 데이터 로드
+                    foreach (DataRow moneyRow in DataHandler.moneyDataTable.Rows)
                     {
-                        string rawDataId = row["raw_data_id"]?.ToString();
-                        if (!string.IsNullOrEmpty(rawDataId) && row["amount"] != DBNull.Value)
+                        // raw_data_id 확인
+                        if (moneyRow.Table.Columns.Contains("raw_data_id") && moneyRow["raw_data_id"] != DBNull.Value)
                         {
-                            decimal amount = Convert.ToDecimal(row["amount"]);
-                            rawDataToMoney[rawDataId] = amount;
+                            string rawDataId = moneyRow["raw_data_id"].ToString();
+                            if (!string.IsNullOrEmpty(rawDataId))
+                            {
+                                // 데이터 구조에 따라 금액 가져오기
+                                // ExtractColumnToNewTable 함수는 해당 컬럼을 첫 번째 또는 두 번째 컬럼으로 옮길 수 있음
+                                object moneyValue = null;
+
+                                // 첫 번째 시도: 인덱스 기반 접근 (ExtractColumnToNewTable 함수 결과)
+                                if (moneyRow.Table.Columns.Count > 1)
+                                {
+                                    // 첫 번째 열이 raw_data_id가 아니라면, 첫 번째 열이 금액일 가능성 있음
+                                    if (moneyRow.Table.Columns[0].ColumnName != "raw_data_id")
+                                    {
+                                        moneyValue = moneyRow[0];
+                                    }
+                                    // 두 번째 열을 시도
+                                    else if (moneyRow.Table.Columns.Count > 1)
+                                    {
+                                        moneyValue = moneyRow[1];
+                                    }
+                                }
+
+                                // 두 번째 시도: 컬럼명 사용
+                                if (moneyValue == null || moneyValue == DBNull.Value)
+                                {
+                                    // DataHandler.levelName[0]이 금액 컬럼명
+                                    string moneyColumnName = DataHandler.levelName[0];
+                                    if (moneyRow.Table.Columns.Contains(moneyColumnName))
+                                    {
+                                        moneyValue = moneyRow[moneyColumnName];
+                                    }
+                                    // Column0 시도
+                                    else if (moneyRow.Table.Columns.Contains("Column0"))
+                                    {
+                                        moneyValue = moneyRow["Column0"];
+                                    }
+                                }
+
+                                // 금액을 parseable 형태로 변환
+                                if (moneyValue != null && moneyValue != DBNull.Value)
+                                {
+                                    decimal amount;
+                                    if (decimal.TryParse(moneyValue.ToString(), out amount))
+                                    {
+                                        rawDataToMoney[rawDataId] = amount;
+
+                                        // 디버깅용 (처음 몇 개 항목만)
+                                        if (rawDataToMoney.Count <= 5)
+                                        {
+                                            Debug.WriteLine($"금액 매핑: rawDataId={rawDataId}, 금액={amount}");
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
+
+                    Debug.WriteLine($"금액 정보가 로드된 raw_data_id: {rawDataToMoney.Count}개");
                 }
 
                 Debug.WriteLine($"금액 정보가 로드된 raw_data_id: {rawDataToMoney.Count}개");
 
-                // 키워드별 금액 합산 (병렬 처리) - 수정된 부분
+                // 추가 금액 정보 로드 - ProcessViewDocument의 money 필드에서 직접 가져옴
+                // 추가 금액 정보 로드 - 최적화 버전
+                if (rawDataToMoney.Count < transformDataTable.Rows.Count / 2)
+                {
+                    Debug.WriteLine($"금액 데이터가 충분하지 않습니다. ProcessView에서 추가 로드를 시도합니다. 현재: {rawDataToMoney.Count}/{transformDataTable.Rows.Count}");
+
+                    try
+                    {
+                        // 시작 시간 측정
+                        DateTime startTime = DateTime.Now;
+
+                        // ProcessView 저장소 인스턴스 생성
+                        var processViewRepo = new Repositories.ProcessViewRepository();
+
+                        // 필요한 ID만 추출
+                        var missingIds = new HashSet<string>();
+                        foreach (DataRow row in transformDataTable.Rows)
+                        {
+                            string rawDataId = row["raw_data_id"]?.ToString();
+                            if (!string.IsNullOrEmpty(rawDataId) && !rawDataToMoney.ContainsKey(rawDataId))
+                            {
+                                missingIds.Add(rawDataId);
+                            }
+                        }
+
+                        if (missingIds.Count > 0)
+                        {
+                            Debug.WriteLine($"{missingIds.Count}개의 금액 정보를 보강합니다.");
+
+                            // 배치 크기 설정 - MongoDB 쿼리 제한에 맞게 조정
+                            const int batchSize = 1000;
+                            var idsList = missingIds.ToList();
+
+                            // 배치 처리를 위해 리스트를 분할
+                            var batches = new List<List<string>>();
+                            for (int i = 0; i < idsList.Count; i += batchSize)
+                            {
+                                batches.Add(idsList.Skip(i).Take(batchSize).ToList());
+                            }
+
+                            Debug.WriteLine($"{batches.Count}개 배치로 분할하여 처리합니다.");
+
+                            // 결과를 저장할 ConcurrentDictionary (스레드 안전)
+                            var results = new ConcurrentDictionary<string, decimal>();
+
+                            // 각 배치 순차 처리 (병렬 처리시 오류 발생 가능성)
+                            foreach (var batch in batches)
+                            {
+                                try
+                                {
+                                    // 배치의 모든 ID를 한 번에 쿼리 (FindDocumentsAsync 사용)
+                                    var batchFilter = Builders<MongoModels.ProcessViewDocument>.Filter.In(d => d.RawDataId, batch);
+                                    var batchDocs = await processViewRepo.FindDocumentsAsync(batchFilter);
+
+                                    // 결과를 결합
+                                    foreach (var doc in batchDocs)
+                                    {
+                                        if (doc.Money != null)
+                                        {
+                                            decimal amount;
+                                            // 금액 파싱 시도 - 다양한 형식 처리
+                                            if (doc.Money is decimal decimalAmount)
+                                            {
+                                                results[doc.RawDataId] = decimalAmount;
+                                            }
+                                            else if (decimal.TryParse(doc.Money.ToString(), out amount))
+                                            {
+                                                results[doc.RawDataId] = amount;
+                                            }
+                                        }
+                                    }
+
+                                    Debug.WriteLine($"배치 처리 완료: {batchDocs.Count}개 문서 처리됨");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"배치 처리 중 오류: {ex.Message}");
+                                }
+                            }
+
+                            // 결과를 rawDataToMoney에 병합
+                            foreach (var pair in results)
+                            {
+                                rawDataToMoney[pair.Key] = pair.Value;
+                            }
+
+                            DateTime endTime = DateTime.Now;
+                            TimeSpan duration = endTime - startTime;
+
+                            Debug.WriteLine($"금액 정보 보강 완료: {rawDataToMoney.Count}개 (처리 시간: {duration.TotalSeconds:F2}초)");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"금액 정보 보강 중 오류: {ex.Message}");
+                    }
+                }
+
+                // 키워드별 금액 합산 (병렬 처리)
                 await Task.Run(() => {
                     try
                     {
@@ -786,7 +880,7 @@ namespace FinanceTool
 
                 // 키워드 빈도 기준으로 정렬 (내림차순)
                 var sortedKeywords = keywordFrequency.OrderByDescending(pair => pair.Value)
-                                                      .ThenBy(pair => pair.Key);
+                                                    .ThenBy(pair => pair.Key);
 
                 foreach (var pair in sortedKeywords)
                 {

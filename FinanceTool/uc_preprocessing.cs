@@ -768,7 +768,13 @@ namespace FinanceTool
         }
 
         /// <summary>
-        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장
+        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장 (개선 버전)
+        /// </summary>
+        /// <summary>
+        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장 (개선 버전)
+        /// </summary>
+        /// <summary>
+        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장 (개선 버전)
         /// </summary>
         private async Task SaveProcessDataToMongoDBAsync(DataTable dataTable, ProcessProgressForm.UpdateProgressDelegate progress)
         {
@@ -776,25 +782,37 @@ namespace FinanceTool
             {
                 await progress(20, "MongoDB 컬렉션 준비 중...");
 
+                // 처리 시작 시간 기록 (성능 측정용)
+                var startTime = DateTime.Now;
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] SaveProcessDataToMongoDBAsync 시작");
+
                 // 프로세스 뷰 저장소 생성
                 var processViewRepo = new Repositories.ProcessViewRepository();
+                var processDataRepo = new Repositories.ProcessDataRepository();
 
-
-                // 올바른 방식
+                // 기존 문서 수 확인
                 var emptyFilter = MongoDB.Driver.Builders<MongoModels.ProcessViewDocument>.Filter.Empty;
-
-                // MongoDBManager를 통해 직접 접근
                 long existingCount = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoModels.ProcessViewDocument>("process_view_data")
                     .Result.CountDocumentsAsync(emptyFilter);
 
-                // 또는 GetAllAsync 메서드 사용하여 간접적으로 확인 (덜 효율적)
-                // var allDocs = await processViewRepo.GetAllAsync();
-                // long existingCount = allDocs.Count;
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 기존 process_view_data 컬렉션 문서 수: {existingCount}개");
 
-                Debug.WriteLine($"기존 process_view_data 컬렉션 문서 수: {existingCount}");
-                // 데이터 처리를 위한 설정
-                int totalRows = dataTable.Rows.Count;
+                // dataGridView_applied에서 데이터 가져오기
+                var dgvApplied = dataGridView_applied;
+                int totalRows = dgvApplied.Rows.Count;
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] dataGridView_applied 행 수: {totalRows}개");
+
+                if (totalRows == 0)
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] dataGridView_applied가 비어있습니다. 저장할 데이터가 없습니다.");
+                    await progress(100, "저장할 데이터가 없습니다.");
+                    return;
+                }
+
                 int processedRows = 0;
+                int validRows = 0;
+                int invalidRows = 0;
 
                 // 시스템 리소스에 맞게 최적화된 스레드 수 계산
                 var processorCount = Environment.ProcessorCount;
@@ -804,14 +822,86 @@ namespace FinanceTool
                 int batchSize = DetermineBatchSize(totalRows);
                 int batchCount = (int)Math.Ceiling(totalRows / (double)batchSize);
 
-                Debug.WriteLine($"병렬 처리 시작: {optimalThreads}개 스레드, {batchCount}개 배치, 배치당 {batchSize}행");
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 처리 시작: {optimalThreads}개 스레드, {batchCount}개 배치, 배치당 {batchSize}행");
                 await progress(30, $"데이터 변환 준비 중... (총 {totalRows}행)");
 
                 // MongoDB 문서 리스트 생성
                 var processViewDocuments = new List<MongoModels.ProcessViewDocument>();
 
-                // DataTable의 행을 MongoDB 문서로 변환
-                for (int rowIndex = 0; rowIndex < totalRows; rowIndex++)
+                // 1. DataHandler.moneyDataTable을 Dictionary로 변환하여 빠른 조회 가능하게 함
+                Dictionary<string, object> moneyDataMap = new Dictionary<string, object>();
+
+                // 수정 필요한 코드 부분:
+                if (DataHandler.moneyDataTable != null)
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] DataHandler.moneyDataTable에서 금액 정보 로드 중... 행 수: {DataHandler.moneyDataTable.Rows.Count}개");
+
+                    // DataHandler.levelName[0]를 금액 컬럼명으로 사용
+                    string moneyColumnName = DataHandler.levelName[0];
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 컬럼명: {moneyColumnName}");
+
+                    foreach (DataRow moneyRow in DataHandler.moneyDataTable.Rows)
+                    {
+                        if (moneyRow["raw_data_id"] != DBNull.Value)
+                        {
+                            string rawDataId = moneyRow["raw_data_id"].ToString();
+                            if (!string.IsNullOrEmpty(rawDataId))
+                            {
+                                // 주의: DataHandler.ExtractColumnToNewTable 함수는 특정 컬럼을 추출하여
+                                // 첫 번째 컬럼으로 만들므로, moneyRow[0] 또는 moneyRow[1]에서 값을 가져와야 함
+                                // moneyDataTable의 실제 구조 확인 필요
+                                object moneyValue = null;
+
+                                // DataHandler.moneyDataTable의 구조에 따라 아래 부분 수정
+                                // ExtractColumnToNewTable 함수의 구현에 따르면 데이터는 Column0에 있을 가능성이 높음
+                                if (moneyRow.Table.Columns.Contains(moneyColumnName))
+                                {
+                                    moneyValue = moneyRow[moneyColumnName];
+                                }
+                                else if (moneyRow.Table.Columns.Contains("Column0"))
+                                {
+                                    moneyValue = moneyRow["Column0"];
+                                }
+                                else if (moneyRow.Table.Columns.Count > 1)
+                                {
+                                    // 첫 번째 컬럼이 raw_data_id가 아닌 경우 두 번째 컬럼에 금액이 있을 수 있음
+                                    moneyValue = moneyRow[1];
+                                }
+
+                                if (moneyValue != null && moneyValue != DBNull.Value)
+                                {
+                                    moneyDataMap[rawDataId] = moneyValue;
+                                    // 디버깅을 위해 처음 몇 개 값 출력
+                                    if (moneyDataMap.Count <= 5)
+                                    {
+                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 매핑: rawDataId={rawDataId}, 금액={moneyValue}");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 정보 매핑 생성 완료: {moneyDataMap.Count}개");
+                }
+
+                // 2. raw_data_id와 process_data_id 매핑 준비
+                Dictionary<string, string> processDataToRawDataMap = new Dictionary<string, string>();
+                Dictionary<string, string> rawDataToProcessDataMap = new Dictionary<string, string>();
+
+                var allProcessData = await processDataRepo.GetAllAsync();
+                foreach (var doc in allProcessData)
+                {
+                    if (doc.Id != null && !string.IsNullOrEmpty(doc.RawDataId))
+                    {
+                        processDataToRawDataMap[doc.Id] = doc.RawDataId;
+                        rawDataToProcessDataMap[doc.RawDataId] = doc.Id;
+                    }
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] ID 매핑 준비 완료: {processDataToRawDataMap.Count}개");
+
+                // 3. dataGridView_applied에서 행 별로 데이터 추출
+                for (int rowIndex = 0; rowIndex < dgvApplied.Rows.Count; rowIndex++)
                 {
                     if (rowIndex % 100 == 0)
                     {
@@ -819,61 +909,146 @@ namespace FinanceTool
                         await progress(percentage, $"문서 변환 중... ({rowIndex}/{totalRows})");
                     }
 
-                    DataRow row = dataTable.Rows[rowIndex];
+                    processedRows++;
 
-                    // 원본 텍스트 추출 - 일반적으로 2번째 컬럼(인덱스 1)에 있음
-                    string originalText = string.Empty;
-                    if (row.Table.Columns.Count > 1)
-                    {
-                        originalText = row[1]?.ToString() ?? string.Empty;
-                    }
+                    // raw_data_id 확인 - "raw_data_id" 컬럼 또는 숨겨진 컬럼일 수 있음
+                    string rawDataId = null;
 
-                    // raw_data_id 확인
-                    string rawDataId = string.Empty;
-                    if (row.Table.Columns.Contains("raw_data_id"))
+                    // DataGridView의 행에서 raw_data_id 찾기 (숨겨진 컬럼일 수 있음)
+                    for (int colIndex = 0; colIndex < dgvApplied.Columns.Count; colIndex++)
                     {
-                        rawDataId = row["raw_data_id"]?.ToString() ?? string.Empty;
-                    }
-
-                    // 키워드 목록 추출 - 첫 두 컬럼(금액, 원본 텍스트)을 제외한 나머지 컬럼
-                    var extractedKeywords = new List<string>();
-                    for (int colIndex = 2; colIndex < row.Table.Columns.Count; colIndex++)
-                    {
-                        if (colIndex != row.Table.Columns.IndexOf("raw_data_id")) // raw_data_id 컬럼 제외
+                        if (dgvApplied.Columns[colIndex].Name.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase))
                         {
-                            string keyword = row[colIndex]?.ToString();
+                            rawDataId = dgvApplied.Rows[rowIndex].Cells[colIndex].Value?.ToString();
+                            break;
+                        }
+                    }
+
+                    // DataGridView에서 raw_data_id를 찾지 못했다면 원본 DataTable에서 찾기 시도
+                    if (string.IsNullOrEmpty(rawDataId) && dataTable.Columns.Contains("raw_data_id"))
+                    {
+                        if (rowIndex < dataTable.Rows.Count)
+                        {
+                            rawDataId = dataTable.Rows[rowIndex]["raw_data_id"]?.ToString();
+                        }
+                    }
+
+                    // process_data_id 확인 - 마찬가지로 숨겨진 컬럼일 수 있음
+                    string processDataId = null;
+                    for (int colIndex = 0; colIndex < dgvApplied.Columns.Count; colIndex++)
+                    {
+                        if (dgvApplied.Columns[colIndex].Name.Equals("process_data_id", StringComparison.OrdinalIgnoreCase))
+                        {
+                            processDataId = dgvApplied.Rows[rowIndex].Cells[colIndex].Value?.ToString();
+                            break;
+                        }
+                    }
+
+                    // process_data_id가 없으면 원본 DataTable에서 찾기 시도
+                    if (string.IsNullOrEmpty(processDataId) && dataTable.Columns.Contains("process_data_id"))
+                    {
+                        if (rowIndex < dataTable.Rows.Count)
+                        {
+                            processDataId = dataTable.Rows[rowIndex]["process_data_id"]?.ToString();
+                        }
+                    }
+
+                    // raw_data_id와 process_data_id를 서로 보완
+                    if (string.IsNullOrEmpty(rawDataId) && !string.IsNullOrEmpty(processDataId))
+                    {
+                        if (processDataToRawDataMap.TryGetValue(processDataId, out string mappedRawDataId))
+                        {
+                            rawDataId = mappedRawDataId;
+                            //Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex}: process_data_id로부터 rawDataId 복구: {rawDataId}");
+                        }
+                    }
+                    else if (!string.IsNullOrEmpty(rawDataId) && string.IsNullOrEmpty(processDataId))
+                    {
+                        if (rawDataToProcessDataMap.TryGetValue(rawDataId, out string mappedProcessDataId))
+                        {
+                            processDataId = mappedProcessDataId;
+                            //Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex}: raw_data_id로부터 processDataId 복구: {processDataId}");
+                        }
+                    }
+
+                    // rawDataId 유효성 검사
+                    bool isValidRawDataId = !string.IsNullOrEmpty(rawDataId) &&
+                                           MongoDB.Bson.ObjectId.TryParse(rawDataId, out _);
+
+                    if (!isValidRawDataId)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex}: 유효하지 않은 rawDataId='{rawDataId}', 건너뜀");
+                        invalidRows++;
+                        continue; // 유효하지 않은 경우 건너뛰기
+                    }
+
+                    // 4. 금액 데이터 처리 - DataHandler.moneyDataTable에서 가져옴
+                    object moneyValue = null;
+                    if (moneyDataMap.TryGetValue(rawDataId, out object mappedMoneyValue))
+                    {
+                        moneyValue = mappedMoneyValue;
+                    }
+
+                    // 5. 키워드 목록 추출 - dataGridView_applied에서 2번째 컬럼부터 마지막 컬럼까지
+                    var finalKeywords = new List<string>();
+
+                    // 2번째 컬럼부터 시작 (일반적으로 0번째는 체크박스, 1번째는 금액 또는 다른 데이터)
+                    // 컬럼 이름으로 1번을 찾지 않고 실제 인덱스 사용
+                    for (int colIndex = 2; colIndex < dgvApplied.Columns.Count; colIndex++)
+                    {
+                        // 메타데이터 컬럼 건너뛰기
+                        if (dgvApplied.Columns[colIndex].Name.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase) ||
+                            dgvApplied.Columns[colIndex].Name.Equals("process_data_id", StringComparison.OrdinalIgnoreCase) ||
+                            dgvApplied.Columns[colIndex].Name.Equals("id", StringComparison.OrdinalIgnoreCase))
+                        {
+                            continue;
+                        }
+
+                        // 셀 값이 있으면 키워드로 추가
+                        object cellValue = dgvApplied.Rows[rowIndex].Cells[colIndex].Value;
+                        if (cellValue != null && cellValue != DBNull.Value)
+                        {
+                            string keyword = cellValue.ToString();
                             if (!string.IsNullOrWhiteSpace(keyword))
                             {
-                                extractedKeywords.Add(keyword.Trim());
+                                finalKeywords.Add(keyword.Trim());
                             }
                         }
                     }
 
-                    // ProcessViewDocument 문서 생성
+                    // 6. ProcessViewDocument 생성
                     var processViewDoc = new MongoModels.ProcessViewDocument
                     {
-                        // ProcessDataId = rawDataId와 동일하게 설정 (실제 구현에서는 조회 필요할 수 있음)
-                        ProcessDataId = rawDataId,
+                        ProcessDataId = processDataId,
+                        RawDataId = rawDataId,
                         Keywords = new MongoModels.KeywordInfo
                         {
-                            OriginalText = originalText,
-                            ExtractedKeywords = extractedKeywords,
-                            FinalKeywords = new List<string>(extractedKeywords), // 초기에는 추출 키워드와 동일
-                            RemovedKeywords = new List<string>() // 초기에는 비어있음
+                            FinalKeywords = finalKeywords
                         },
-                        ProcessingInfo = new MongoModels.ProcessingInfo
-                        {
-                            ProcessingType = iskeywordExtractor ? "separator" : "direct",
-                            Separator = "_", // 기본 구분자
-                            ModelName = null // 필요시 설정
-                        },
-                        ProcessedDate = DateTime.Now,
-                        UserModified = false,
+                        Money = moneyValue,
                         LastModifiedDate = DateTime.Now
                     };
 
+                    // 디버그 로깅 
+                    if (processViewDocuments.Count < 5)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 생성된 문서 샘플 #{processViewDocuments.Count + 1}: " +
+                                      $"ProcessDataId={processDataId}, RawDataId={rawDataId}, " +
+                                      $"Keywords={string.Join(", ", finalKeywords)}, " +
+                                      $"Money={moneyValue}");
+                    }
+
                     processViewDocuments.Add(processViewDoc);
-                    processedRows++;
+                    validRows++;
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 변환 완료: 총 {processedRows}개 처리, {validRows}개 유효, {invalidRows}개 무효");
+
+                if (processViewDocuments.Count == 0)
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 삽입할 유효한 문서가 없습니다.");
+                    await progress(100, "삽입할 유효한 문서가 없습니다.");
+                    return;
                 }
 
                 // 문서를 배치로 분할하여 MongoDB에 삽입
@@ -886,7 +1061,25 @@ namespace FinanceTool
                     batches.Add(processViewDocuments.Skip(i).Take(batchSize).ToList());
                 }
 
-                Debug.WriteLine($"총 {batches.Count}개 배치로 분할됨");
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 총 {batches.Count}개 배치로 분할됨");
+
+                // 병렬 삽입 작업 수행 전 유효성 추가 점검
+                foreach (var batch in batches)
+                {
+                    // 각 배치의 모든 문서가 유효한 raw_data_id를 가지는지 확인
+                    for (int i = batch.Count - 1; i >= 0; i--)
+                    {
+                        var doc = batch[i];
+                        if (string.IsNullOrEmpty(doc.RawDataId) || !MongoDB.Bson.ObjectId.TryParse(doc.RawDataId, out _))
+                        {
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 유효하지 않은 rawDataId='{doc.RawDataId}' 문서 제거");
+                            batch.RemoveAt(i);
+                        }
+                    }
+                }
+
+                // 성공한 삽입 수 추적
+                int successfulInserts = 0;
 
                 // 병렬 삽입 작업 (SemaphoreSlim을 사용하여 동시성 제한)
                 using (var semaphore = new SemaphoreSlim(optimalThreads))
@@ -896,6 +1089,13 @@ namespace FinanceTool
 
                     foreach (var batch in batches)
                     {
+                        if (batch.Count == 0)
+                        {
+                            // 빈 배치는 건너뛰기
+                            completedBatches++;
+                            continue;
+                        }
+
                         await semaphore.WaitAsync();
 
                         tasks.Add(Task.Run(async () => {
@@ -907,13 +1107,42 @@ namespace FinanceTool
                                     try
                                     {
                                         await processViewRepo.InsertManyAsync(batch);
+
+                                        // 성공 시 카운트 증가
+                                        Interlocked.Add(ref successfulInserts, batch.Count);
+
+                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 성공: {batch.Count}개 문서");
                                         break; // 성공시 루프 탈출
                                     }
-                                    catch (Exception ex) when (attempt < 3)
+                                    catch (Exception ex)
                                     {
-                                        // 마지막 시도가 아니면 잠시 대기 후 재시도
-                                        Debug.WriteLine($"배치 삽입 {attempt}번째 시도 실패: {ex.Message}");
-                                        await Task.Delay(1000 * attempt);
+                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 {attempt}번째 시도 실패: {ex.Message}");
+
+                                        if (attempt < 3)
+                                        {
+                                            // 마지막 시도가 아니면 잠시 대기 후 재시도
+                                            await Task.Delay(1000 * attempt);
+                                        }
+                                        else if (batch.Count > 1)
+                                        {
+                                            // 마지막 시도에서도 실패하고 배치 크기가 1보다 크면
+                                            // 개별 문서 단위로 처리
+                                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 문서 단위로 처리 시도 (총 {batch.Count}개)");
+
+                                            foreach (var doc in batch)
+                                            {
+                                                try
+                                                {
+                                                    await processViewRepo.InsertOneAsync(doc);
+                                                    Interlocked.Increment(ref successfulInserts);
+                                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 삽입 성공: ProcessDataId={doc.ProcessDataId}");
+                                                }
+                                                catch (Exception docEx)
+                                                {
+                                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 삽입 실패: ProcessDataId={doc.ProcessDataId}, RawDataId={doc.RawDataId}, 오류={docEx.Message}");
+                                                }
+                                            }
+                                        }
                                     }
                                 }
 
@@ -923,7 +1152,7 @@ namespace FinanceTool
                             }
                             catch (Exception ex)
                             {
-                                Debug.WriteLine($"배치 삽입 중 오류: {ex.Message}");
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 중 오류: {ex.Message}");
                             }
                             finally
                             {
@@ -937,13 +1166,19 @@ namespace FinanceTool
 
                 // 최종 확인
                 long finalCount = await processViewRepo.CountDocumentsAsync();
-                Debug.WriteLine($"MongoDB 저장 완료: {finalCount - existingCount}개 문서 삽입됨");
+                long insertedCount = finalCount - existingCount;
 
-                await progress(80, "데이터 저장 완료");
+                var endTime = DateTime.Now;
+                var duration = endTime - startTime;
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MongoDB 저장 완료: {insertedCount}개 문서 삽입됨 ({successfulInserts}개 성공)");
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 처리 시간: {duration.TotalSeconds:F2}초 (시작: {startTime:HH:mm:ss.fff}, 종료: {endTime:HH:mm:ss.fff})");
+
+                await progress(80, $"데이터 저장 완료: {insertedCount}개 문서 삽입됨");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MongoDB 저장 중 오류 발생: {ex.Message}");
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MongoDB 저장 중 오류 발생: {ex.Message}\n{ex.StackTrace}");
                 throw;
             }
         }

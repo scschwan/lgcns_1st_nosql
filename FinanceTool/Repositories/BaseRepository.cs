@@ -1,8 +1,9 @@
-﻿using System;
+﻿using MongoDB.Driver;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
-using MongoDB.Driver;
 
 namespace FinanceTool.Repositories
 {
@@ -139,6 +140,72 @@ namespace FinanceTool.Repositories
             }
 
             throw new InvalidOperationException("문서에 Id 속성이 없습니다.");
+        }
+
+        /// <summary>
+        /// 필터 조건에 맞는 문서 목록을 조회합니다.
+        /// </summary>
+        /// <param name="filter">적용할 필터 조건</param>
+        /// <returns>필터와 일치하는 문서 목록</returns>
+        public async Task<List<T>> FindDocumentsAsync(FilterDefinition<T> filter)
+        {
+            try
+            {
+                return await _collection.Find(filter).ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"FindDocumentsAsync 오류: {ex.Message}");
+                return new List<T>();
+            }
+        }
+
+        /// <summary>
+        /// 필터 조건과 정렬 방식을 적용하여 문서 목록을 조회합니다.
+        /// </summary>
+        /// <param name="filter">적용할 필터 조건</param>
+        /// <param name="sort">적용할 정렬 방식</param>
+        /// <returns>조건에 맞는 정렬된 문서 목록</returns>
+        public async Task<List<T>> FindDocumentsAsync(FilterDefinition<T> filter, SortDefinition<T> sort)
+        {
+            try
+            {
+                return await _collection.Find(filter).Sort(sort).ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"FindDocumentsAsync 오류: {ex.Message}");
+                return new List<T>();
+            }
+        }
+
+        /// <summary>
+        /// 필터 조건, 정렬 방식 및 페이징을 적용하여 문서 목록을 조회합니다.
+        /// </summary>
+        /// <param name="filter">적용할 필터 조건</param>
+        /// <param name="sort">적용할 정렬 방식</param>
+        /// <param name="skip">건너뛸 문서 수</param>
+        /// <param name="limit">가져올 최대 문서 수</param>
+        /// <returns>조건에 맞는 정렬 및 페이징된 문서 목록</returns>
+        public async Task<List<T>> FindDocumentsAsync(
+            FilterDefinition<T> filter,
+            SortDefinition<T> sort,
+            int skip,
+            int limit)
+        {
+            try
+            {
+                return await _collection.Find(filter)
+                    .Sort(sort)
+                    .Skip(skip)
+                    .Limit(limit)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"FindDocumentsAsync 오류: {ex.Message}");
+                return new List<T>();
+            }
         }
     }
 }
