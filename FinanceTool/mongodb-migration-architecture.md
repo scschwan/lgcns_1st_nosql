@@ -338,11 +338,11 @@ var batches = documents
     .ToList();
 
     
-## 2025-05-16 달성 목표
-1.preprocessing -> datatransfom 데이터 이동시 로직 개선 필요
- > process_data table에서 금액 데이터를 제대로 가져오지 못함(금액 컬럼으로 지정한 컬럼 데이터를 제대로 확보하지 못하는 듯)
- > 분할된 키워드가 제대로 등록되지 않음
- > raw_data 컬렉션의 id값을 가져와서 raw_data와 정확한 동기화가 필요
-
+## 2025-05-16 작업내용
+1.preprocessing -> datatransfom 데이터 이동시 로직 개선 
+2.datatransform 병합 로직 개선
+3.키워드 변환 테스트 중
+4.clustering 병합 결과 확인 테스트 필요
+5.clustering 페이지 데이터 전송 구간 개선 필요
 
   

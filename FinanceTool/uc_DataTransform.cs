@@ -36,20 +36,7 @@ namespace FinanceTool
             InitializeComponent();
         }
 
-        /*
-        public void initUI(DataTable dataTable)
-        {
-            originDataTable = dataTable;
-            transformDataTable = dataTable.Copy();
-            dataGridView_2nd.DataSource = originDataTable;
-            dataGridView_transform.DataSource = transformDataTable;
-
-            create_merge_keyword_list();
-            set_keyword_combo_list();
-
-            DataHandler.SyncDataGridViewSelections(dataGridView_2nd, dataGridView_transform);
-        }
-        */
+       
         // initUI 메서드 수정
         public async Task initUI()
         {
@@ -534,8 +521,6 @@ namespace FinanceTool
             }
         }
 
-        // 키워드 병합 처리 함수
-        // 키워드 병합 처리 함수
         // 키워드 병합 처리 함수 (개선버전)
         private async Task ProcessMergeKeywordListWithProgress(ProcessProgressForm.UpdateProgressDelegate progress)
         {
@@ -565,7 +550,7 @@ namespace FinanceTool
                 {
                     if (column.ColumnName.StartsWith("Column") &&
                         int.TryParse(column.ColumnName.Substring(6), out int colIndex) &&
-                        colIndex >= 2)
+                        colIndex >= 0)
                     {
                         keywordColumns.Add(column.ColumnName);
                     }
@@ -694,11 +679,7 @@ namespace FinanceTool
                                     {
                                         moneyValue = moneyRow[moneyColumnName];
                                     }
-                                    // Column0 시도
-                                    else if (moneyRow.Table.Columns.Contains("Column0"))
-                                    {
-                                        moneyValue = moneyRow["Column0"];
-                                    }
+                                    
                                 }
 
                                 // 금액을 parseable 형태로 변환
@@ -962,38 +943,37 @@ namespace FinanceTool
             try
             {
                 // 원본 데이터를 수정하지 않도록 복사본 생성
-                //DataTable resultTable = transformDataTable.Copy();
                 DataTable resultTable = new DataTable();
 
-                // 1. is_visible=1인 컬럼 목록 가져오기
-                string columnsQuery = @"
-                                    SELECT original_name 
-                                    FROM column_mapping 
-                                    WHERE is_visible = 1 
-                                    ORDER BY sequence";
+                // MongoDB 연결 확인
+                await Data.MongoDBManager.Instance.EnsureInitializedAsync();
 
-                DataTable visibleColumnsTable = dbmanager.Instance.ExecuteQuery(columnsQuery);
-                List<string> visibleColumns = visibleColumnsTable.AsEnumerable()
-                    .Select(row => row["original_name"].ToString())
-                    .ToList();
+                // 1. is_visible=true인 컬럼 목록 가져오기
+                var columnMappingFilter = Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("is_visible", true);
+                var columnMappingsResult = await Data.MongoDBManager.Instance.FindDocumentsAsync<MongoDB.Bson.BsonDocument>(
+                    "column_mapping",
+                    columnMappingFilter);
+
+                // 시각화될 컬럼명 추출
+                List<string> visibleColumns = new List<string>();
+                foreach (var doc in columnMappingsResult)
+                {
+                    if (doc.Contains("original_name"))
+                    {
+                        string originalName = doc["original_name"].AsString;
+                        visibleColumns.Add(originalName);
+                    }
+                }
+
+                Debug.WriteLine($"시각화될 컬럼: {string.Join(", ", visibleColumns)}");
 
                 if (visibleColumns.Count == 0)
                 {
-                    Debug.WriteLine("표시할 컬럼이 없습니다. column_mapping 테이블의 is_visible 속성을 확인하세요.");
-                    return resultTable;
+                    Debug.WriteLine("표시할 컬럼이 없습니다. column_mapping 컬렉션의 is_visible 속성을 확인하세요.");
+                    return transformDataTable.Copy();
                 }
 
-                // 2. 결과 테이블에 컬럼 추가
-                /*
-                foreach (string column in visibleColumns)
-                {
-                    if (!resultTable.Columns.Contains(column))
-                    {
-                        resultTable.Columns.Add(column, typeof(string));
-                    }
-                }
-                */
-               
+                // 2. 결과 테이블에 컬럼 구성
                 // 먼저 visibleColumns 추가
                 foreach (string column in visibleColumns)
                 {
@@ -1009,7 +989,7 @@ namespace FinanceTool
                     }
                 }
 
-                // 원본 데이터의 모든 행 복사
+                // 3. 원본 데이터의 모든 행 복사
                 foreach (DataRow originalRow in transformDataTable.Rows)
                 {
                     DataRow newRow = resultTable.NewRow();
@@ -1017,35 +997,44 @@ namespace FinanceTool
                     // 원본 테이블의 모든 컬럼 값을 새 행에 복사
                     foreach (DataColumn column in transformDataTable.Columns)
                     {
-                        newRow[column.ColumnName] = originalRow[column.ColumnName];
+                        if (resultTable.Columns.Contains(column.ColumnName))
+                        {
+                            newRow[column.ColumnName] = originalRow[column.ColumnName];
+                        }
                     }
 
                     resultTable.Rows.Add(newRow);
                 }
 
-                // 3. raw_data_id 컬럼이 있는지 확인
+                // 4. raw_data_id 컬럼이 있는지 확인
                 if (!resultTable.Columns.Contains("raw_data_id"))
                 {
                     Debug.WriteLine("transformDataTable에 raw_data_id 컬럼이 없습니다.");
                     return resultTable;
                 }
 
-                // 4. 모든 행의 raw_data_id 목록 수집
-                HashSet<int> rawDataIds = new HashSet<int>();
-                Dictionary<int, List<DataRow>> idToRowsMap = new Dictionary<int, List<DataRow>>();
+                // 5. RawData 저장소 생성
+                var rawDataRepo = new Repositories.RawDataRepository();
+
+                // 6. 모든 행의 raw_data_id 목록 수집
+                HashSet<string> rawDataIds = new HashSet<string>();
+                Dictionary<string, List<DataRow>> idToRowsMap = new Dictionary<string, List<DataRow>>();
 
                 foreach (DataRow row in resultTable.Rows)
                 {
-                    if (row["raw_data_id"] != DBNull.Value &&
-                        int.TryParse(row["raw_data_id"].ToString(), out int rawDataId))
+                    if (row["raw_data_id"] != DBNull.Value)
                     {
-                        rawDataIds.Add(rawDataId);
-
-                        if (!idToRowsMap.ContainsKey(rawDataId))
+                        string rawDataId = row["raw_data_id"].ToString();
+                        if (!string.IsNullOrEmpty(rawDataId))
                         {
-                            idToRowsMap[rawDataId] = new List<DataRow>();
+                            rawDataIds.Add(rawDataId);
+
+                            if (!idToRowsMap.ContainsKey(rawDataId))
+                            {
+                                idToRowsMap[rawDataId] = new List<DataRow>();
+                            }
+                            idToRowsMap[rawDataId].Add(row);
                         }
-                        idToRowsMap[rawDataId].Add(row);
                     }
                 }
 
@@ -1055,64 +1044,52 @@ namespace FinanceTool
                     return resultTable;
                 }
 
-                // 5. 배치 처리로 원본 데이터 가져오기 (병렬 처리 수정)
-                const int batchSize = 1000;
-                List<int> idList = rawDataIds.ToList();
+                Debug.WriteLine($"보강할 raw_data_id: {rawDataIds.Count}개");
+
+                // 7. 배치 처리로 원본 데이터 가져오기
+                const int batchSize = 100;
+                List<string> idList = rawDataIds.ToList();
 
                 // 안전한 배치 처리
                 for (int i = 0; i < idList.Count; i += batchSize)
                 {
                     int currentBatchSize = Math.Min(batchSize, idList.Count - i);
-                    // 범위 체크 추가
                     if (i >= idList.Count || currentBatchSize <= 0)
                         continue;
 
-                    List<int> batchIds = idList.GetRange(i, currentBatchSize);
+                    List<string> batchIds = idList.GetRange(i, currentBatchSize);
 
-                    string batchIdList = string.Join(",", batchIds);
-                    string columnsToSelect = "id, " + string.Join(", ", visibleColumns);
-                    string rawDataQuery = $@"
-                                    SELECT {columnsToSelect}
-                                    FROM raw_data
-                                    WHERE id IN ({batchIdList})";
-
-                    DataTable batchRawData = dbmanager.Instance.ExecuteQuery(rawDataQuery);
+                    // MongoDB ID 형식으로 필터 생성
+                    var batchFilter = Builders<MongoModels.RawDataDocument>.Filter.In(d => d.Id, batchIds);
+                    var batchRawDatas = await rawDataRepo.FindDocumentsAsync(batchFilter);
 
                     // 조회된 데이터를 매핑
-                    foreach (DataRow rawRow in batchRawData.Rows)
+                    foreach (var rawData in batchRawDatas)
                     {
-                        int id = Convert.ToInt32(rawRow["id"]);
+                        string id = rawData.Id;
 
-                        if (idToRowsMap.ContainsKey(id))
+                        if (idToRowsMap.ContainsKey(id) && rawData.Data != null)
                         {
                             foreach (DataRow resultRow in idToRowsMap[id])
                             {
                                 foreach (string column in visibleColumns)
                                 {
-                                    if (rawRow[column] != DBNull.Value)
+                                    if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
                                     {
-                                        resultRow[column] = rawRow[column];
+                                        resultRow[column] = rawData.Data[column]?.ToString() ?? string.Empty;
                                     }
                                 }
                             }
                         }
                     }
-
-                    Debug.WriteLine($"배치 처리 완료: {batchIds.Count}개 ID, 처리된 ID: {batchRawData.Rows.Count}");
                 }
 
-                // 6. id와 import_date 컬럼 삭제
-                if (resultTable.Columns.Contains("id"))
-                    resultTable.Columns.Remove("id");
-
-                if (resultTable.Columns.Contains("import_date"))
-                    resultTable.Columns.Remove("import_date");
-
+                Debug.WriteLine("EnrichTransformDataWithRawData 완료");
                 return resultTable;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"raw_data 데이터 추가 중 오류 발생: {ex.Message}");
+                Debug.WriteLine($"MongoDB 데이터 보강 중 오류 발생: {ex.Message}\n{ex.StackTrace}");
                 // 예외 발생 시 원본 데이터 테이블의 복사본 반환
                 return transformDataTable.Copy();
             }
@@ -1165,97 +1142,6 @@ namespace FinanceTool
             return resultTable;
         }
 
-
-        private void CreateTempTableFromDataTable(string tableName, DataTable dt, bool preserveTable = false)
-        {
-            try
-            {
-                // 테이블 존재 여부 확인
-                bool tableExists = false;
-                string checkQuery = $"SELECT name FROM sqlite_master WHERE type='table' AND name='{tableName}'";
-                object result = dbmanager.Instance.ExecuteScalar(checkQuery);
-                tableExists = (result != null);
-
-
-                // 테이블이 존재하지 않거나 보존하지 않을 경우에만 테이블 생성
-                if (!tableExists || !preserveTable)
-                {
-                    //테이블이 존재하지 않는 경우 생성
-                    if (!tableExists)
-                    {
-                        // 테이블 생성
-                        StringBuilder createQuery = new StringBuilder();
-                        createQuery.AppendLine($"CREATE TABLE IF NOT EXISTS {tableName} (");
-                        List<string> columns = dt.Columns.Cast<DataColumn>()
-                            .Select(col => $"{col.ColumnName} {GetSQLiteType(col.DataType)}")
-                            .ToList();
-                        createQuery.AppendLine(string.Join(",\n", columns));
-                        createQuery.AppendLine(");");
-                        dbmanager.Instance.ExecuteNonQuery(createQuery.ToString());
-
-
-                        //temp_transform_data의 경우 keywordColumns 값 저장
-                        if (!preserveTable)
-                        {
-                            keywordColumnsCount = dt.Columns.Count;
-                        }
-                    }
-                    //테이블이 존재하는 경우
-                    else
-                    {
-                        //보존 여부 x 이면 이전 데이터 삭제
-                        if (!preserveTable)
-                        {
-                            Debug.WriteLine($"DELETE FROM {tableName}");
-                            dbmanager.Instance.ExecuteNonQuery($"DELETE FROM {tableName}");
-                        }
-                    }
-                }
-                //테이블 존재 o & 보존 테이블인 경우 로직 종료
-                else
-                {
-                    Debug.WriteLine($"Table Exist => return {tableName}");
-                    return;
-                }
-
-                // 데이터 삽입
-                using (var transaction = dbmanager.Instance.BeginTransaction())
-                {
-                    var paramNames = dt.Columns.Cast<DataColumn>()
-                        .Select(col => $"@{col.ColumnName}")
-                        .ToList();
-                    string insertQuery = $"INSERT INTO {tableName} VALUES ({string.Join(",", paramNames)})";
-                    foreach (DataRow row in dt.Rows)
-                    {
-                        var parameters = new Dictionary<string, object>();
-                        foreach (DataColumn col in dt.Columns)
-                        {
-                            parameters[col.ColumnName] = row[col] ?? DBNull.Value;
-                        }
-                        dbmanager.Instance.ExecuteNonQuery(insertQuery, parameters);
-                    }
-                    transaction.Commit();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"임시 테이블 생성 오류: {ex.Message}");
-                throw;
-            }
-        }
-
-
-
-        private string GetSQLiteType(Type type)
-        {
-            if (type == typeof(int) || type == typeof(long))
-                return "INTEGER";
-            if (type == typeof(double) || type == typeof(decimal))
-                return "REAL";
-            if (type == typeof(byte[]))
-                return "BLOB";
-            return "TEXT";
-        }
 
         private async Task set_keyword_combo_list()
         {
@@ -1553,9 +1439,6 @@ namespace FinanceTool
             }
            
 
-           
-
-           
             MessageBox.Show("키워드 변환이 완료되었습니다.", "Info",
                                    MessageBoxButtons.OK,
                                    MessageBoxIcon.Information);
@@ -1732,21 +1615,7 @@ namespace FinanceTool
 
             }
             
-            /*
-            DataHandler.secondClusteringData = DataHandler.CreateSetGroupDataTable(transformDataTable, DataHandler.moneyDataTable, true);
-
-
-            DataHandler.recomandKeywordTable = modifiedDataTable;
-
-            userControlHandler.uc_clustering.initUI();
-
-            if (this.ParentForm is Form1 form)
-            {
-                form.LoadUserControl(userControlHandler.uc_clustering);
-            }
-
-            isFinishSession = true;
-            */
+          
         }
 
         private void search_keyword_KeyDown(object sender, KeyEventArgs e)
