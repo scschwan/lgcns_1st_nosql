@@ -1,7 +1,11 @@
 ﻿using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
 using FinanceTool;
+using FinanceTool.MongoModels;
+using FinanceTool.Repositories;
 using Microsoft.VisualBasic.Devices;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -44,123 +48,157 @@ namespace FinanceTool
 
         public async void initUI()
         {
-            // Deep Copy 수행
-            DataHandler.finalClusteringData = DataHandler.secondClusteringData.Copy();
-
-            mergeClusterDataTable = EnrichWithRawTableData(DataHandler.finalClusteringData);
-
-            // 검색 모드 UI 초기화
-            //InitializeSearchModeUI();
-
-            set_keyword_combo_list();
-
-            create_merge_keyword_list(true);
-
-
-            //최초 수행시만 별도 수행
-            supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
-
-            // 메인 UI 스레드로 돌아가서 DataHandler 등록
-            await Task.Run(() =>
+            try
             {
-                if (Application.OpenForms.Count > 0)
+                // Deep Copy 수행
+                DataHandler.finalClusteringData = DataHandler.secondClusteringData.Copy();
+
+                // 클러스터링 데이터가 있고 MongoDB가 비어있으면 데이터 삽입
+                var clusteringRepo = new ClusteringRepository();
+
+                // MongoDB의 clustering_results 컬렉션에 데이터가 있는지 확인
+                var existingData = await clusteringRepo.GetAllAsync();
+
+                if (existingData.Count == 0 && DataHandler.finalClusteringData != null && DataHandler.finalClusteringData.Rows.Count > 0)
                 {
-                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                    Debug.WriteLine("clustering_results 컬렉션이 비어 있습니다. 데이터를 삽입합니다.");
+
+                    // DataTable을 MongoDB 문서로 변환하여 삽입
+                    List<ClusteringResultDocument> documents = new List<ClusteringResultDocument>();
+
+                    foreach (DataRow row in DataHandler.finalClusteringData.Rows)
                     {
-                        //merge_check_table 초기화
-                        merge_check_table.DataSource = null;
-                        merge_check_table.Rows.Clear();
-                        merge_check_table.Columns.Clear();
-                        if (DataHandler.dragSelections.ContainsKey(merge_check_table))
+                        var clusterDoc = new ClusteringResultDocument
                         {
-                            DataHandler.dragSelections[merge_check_table].Clear();
+                            ClusterId = Convert.ToInt32(row["ClusterID"]),
+                            ClusterName = row["클러스터명"].ToString(),
+                            Keywords = row["키워드목록"].ToString().Split(',').Select(k => k.Trim()).ToList(),
+                            Count = Convert.ToInt32(row["Count"]),
+                            TotalAmount = Convert.ToDecimal(row["합산금액"])
+                        };
+
+                        // dataIndex 처리 (raw_data_id 목록)
+                        if (!row.IsNull("dataIndex") && !string.IsNullOrEmpty(row["dataIndex"].ToString()))
+                        {
+                            clusterDoc.DataIndices = row["dataIndex"].ToString()
+                                                    .Split(',')
+                                                    .Select(id => id.Trim())
+                                                    .Where(id => !string.IsNullOrEmpty(id))
+                                                    .ToList();
                         }
 
-                        Debug.WriteLine("RegisterDataGridView->match_keyword_table ");
-                        DataHandler.RegisterDataGridView(merge_cluster_table);
-                        DataHandler.RegisterDataGridView(dataGridView_lv1);
-                        DataHandler.RegisterDataGridView(dataGridView_recoman_keyword);
+                        documents.Add(clusterDoc);
+                    }
 
-                        Debug.WriteLine("RegisterDataGridView->complete ");
-                        // 이벤트 핸들러 중복 등록 방지
-                        decimal_combo.SelectedIndexChanged -= decimal_combo_SelectedIndexChanged; // 기존 핸들러 제거
+                    // 데이터 일괄 삽입
+                    if (documents.Count > 0)
+                    {
+                        await clusteringRepo.CreateManyAsync(documents);
+                        Debug.WriteLine($"{documents.Count}개의 클러스터링 데이터를 MongoDB에 삽입했습니다.");
+                    }
+                }
 
-                        decimal_combo.SelectedIndex = 0;
+                // 이제 MongoDB에서 데이터 가져오기
+                DataTable mongoData = await clusteringRepo.ToDataTableAsync();
 
-                        decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
+                if (mongoData != null && mongoData.Rows.Count > 0)
+                {
+                    // MongoDB에서 가져온 데이터가 있으면 사용
+                    DataHandler.finalClusteringData = mongoData;
+                    Debug.WriteLine($"MongoDB에서 {mongoData.Rows.Count}개의 클러스터링 데이터를 가져왔습니다.");
+                }
+                else
+                {
+                    Debug.WriteLine("MongoDB에서 데이터를 가져오지 못했습니다. 메모리 데이터를 사용합니다.");
+                }
 
-                        //sorting 기준 변환
-                        merge_cluster_table.SortCompare -= DataHandler.money_SortCompare;
-                        merge_check_table.SortCompare -= DataHandler.money_SortCompare;
-                        dataGridView_modified.SortCompare -= DataHandler.money_SortCompare;
-
-                        merge_cluster_table.SortCompare += DataHandler.money_SortCompare;
-                        merge_check_table.SortCompare += DataHandler.money_SortCompare;
-                        dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
-
-                        dataGridView_modified.CellClick -= dataGridView_keyword_CellClick;
+                // MongoDB에서 가져온 클러스터링 데이터를 raw_data와 결합하기
+                mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
 
-                        if (dataGridView_modified.Rows.Count > 0)
+                // 검색 UI 초기화
+                set_keyword_combo_list();
+                create_merge_keyword_list(true);
+
+                // 최초 수행 시 별도 수행
+                supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
+
+                // 메인 UI 스레드로 돌아가서 DataGridView 설정
+                await Task.Run(() =>
+                {
+                    if (Application.OpenForms.Count > 0)
+                    {
+                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
                         {
-                            dataGridView_modified.DataSource = null;  // 먼저 DataSource를 null로 설정
-                            dataGridView_modified.Rows.Clear();
-                            dataGridView_modified.Columns.Clear();
-                        }
-
-                        /*
-                        // 원본 DataTable의 컬럼들 추가
-                        foreach (DataColumn col in DataHandler.recomandKeywordTable.Columns)
-                        {
-                            dataGridView_modified.Columns.Add(col.ColumnName, col.ColumnName);
-                        }
-
-
-                        // 데이터 필터링 및 추가
-                        foreach (DataRow row in DataHandler.recomandKeywordTable.Rows)
-                        {
-                            int rowIndex = dataGridView_modified.Rows.Add();
-
-                            // 데이터 채우기
-                            for (int i = 0; i < DataHandler.recomandKeywordTable.Columns.Count; i++)
+                            // merge_check_table 초기화
+                            merge_check_table.DataSource = null;
+                            merge_check_table.Rows.Clear();
+                            merge_check_table.Columns.Clear();
+                            if (DataHandler.dragSelections.ContainsKey(merge_check_table))
                             {
-                                dataGridView_modified.Rows[rowIndex].Cells[i].Value = row[i];
+                                DataHandler.dragSelections[merge_check_table].Clear();
                             }
 
+                            Debug.WriteLine("RegisterDataGridView->match_keyword_table");
+                            DataHandler.RegisterDataGridView(merge_cluster_table);
+                            DataHandler.RegisterDataGridView(dataGridView_lv1);
+                            DataHandler.RegisterDataGridView(dataGridView_recoman_keyword);
 
-                        }
-                        */
+                            Debug.WriteLine("RegisterDataGridView->complete");
 
-                        // 초기 데이터 로드 후 업데이트
-                        UpdateModifiedDataGridView();
+                            // 이벤트 핸들러 중복 등록 방지
+                            decimal_combo.SelectedIndexChanged -= decimal_combo_SelectedIndexChanged;
+                            decimal_combo.SelectedIndex = 0;
+                            decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
 
-                        // DataGridView 속성 설정
-                        dataGridView_modified.AllowUserToAddRows = false;
-                        dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                        dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                        dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                            // sorting 기준 변환
+                            merge_cluster_table.SortCompare -= DataHandler.money_SortCompare;
+                            merge_check_table.SortCompare -= DataHandler.money_SortCompare;
+                            dataGridView_modified.SortCompare -= DataHandler.money_SortCompare;
 
+                            merge_cluster_table.SortCompare += DataHandler.money_SortCompare;
+                            merge_check_table.SortCompare += DataHandler.money_SortCompare;
+                            dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
 
-                        // 나머지 컬럼들은 읽기 전용으로 설정
-                        for (int i = 1; i < dataGridView_modified.Columns.Count; i++)
-                        {
-                            dataGridView_modified.Columns[i].ReadOnly = true;
-                        }
+                            dataGridView_modified.CellClick -= dataGridView_keyword_CellClick;
 
+                            if (dataGridView_modified.Rows.Count > 0)
+                            {
+                                dataGridView_modified.DataSource = null;
+                                dataGridView_modified.Rows.Clear();
+                                dataGridView_modified.Columns.Clear();
+                            }
 
-                        dataGridView_modified.CellClick += dataGridView_keyword_CellClick;
+                            // 초기 데이터 로드 후 업데이트
+                            UpdateModifiedDataGridView();
 
-                        //dataGridView_modified.SortCompare -= DataHandler.DataGridView1_SortCompare;
-                        dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
+                            // DataGridView 속성 설정
+                            dataGridView_modified.AllowUserToAddRows = false;
+                            dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                            dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                            dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
 
-                        Debug.WriteLine("LoadSeparatorsAndRemovers");
+                            // 나머지 컬럼들은 읽기 전용으로 설정
+                            for (int i = 1; i < dataGridView_modified.Columns.Count; i++)
+                            {
+                                dataGridView_modified.Columns[i].ReadOnly = true;
+                            }
 
-                        LoadSeparatorsAndRemovers();
+                            dataGridView_modified.CellClick += dataGridView_keyword_CellClick;
+                            dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
 
-
-                    });
-                }
-            });
+                            Debug.WriteLine("LoadSeparatorsAndRemovers");
+                            LoadSeparatorsAndRemovers();
+                        });
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"initUI 메서드 오류: {ex.Message}");
+                MessageBox.Show($"클러스터링 데이터 로드 중 오류가 발생했습니다.\n{ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadSeparatorsAndRemovers()
@@ -315,6 +353,12 @@ namespace FinanceTool
 
                 if (MathcingPairs.Count > 0)
                 {
+                    if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
+                    {
+                        Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
+                        return; // 또는 적절한 오류 처리
+                    }
+
                     //CreateFilteredDataGridView(merge_cluster_table, DataHandler.finalClusteringData, MathcingPairs);
                     if (!"".Equals(except_keyword.Text))
                     {
@@ -364,134 +408,101 @@ namespace FinanceTool
         }
 
 
-        public DataTable EnrichWithRawTableData(DataTable inputTable)
+        public async Task<DataTable> EnrichWithRawTableDataAsync(DataTable inputTable)
         {
             DataTable resultTable = inputTable.Copy();
 
-
             try
             {
-                // 1. is_visible=1인 컬럼 목록 가져오기
-                string columnsQuery = @"
-            SELECT original_name 
-            FROM column_mapping 
-            WHERE is_visible = 1 
-            ORDER BY sequence";
-
-                DataTable visibleColumnsTable = dbmanager.Instance.ExecuteQuery(columnsQuery);
-                List<string> visibleColumns = visibleColumnsTable.AsEnumerable()
-                    .Select(row => row["original_name"].ToString())
-                    .ToList();
-
-                if (visibleColumns.Count == 0)
-                {
-                    Debug.WriteLine("표시할 컬럼이 없습니다. column_mapping 테이블의 is_visible 속성을 확인하세요.");
-                    return resultTable;
-                }
-
-                // 2. 결과 테이블에 컬럼 추가
-                foreach (string column in visibleColumns)
-                {
-                    if (!resultTable.Columns.Contains(column))
-                    {
-                        resultTable.Columns.Add(column, typeof(string));
-                    }
-                }
-
-                // 3. 모든 행에서 조회할 ID 목록 수집
-                HashSet<int> rawTableIds = new HashSet<int>();
-                Dictionary<int, List<DataRow>> idToRowsMap = new Dictionary<int, List<DataRow>>();
+                // 1. 모든 행에서 조회할 ID 목록 수집
+                HashSet<string> rawDataIds = new HashSet<string>();
+                Dictionary<string, List<DataRow>> idToRowsMap = new Dictionary<string, List<DataRow>>();
 
                 foreach (DataRow row in resultTable.Rows)
                 {
-                    string dataIndices = row["dataIndex"].ToString();
+                    string dataIndices = row["dataIndex"]?.ToString();
                     if (string.IsNullOrEmpty(dataIndices))
                         continue;
 
-                    string firstIndexStr = dataIndices.Split(',')[0].Trim();
-                    if (!int.TryParse(firstIndexStr, out int firstIndex))
+                    // 쉼표로 구분된 경우 첫 번째 ID를 사용
+                    string[] indices = dataIndices.Split(',');
+                    if (indices.Length == 0)
                         continue;
 
-                    // rowindex를 RAW_TABLE의 id로 변환 
-                    int rawTableId = firstIndex;
+                    string firstIndexStr = indices[0].Trim();
+                    if (string.IsNullOrEmpty(firstIndexStr))
+                        continue;
 
-                    rawTableIds.Add(rawTableId);
+                    // MongoDB ObjectId로 저장된 ID 사용
+                    rawDataIds.Add(firstIndexStr);
 
                     // ID를 키로, 해당 ID를 참조하는 행들을 값으로 저장
-                    if (!idToRowsMap.ContainsKey(rawTableId))
+                    if (!idToRowsMap.ContainsKey(firstIndexStr))
                     {
-                        idToRowsMap[rawTableId] = new List<DataRow>();
+                        idToRowsMap[firstIndexStr] = new List<DataRow>();
                     }
-                    idToRowsMap[rawTableId].Add(row);
+                    idToRowsMap[firstIndexStr].Add(row);
                 }
 
-                if (rawTableIds.Count == 0)
+                if (rawDataIds.Count == 0)
                     return resultTable;
 
-                // 4. 임시 테이블 생성 및 ID 삽입
-                dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids");
-                dbmanager.Instance.ExecuteNonQuery("CREATE TEMP TABLE temp_ids (id INTEGER PRIMARY KEY)");
+                // 2. MongoDB에서 필요한 컬럼 목록 가져오기
+                var columnMappingRepo = new ColumnMappingRepository();
+                var visibleColumns = await columnMappingRepo.GetVisibleColumnsAsync();
 
-                // 배치로 나누어 ID 삽입
-                const int batchSize = 100; // 더 작은 배치 크기
-                List<int> idList = rawTableIds.ToList();
-
-                using (var transaction = dbmanager.Instance.BeginTransaction())
+                if (visibleColumns.Count == 0)
                 {
-                    for (int i = 0; i < idList.Count; i += batchSize)
-                    {
-                        // 현재 배치의 ID 범위 가져오기
-                        int currentBatchSize = Math.Min(batchSize, idList.Count - i);
-                        StringBuilder insertBatch = new StringBuilder("INSERT INTO temp_ids (id) VALUES ");
-
-                        for (int j = 0; j < currentBatchSize; j++)
-                        {
-                            if (j > 0) insertBatch.Append(",");
-                            insertBatch.Append($"({idList[i + j]})");
-                        }
-
-                        dbmanager.Instance.ExecuteNonQuery(insertBatch.ToString());
-                    }
-
-                    transaction.Commit();
+                    Debug.WriteLine("표시할 컬럼이 없습니다. column_mapping 컬렉션의 is_visible 속성을 확인하세요.");
+                    return resultTable;
                 }
 
-                // 5. 임시 테이블을 사용하여 JOIN 쿼리 실행
-                string columnsToSelect = "r.id, " + string.Join(", ", visibleColumns.Select(c => "r." + c));
-                string joinQuery = $@"
-            SELECT {columnsToSelect}
-            FROM raw_data r
-            JOIN temp_ids t ON r.id = t.id";
-
-                DataTable rawData = dbmanager.Instance.ExecuteQuery(joinQuery);
-
-                // 6. 조회된 데이터를 결과 테이블에 매핑
-                foreach (DataRow rawRow in rawData.Rows)
+                // 3. 결과 테이블에 컬럼 추가
+                foreach (var columnInfo in visibleColumns)
                 {
-                    int id = Convert.ToInt32(rawRow["id"]);
+                    if (!resultTable.Columns.Contains(columnInfo.OriginalName))
+                    {
+                        resultTable.Columns.Add(columnInfo.OriginalName, typeof(string));
+                    }
+                }
+
+                // 4. MongoDB에서 필요한 문서들 가져오기
+                var rawDataRepo = new RawDataRepository();
+                List<RawDataDocument> rawDataDocuments = new List<RawDataDocument>();
+
+                // ObjectId 형식으로 필터 생성
+                var filterBuilder = Builders<RawDataDocument>.Filter;
+                var filter = filterBuilder.In(doc => doc.Id, rawDataIds);
+
+                // RawDataRepository 확장 메서드 추가하기
+                rawDataDocuments = await rawDataRepo.FindDocumentsAsync(filter);
+
+                // 5. 조회된 데이터를 결과 테이블에 매핑
+                foreach (var doc in rawDataDocuments)
+                {
+                    string id = doc.Id;
 
                     if (idToRowsMap.ContainsKey(id))
                     {
                         foreach (DataRow resultRow in idToRowsMap[id])
                         {
-                            foreach (string column in visibleColumns)
+                            foreach (var columnInfo in visibleColumns)
                             {
-                                resultRow[column] = rawRow[column];
+                                string columnName = columnInfo.OriginalName;
+                                if (doc.Data.ContainsKey(columnName))
+                                {
+                                    resultRow[columnName] = doc.Data[columnName]?.ToString() ?? "";
+                                }
                             }
                         }
                     }
                 }
 
-                // 7. 임시 테이블 삭제
-                dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids");
-
                 return resultTable;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"RAW_TABLE 데이터 추가 중 오류 발생: {ex.Message}");
-                // 예외 발생 시에도 임시 테이블 정리
-                try { dbmanager.Instance.ExecuteNonQuery("DROP TABLE IF EXISTS temp_ids"); } catch { }
+                Debug.WriteLine($"MongoDB에서 RAW_DATA 데이터 추가 중 오류 발생: {ex.Message}");
                 return resultTable;
             }
         }
@@ -562,6 +573,12 @@ namespace FinanceTool
                         return;
                     }
 
+                    if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
+                    {
+                        Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
+                        return; // 또는 적절한 오류 처리
+                    }
+
                     if (!"".Equals(except_keyword.Text))
                     {
                         CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString(), keyword_radio2.Checked);
@@ -574,6 +591,12 @@ namespace FinanceTool
                 //전체 검색
                 else
                 {
+                    if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
+                    {
+                        Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
+                        return; // 또는 적절한 오류 처리
+                    }
+
                     CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
                 }
 
@@ -658,6 +681,12 @@ namespace FinanceTool
                         await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
                         await Task.Delay(10);
 
+                        if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
+                        {
+                            Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
+                            return; // 또는 적절한 오류 처리
+                        }
+
                         if (!"".Equals(except_keyword.Text))
                         {
                             CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString(), keyword_radio2.Checked);
@@ -672,6 +701,12 @@ namespace FinanceTool
                     {
                         await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
                         await Task.Delay(10);
+
+                        if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
+                        {
+                            Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
+                            return; // 또는 적절한 오류 처리
+                        }
 
                         CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
                     }
@@ -866,7 +901,13 @@ namespace FinanceTool
             HashSet<string> uniqueKeywords = new HashSet<string>();
 
             // dataTable이 null이거나 공급업체 컬럼이 없으면 빈 리스트 반환
-            if (dataTable == null || !dataTable.Columns.Contains(DataHandler.prod_col_name))
+            if (dataTable == null)
+            {
+                Debug.WriteLine($"ExtractUniqueSupplierKeywords: dataTable이 null입니다.");
+                return new List<string>();
+            }
+
+            if (!dataTable.Columns.Contains(DataHandler.prod_col_name))
             {
                 Debug.WriteLine($"ExtractUniqueSupplierKeywords: dataTable에 {DataHandler.prod_col_name} 컬럼이 없거나 테이블이 null입니다.");
                 return new List<string>();
@@ -1252,9 +1293,21 @@ namespace FinanceTool
                                      .ToList();
 
             int nextIndex = desiredOrder.Count;
+            int columnCount = dgv.Columns.Count;
+
             foreach (var col in remainingColumns)
             {
-                col.DisplayIndex = nextIndex++;
+                // DisplayIndex가 열 개수보다 작은지 확인
+                if (nextIndex < columnCount)
+                {
+                    col.DisplayIndex = nextIndex++;
+                }
+                else
+                {
+                    // 범위를 벗어나면 오류를 기록하고 처리를 중단
+                    Debug.WriteLine($"DisplayIndex({nextIndex})가 열 개수({columnCount})를 초과했습니다. 열: {col.Name}");
+                    break;
+                }
             }
         }
 
@@ -1428,20 +1481,16 @@ namespace FinanceTool
         }
 
         //체크 항목 데이터 수집
-        public List<int> GetCheckedRowsData(DataGridView dgv)
+        public List<string> GetCheckedRowsData(DataGridView dgv)
         {
-            List<int> checkedData = new List<int>();
+            List<string> checkedData = new List<string>();
             foreach (DataGridViewRow row in dgv.Rows)
             {
-                // CheckBox 컬럼(0번째)이 체크되었는지 확인
-                if (row.Cells[0].Value != null &&
-                    Convert.ToBoolean(row.Cells[0].Value) == true)
+                if (row.Cells[0].Value != null && Convert.ToBoolean(row.Cells[0].Value) == true)
                 {
-                    // ID 컬럼의 값을 직접 int로 가져오기
                     if (row.Cells["ID"].Value != null)
                     {
-                        int id = Convert.ToInt32(row.Cells["ID"].Value);
-                        checkedData.Add(id);
+                        checkedData.Add(row.Cells["ID"].Value.ToString());
                     }
                 }
             }
@@ -1464,43 +1513,41 @@ namespace FinanceTool
             return checkedData;
         }
 
-        public void MergeAndCreateNewCluster(DataTable dataTable, List<int> targetIds, string clusterName = null, string clusterID = null)
+        public async Task MergeAndCreateNewCluster(DataTable dataTable, List<string> targetIds, string clusterName = null, string clusterID = null)
         {
             if (targetIds == null || targetIds.Count == 0) return;
 
-            int newId;
+            string newId;
             bool isNewCluster = true;
 
             // clusterID가 주어진 경우, 해당 ID를 사용
             if (clusterID != null)
             {
-                newId = Convert.ToInt32(clusterID);
+                newId = clusterID;
                 isNewCluster = false;  // 새 클러스터를 생성하지 않음
             }
             else
             {
-                // 1. 가장 큰 ID 값 찾기
-                int maxId = DataHandler.finalClusteringData.AsEnumerable()
-                    .Max(row => Convert.ToInt32(row["ID"]));
-                newId = maxId + 1;
+                // MongoDB용 새 ID 생성
+                newId = ObjectId.GenerateNewId().ToString();
             }
 
-            //Debug.WriteLine($"[MergeAndCreateNewCluster] newId: {newId}, isNewCluster: {isNewCluster}");
-
-
-            // 2. 병합할 행들의 데이터 수집
+            // 병합할 행들의 데이터 수집
             var targetRows = dataTable.AsEnumerable()
-                .Where(row => targetIds.Contains(Convert.ToInt32(row["ID"])))
+                .Where(row => {
+                    if (row["ID"] == null || row["ID"] == DBNull.Value) return false;
+                    string idStr = row["ID"].ToString();
+                    return targetIds.Contains(idStr);
+                })
                 .ToList();
 
             if (targetRows.Count == 0) return;
 
-            // 3. 병합 데이터 준비
+            // 병합 데이터 준비
             string mergedClusterName = "";
 
             if (clusterName == null || "".Equals(clusterName))
             {
-                // 3. 병합 데이터 준비
                 mergedClusterName = string.Join("_",
                     targetRows.Select(row => row["클러스터명"].ToString()));
 
@@ -1515,7 +1562,6 @@ namespace FinanceTool
                 mergedClusterName = clusterName;
             }
 
-
             string mergedKeywords = string.Join(",",
                 targetRows.Select(row => row["키워드목록"].ToString()));
 
@@ -1525,9 +1571,24 @@ namespace FinanceTool
             decimal totalAmount = targetRows.Sum(row =>
                 Convert.ToDecimal(row["합산금액"]));
 
+            // 데이터 인덱스 수집
+            HashSet<string> dataIndicesSet = new HashSet<string>();
+            foreach (var row in targetRows)
+            {
+                string indices = row["dataIndex"].ToString();
+                if (!string.IsNullOrEmpty(indices))
+                {
+                    foreach (string index in indices.Split(',').Select(i => i.Trim()).Where(i => !string.IsNullOrEmpty(i)))
+                    {
+                        dataIndicesSet.Add(index);
+                    }
+                }
+            }
+            List<string> dataIndices = dataIndicesSet.ToList();
+
             if (isNewCluster)
             {
-                // 4. 새로운 행 추가 (새 클러스터 생성 시)
+                // 새로운 행 추가 (새 클러스터 생성 시)
                 DataRow newRow = dataTable.NewRow();
                 newRow["ID"] = newId;
                 newRow["ClusterID"] = newId;
@@ -1535,20 +1596,22 @@ namespace FinanceTool
                 newRow["키워드목록"] = mergedKeywords;
                 newRow["Count"] = totalCount;
                 newRow["합산금액"] = totalAmount;
+                newRow["dataIndex"] = string.Join(",", dataIndices);
                 dataTable.Rows.Add(newRow);
             }
             else
             {
-                // 4. 기존 클러스터 정보 업데이트
+                // 기존 클러스터 정보 업데이트
                 DataRow existingRow = dataTable.AsEnumerable()
-                    .FirstOrDefault(row => Convert.ToInt32(row["ID"]) == newId);
+                    .FirstOrDefault(row => row["ID"].ToString() == newId);
 
                 if (existingRow != null)
                 {
-                    // 기존 클러스터에 추가될 항목들의 정보를 통합
+                    // 기존 클러스터 데이터 통합
                     string existingKeywords = existingRow["키워드목록"].ToString();
                     int existingCount = Convert.ToInt32(existingRow["Count"]);
                     decimal existingAmount = Convert.ToDecimal(existingRow["합산금액"]);
+                    string existingIndices = existingRow["dataIndex"].ToString();
 
                     // 클러스터명 업데이트 (사용자 지정 클러스터명이 있으면 그것 사용)
                     if (clusterName != null && !string.IsNullOrEmpty(clusterName))
@@ -1557,53 +1620,91 @@ namespace FinanceTool
                     }
 
                     // 키워드 목록 병합 (중복 제거)
-                    string combinedKeywords = existingKeywords;
-                    if (!string.IsNullOrEmpty(mergedKeywords))
+                    HashSet<string> keywordSet = new HashSet<string>(
+                        existingKeywords.Split(',').Select(k => k.Trim()));
+
+                    foreach (string keyword in mergedKeywords.Split(',').Select(k => k.Trim()))
                     {
-                        // 키워드 목록을 합치되, 중복된 키워드는 한 번만 포함
-                        HashSet<string> keywordSet = new HashSet<string>(
-                            existingKeywords.Split(',').Select(k => k.Trim()));
-
-                        foreach (string keyword in mergedKeywords.Split(',').Select(k => k.Trim()))
-                        {
-                            keywordSet.Add(keyword);
-                        }
-
-                        combinedKeywords = string.Join(",", keywordSet);
+                        keywordSet.Add(keyword);
                     }
+
+                    string combinedKeywords = string.Join(",", keywordSet);
+
+                    // 데이터 인덱스 병합 (중복 제거)
+                    HashSet<string> indexSet = new HashSet<string>(
+                        existingIndices.Split(',').Select(i => i.Trim()));
+
+                    foreach (string index in dataIndices)
+                    {
+                        indexSet.Add(index);
+                    }
+
+                    string combinedIndices = string.Join(",", indexSet);
 
                     // 값 업데이트
                     existingRow["키워드목록"] = combinedKeywords;
                     existingRow["Count"] = existingCount + totalCount;
                     existingRow["합산금액"] = existingAmount + totalAmount;
+                    existingRow["dataIndex"] = combinedIndices;
                 }
             }
-            // 5. 병합된 행들의 ClusterID 업데이트
+
+            // 병합된 행들의 ClusterID 업데이트
             foreach (var row in targetRows)
             {
                 row["ClusterID"] = newId;
             }
 
-            // 6. 변경사항 적용
+            // 변경사항 적용
             dataTable.AcceptChanges();
-            mergeClusterDataTable = EnrichWithRawTableData(dataTable);
+
+            // MongoDB에 변경사항 반영
+            try
+            {
+                var clusteringRepo = new ClusteringRepository();
+
+                // 키워드 배열 생성
+                List<string> keywordsList = mergedKeywords
+                    .Split(',')
+                    .Select(k => k.Trim())
+                    .Where(k => !string.IsNullOrEmpty(k))
+                    .Distinct()
+                    .ToList();
+
+                // MergeOrUpdateClusterAsync 메서드 호출
+                await clusteringRepo.MergeOrUpdateClusterAsync(
+                    newId,
+                    mergedClusterName,
+                    keywordsList,
+                    totalCount,
+                    totalAmount,
+                    dataIndices,
+                    targetIds,
+                    isNewCluster
+                );
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 클러스터 업데이트 오류: {ex.Message}");
+            }
+
+            mergeClusterDataTable = await EnrichWithRawTableDataAsync(dataTable);
         }
 
-        public void deleteClusterId(DataTable dataTable, List<int> targetIds)
+        public async Task deleteClusterId(DataTable dataTable, List<string> targetIds)
         {
 
             Debug.WriteLine($"targetIds : {targetIds[0]}");
 
             // 삭제할 행들을 찾아서 리스트에 담기
             var rowsToDelete = dataTable.AsEnumerable()
-                .Where(row => targetIds.Contains(Convert.ToInt32(row["ID"])))
+                .Where(row => {
+                    if (row["ID"] == null || row["ID"] == DBNull.Value) return false;
+                    // 문자열 비교 수행
+                    string idStr = row["ID"].ToString();
+                    return targetIds.Contains(idStr);
+                })
                 .ToList();
-
-            // 찾은 행들을 삭제
-            foreach (var row in rowsToDelete)
-            {
-                dataTable.Rows.Remove(row);
-            }
 
             // 대상 ID를 가진 행들에 새로운 ClusterID 할당
             foreach (DataRow row in dataTable.Rows)
@@ -1611,19 +1712,32 @@ namespace FinanceTool
                 // null 체크 후 변환
                 if (row["ClusterID"] != DBNull.Value)
                 {
-                    int rowId = Convert.ToInt32(row["ClusterID"]);
-                    if (targetIds.Contains(rowId))
+                    // ClusterID를 문자열로 비교
+                    string clusterIdStr = row["ClusterID"].ToString();
+                    if (targetIds.Contains(clusterIdStr))
                     {
-                        //row["ClusterID"] = DBNull.Value;  // null 대신 DBNull.Value 사용
-                        row["ClusterID"] = -1;
+                        row["ClusterID"] = -1;  // 미병합 상태로 변경
                     }
                 }
-
             }
 
             // 변경사항 적용
             dataTable.AcceptChanges();
-            mergeClusterDataTable = EnrichWithRawTableData(dataTable);
+
+            // MongoDB에 변경사항 반영
+            try
+            {
+                var clusteringRepo = new ClusteringRepository();
+
+                // 새로 추가한 메서드 호출
+                await clusteringRepo.DeleteClustersAndResetMembersAsync(targetIds);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 클러스터 삭제 오류: {ex.Message}");
+            }
+
+            mergeClusterDataTable = await EnrichWithRawTableDataAsync(dataTable);
         }
 
 
@@ -1643,7 +1757,7 @@ namespace FinanceTool
 
         private async void button1_Click(object sender, EventArgs e)
         {
-            List<int> mergeIDlList = GetCheckedRowsData(merge_cluster_table);
+            List<string> mergeIDlList = GetCheckedRowsData(merge_cluster_table);
 
             if (mergeIDlList.Count == 0)
             {
@@ -1657,18 +1771,13 @@ namespace FinanceTool
             using (var progressForm = new ProcessProgressForm())
             {
                 progressForm.Show();
-
-
                 await progressForm.UpdateProgressHandler(10, "클러스터 병합 시작");
                 await Task.Delay(10);
 
-
-                MergeAndCreateNewCluster(DataHandler.finalClusteringData, mergeIDlList);
+                await MergeAndCreateNewCluster(DataHandler.finalClusteringData, mergeIDlList);
 
                 await progressForm.UpdateProgressHandler(50, "클러스터 병합 진행중...");
                 await Task.Delay(10);
-
-
 
                 set_keyword_combo_list();
 
@@ -1679,14 +1788,12 @@ namespace FinanceTool
                 await progressForm.UpdateProgressHandler(70, "클러스터 병합 결과 출력 중...");
                 await Task.Delay(10);
 
-
                 create_merge_keyword_list(true);
                 create_check_keyword_list();
 
                 await progressForm.UpdateProgressHandler(100);
                 await Task.Delay(10);
                 progressForm.Close();
-
 
                 MessageBox.Show("클러스터 병합이 완료되었습니다.", "Info",
                                        MessageBoxButtons.OK,
@@ -1695,42 +1802,11 @@ namespace FinanceTool
 
             // 병합 작업 후 업데이트
             UpdateModifiedDataGridView();
-
-            /*
-            List<int> mergeIDlList = GetCheckedRowsData(merge_cluster_table);
-
-            if (mergeIDlList.Count == 0)
-            {
-                MessageBox.Show("병합 대상을 선택하셔야 합니다.", "알림",
-                                   MessageBoxButtons.OK,
-                                   MessageBoxIcon.Warning);
-
-                return;
-            }
-
-
-            MergeAndCreateNewCluster(DataHandler.finalClusteringData, mergeIDlList);
-
-            set_keyword_combo_list();
-
-            //검색조건 초기화
-            merge_keyword_combo.SelectedIndex = 0;
-            merge_search_keyword.Text = "";
-
-            create_merge_keyword_list();
-            create_check_keyword_list();
-
-            //DataHandler.SetupDataGridView(dataGridView_3rd, DataHandler.finalClusteringData);
-
-            MessageBox.Show("클러스터 병합이 완료되었습니다.", "Info",
-                                   MessageBoxButtons.OK,
-                                   MessageBoxIcon.Information);
-            */
         }
 
-        private void merge_cancel_button_Click(object sender, EventArgs e)
+        private async void merge_cancel_button_Click(object sender, EventArgs e)
         {
-            List<int> mergeIDlList = GetCheckedRowsData(merge_check_table);
+            List<string> mergeIDlList = GetCheckedRowsData(merge_check_table);
 
             if (mergeIDlList.Count == 0)
             {
@@ -1741,7 +1817,7 @@ namespace FinanceTool
                 return;
             }
 
-            deleteClusterId(DataHandler.finalClusteringData, mergeIDlList);
+            await deleteClusterId(DataHandler.finalClusteringData, mergeIDlList);
 
             set_keyword_combo_list();
 
@@ -1749,10 +1825,8 @@ namespace FinanceTool
             check_search_combo.SelectedIndex = 0;
             check_search_keyword.Text = "";
 
-
             create_merge_keyword_list();
             create_check_keyword_list();
-            //DataHandler.SetupDataGridView(dataGridView_3rd, DataHandler.finalClusteringData);
 
             // 병합 작업 후 업데이트
             UpdateModifiedDataGridView();
@@ -1840,7 +1914,7 @@ namespace FinanceTool
 
                 // 변경 사항 저장
                 DataHandler.finalClusteringData.AcceptChanges();
-                mergeClusterDataTable = EnrichWithRawTableData(DataHandler.finalClusteringData);
+                mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
                 await progressForm.UpdateProgressHandler(70, "클러스터명 변경 결과 출력 중...");
                 await Task.Delay(10);
@@ -1925,8 +1999,6 @@ namespace FinanceTool
                 }
             }
 
-
-
             DialogResult result = MessageBox.Show(
                 $"Clustering 병합 테이블에 {clusterCount} 개의 Cluster가 남아있습니다.\n해당 Cluster를 'Undefined'로 일괄 통합하시겠습니까?\n(클러스터명은 다음 페이지에서 수정 가능합니다.)",
                 "클러스터 통합 확인",
@@ -1936,25 +2008,11 @@ namespace FinanceTool
 
             if (result == DialogResult.Yes)
             {
-
-                //남은 clustering 항목 일괄 병합
-                /*
-                List<int> checkedData = new List<int>();
-                
-                foreach (DataGridViewRow row in merge_cluster_table.Rows)
-                {
-                    // ID 컬럼의 값을 직접 int로 가져오기
-                    if (row.Cells["ID"].Value != null)
-                    {
-                        int id = Convert.ToInt32(row.Cells["ID"].Value);
-                        checkedData.Add(id);
-                    }
-                }
-                */
-                List<int> checkedData = DataHandler.finalClusteringData.AsEnumerable()
-                                .Where(row => row.Field<int>("clusterID") < 0)
-                                .Select(row => row.Field<int>("ID"))
-                                .ToList();
+                // 남은 clustering 항목 일괄 병합
+                List<string> checkedData = DataHandler.finalClusteringData.AsEnumerable()
+                                    .Where(row => Convert.ToInt32(row["clusterID"]) < 0)
+                                    .Select(row => row["ID"].ToString()) // 문자열로 ID 가져오기
+                                    .ToList();
 
                 MergeAndCreateNewCluster(DataHandler.finalClusteringData, checkedData, "Undefined");
 
@@ -1966,10 +2024,6 @@ namespace FinanceTool
 
                 create_merge_keyword_list();
                 create_check_keyword_list();
-
-                //DataHandler.SetupDataGridView(dataGridView_3rd, DataHandler.finalClusteringData);
-
-
 
                 //Export 페이지로 이동
                 userControlHandler.uc_classification.initUI();
@@ -2086,7 +2140,7 @@ namespace FinanceTool
 
         private async void merge_addon_btn_Click(object sender, EventArgs e)
         {
-            List<int> mergeIDlList = GetCheckedRowsData(merge_cluster_table);
+            List<string> mergeIDlList = GetCheckedRowsData(merge_cluster_table);
             if (mergeIDlList.Count < 1)
             {
                 MessageBox.Show("병합 테이블에서 추가 병합을 진행할 대상을 선택하셔야 합니다.", "알림",
@@ -2096,7 +2150,7 @@ namespace FinanceTool
                 return;
             }
 
-            List<int> mergeClusterIDlList = GetCheckedRowsData(merge_check_table);
+            List<string> mergeClusterIDlList = GetCheckedRowsData(merge_check_table);
             if (mergeClusterIDlList.Count < 1)
             {
                 MessageBox.Show("추가 병합 수행 시 병합 결과 확인 테이블에서 \n 병합 시킬 클러스터를 선택하셔야 합니다.", "알림",
@@ -2118,23 +2172,19 @@ namespace FinanceTool
             using (var progressForm = new ProcessProgressForm())
             {
                 progressForm.Show();
-
-
                 await progressForm.UpdateProgressHandler(10, "클러스터 병합 시작");
                 await Task.Delay(10);
 
-
-
-                int mergeAddClusterID = mergeClusterIDlList[0];
+                string mergeAddClusterID = mergeClusterIDlList[0]; // 문자열로 변경
                 int checkIndex = GetCheckedRowsIndex(merge_check_table);
 
                 Debug.WriteLine($" checkIndex : {checkIndex}");
 
-                MergeAndCreateNewCluster(DataHandler.finalClusteringData, mergeIDlList, null, mergeAddClusterID.ToString());
+                // clusterID 매개변수를 문자열로 전달
+                await MergeAndCreateNewCluster(DataHandler.finalClusteringData, mergeIDlList, null, mergeAddClusterID);
 
                 await progressForm.UpdateProgressHandler(50, "클러스터 병합 진행중...");
                 await Task.Delay(10);
-
 
                 set_keyword_combo_list();
 
@@ -2145,13 +2195,8 @@ namespace FinanceTool
                 await progressForm.UpdateProgressHandler(70, "클러스터 병합 결과 출력 중...");
                 await Task.Delay(10);
 
-
                 create_merge_keyword_list(true);
                 create_check_keyword_list();
-
-
-
-                //DataHandler.SetupDataGridView(dataGridView_3rd, DataHandler.finalClusteringData);
 
                 //추가 병합의 경우만 포커스 셀 변경
                 await Task.Run(() =>
@@ -2171,7 +2216,6 @@ namespace FinanceTool
                 await Task.Delay(10);
                 progressForm.Close();
 
-
                 MessageBox.Show("클러스터 병합이 완료되었습니다.", "Info",
                                        MessageBoxButtons.OK,
                                        MessageBoxIcon.Information);
@@ -2179,45 +2223,6 @@ namespace FinanceTool
 
             // 병합 작업 후 업데이트
             UpdateModifiedDataGridView();
-            /*
-            int mergeAddClusterID = mergeClusterIDlList[0];
-            int checkIndex = GetCheckedRowsIndex(merge_check_table);
-
-            Debug.WriteLine($" checkIndex : {checkIndex}");
-
-            MergeAndCreateNewCluster(DataHandler.finalClusteringData, mergeIDlList, null, mergeAddClusterID.ToString());
-
-            set_keyword_combo_list();
-
-            //검색조건 초기화
-            merge_keyword_combo.SelectedIndex = 0;
-            merge_search_keyword.Text = "";
-
-            create_merge_keyword_list();
-            create_check_keyword_list();
-
-            //DataHandler.SetupDataGridView(dataGridView_3rd, DataHandler.finalClusteringData);
-
-            //추가 병합의 경우만 포커스 셀 변경
-            await Task.Run(() =>
-            {
-                if (Application.OpenForms.Count > 0)
-                {
-                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                    {
-                        merge_check_table.ClearSelection();
-                        merge_check_table.Rows[checkIndex].Selected = true;
-                        merge_check_table.CurrentCell = merge_check_table.Rows[checkIndex].Cells[0];
-                    });
-                }
-            });
-
-
-
-            MessageBox.Show("클러스터 병합이 완료되었습니다.", "Info",
-                                   MessageBoxButtons.OK,
-                                   MessageBoxIcon.Information);
-            */
         }
 
 
@@ -2559,7 +2564,7 @@ namespace FinanceTool
             }
         }
 
-        private void union_cluster_btn_Click(object sender, EventArgs e)
+        private async void union_cluster_btn_Click(object sender, EventArgs e)
         {
             // 1. 체크된 항목들 찾기
             List<int> checkedClusterIds = new List<int>();
@@ -2709,7 +2714,7 @@ namespace FinanceTool
 
                 // 6. 변경사항 적용
                 DataHandler.finalClusteringData.AcceptChanges();
-                mergeClusterDataTable = EnrichWithRawTableData(DataHandler.finalClusteringData);
+                mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
                 // 7. 데이터 리스트 갱신
                 set_keyword_combo_list();

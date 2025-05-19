@@ -25,6 +25,43 @@ SQLite 기반의 데이터 처리 애플리케이션을 MongoDB로 마이그레�
 * **최소 수정 원칙**: UI 로직은 그대로 유지하고 데이터 액세스 로직만 MongoDB로 교체합니다.
 * **역할 분리**: DBManager.cs는 MongoDBManager.cs로, DataConverter.cs는 MongoDataConverter.cs로 대체합니다.
 
+## Data Clustering(Grouping) 원칙(Clustering.cs
+)
+### 클러스터 구조 및 ID 관리
+
+* 각 클러스터는 고유 ID를 가지며, 병합 시 신규 ID 생성
+* 클러스터 상태는 ID와 ClusterID 관계로 구분:
+
+* ClusterID = ID: 병합된 클러스터(상위) 객체
+* ClusterID = -1: 아직 어떤 클러스터에도 병합되지 않은 독립 객체
+* ClusterID > 0 & ClusterID ≠ ID: 이미 다른 클러스터에 속한 하위 객체
+
+
+
+### 데이터 병합 메커니즘
+
+* 클러스터 병합 시 하위 클러스터들의 모든 데이터가 합쳐짐:
+
+* data_indices: 원본 데이터 ID 참조 목록
+* count: 포함된 항목 수
+* total_amount: 금액 합계
+* keywords: 키워드 목록(중복 제거)
+
+
+
+### 병합 시나리오
+
+* 병합된 클러스터 간 추가 병합 가능
+* 병합된 클러스터에 미병합 클러스터 추가 가능
+* 클러스터 병합 취소 기능으로 기존 구조 복원 가능
+
+### 추가 관리 기능
+
+* 클러스터명 자동 생성 및 수동 변경 가능(20자 제한)
+* 키워드 기반 클러스터 검색
+* 공급업체 기반 클러스터 필터링
+* 미병합 클러스터 "Undefined" 일괄 통합
+
 
 ## 대용량 데이터 처리 전략
 
@@ -112,6 +149,15 @@ FinanceTool/
    - MongoDB 기반의 데이터 페이징 처리
    - `is_hidden` 필드를 사용한 데이터 숨김 처리
    - UI 그리드뷰에 데이터 표시 및 스타일링
+   
+3. **uc_processing.cs 수정**:
+  - sqlite -> mongodb 대체 및 관련 함수 수정
+  - datatransform.cs 데이터 전송 로직 개선
+
+
+4. **uc_datatransform.cs 수정**:
+  - sqlite -> mongodb 대체 및 관련 함수 수정
+  - clustering.cs 데이터 전송 로직 개선
 
 ### 진행 중인 작업
 
@@ -344,5 +390,10 @@ var batches = documents
 3.키워드 변환 테스트 중
 4.clustering 병합 결과 확인 테스트 필요
 5.clustering 페이지 데이터 전송 구간 개선 필요
+
+## 2025-05-19 작업 내용
+1.datatransform 키워드 변환 로직 점검
+2.clustering 병합 결과 페이지 개성
+3.clustering 페이지 데이터 전송 구간 개선 -> 신규 로직 적용
 
   

@@ -297,6 +297,79 @@ namespace FinanceTool.Repositories
             return await _collection.Find(filter).ToListAsync();
         }
 
+
+        // ClusteringRepository에 추가할 메서드
+        /// <summary>
+        /// 새 클러스터 생성 또는 기존 클러스터 업데이트 및 병합된 클러스터들의 상태 업데이트
+        /// </summary>
+        public async Task MergeOrUpdateClusterAsync(
+    string newClusterId,  // 문자열 ID 사용
+    string clusterName,
+    List<string> keywords,
+    int count,
+    decimal totalAmount,
+    List<string> dataIndices,
+    List<string> mergedClusterIds,  // 문자열 ID 목록 사용
+    bool isNewCluster)
+        {
+            if (isNewCluster)
+            {
+                // 새 클러스터 생성
+                var newCluster = new ClusteringResultDocument
+                {
+                    Id = newClusterId,  // 문자열 ID 할당
+                    ClusterId = -1,     // 기본값 유지
+                    ClusterName = clusterName,
+                    Keywords = keywords,
+                    Count = count,
+                    TotalAmount = totalAmount,
+                    DataIndices = dataIndices,
+                    CreatedAt = DateTime.Now
+                };
+
+                await CreateAsync(newCluster);
+            }
+            else
+            {
+                // 기존 클러스터 업데이트
+                var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.Id, newClusterId);
+                var update = Builders<ClusteringResultDocument>.Update
+                    .Set(c => c.ClusterName, clusterName)
+                    .Set(c => c.Keywords, keywords)
+                    .Set(c => c.Count, count)
+                    .Set(c => c.TotalAmount, totalAmount)
+                    .Set(c => c.DataIndices, dataIndices);
+
+                await _collection.UpdateOneAsync(filter, update);
+            }
+
+            // 병합된 클러스터들의 ClusterId 업데이트
+            foreach (string id in mergedClusterIds)
+            {
+                var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.Id, id);
+                var update = Builders<ClusteringResultDocument>.Update
+                    .Set(c => c.ClusterId, Convert.ToInt32(newClusterId));
+
+                await _collection.UpdateOneAsync(filter, update);
+            }
+        }
+
+        public async Task DeleteClustersAndResetMembersAsync(List<string> clusterIds)
+        {
+            // 1. 클러스터 삭제
+            foreach (var id in clusterIds)
+            {
+                await DeleteAsync(id);
+            }
+
+            // 2. 해당 클러스터에 속한 항목들의 클러스터 ID 재설정
+            var filter = Builders<ClusteringResultDocument>.Filter.In(c => c.Id, clusterIds);
+            var update = Builders<ClusteringResultDocument>.Update
+                .Set(c => c.ClusterId, -1);
+
+            await _collection.UpdateManyAsync(filter, update);
+        }
+
         public async Task<List<ClusteringResultDocument>> GetWithPaginationAsync(int page, int pageSize, Expression<Func<ClusteringResultDocument, object>> sortField = null)
         {
             // 페이징 처리와 정렬 기능 추가

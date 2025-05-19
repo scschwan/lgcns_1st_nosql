@@ -184,6 +184,14 @@ namespace FinanceTool.Repositories
             return await query.ToListAsync();
         }
 
+        /// <summary>
+        /// ID 목록으로 여러 문서 한 번에 조회
+        /// </summary>
+        public async Task<List<RawDataDocument>> GetDocumentsByIdsAsync(List<string> ids)
+        {
+            var filter = Builders<RawDataDocument>.Filter.In(d => d.Id, ids);
+            return await _collection.Find(filter).ToListAsync();
+        }
 
     }
 }
