@@ -73,8 +73,8 @@ namespace FinanceTool
                     DataTable viewData = new DataTable();
 
                     // 필요한 메타데이터 컬럼 추가
-                    viewData.Columns.Add("id", typeof(string));
-                    viewData.Columns.Add("process_data_id", typeof(string));
+                    //viewData.Columns.Add("id", typeof(string));
+                    //viewData.Columns.Add("process_data_id", typeof(string));
                     viewData.Columns.Add("raw_data_id", typeof(string)); // raw_data_id 직접 사용
 
                     // 각 키워드를 별도 컬럼으로 추가
@@ -100,8 +100,8 @@ namespace FinanceTool
                         foreach (var doc in processViewDocs)
                         {
                             DataRow row = viewData.NewRow();
-                            row["id"] = doc.Id;
-                            row["process_data_id"] = doc.ProcessDataId;
+                            //row["id"] = doc.Id;
+                            //row["process_data_id"] = doc.ProcessDataId;
                             row["raw_data_id"] = doc.RawDataId; // 직접 raw_data_id 사용
 
                             // 키워드들을 Column0부터 바로 매핑
@@ -202,11 +202,13 @@ namespace FinanceTool
                                 if (dataGridView_2nd.Columns["raw_data_id"] != null)
                                     dataGridView_2nd.Columns["raw_data_id"].Visible = false;
 
+                                /*
                                 if (dataGridView_2nd.Columns["id"] != null)
                                     dataGridView_2nd.Columns["id"].Visible = false;
 
                                 if (dataGridView_2nd.Columns["process_data_id"] != null)
                                     dataGridView_2nd.Columns["process_data_id"].Visible = false;
+                                */
 
                                 // 필요한 경우 열 너비 조정
                                 dataGridView_2nd.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
@@ -1423,9 +1425,15 @@ namespace FinanceTool
                 await progressForm.UpdateProgressHandler(60, "변환 키워드 기반 요약 정보 재 산출 중...");
                 await Task.Delay(10);
 
+
+                Debug.WriteLine("data Transform change_keyword_Click -> create_merge_keyword_list & set_keyword_combo_list 설정 시작");
+
                 //3.변경된 키워드 기반 리스트 재 생성
-                create_merge_keyword_list();
-                set_keyword_combo_list();
+                await create_merge_keyword_list();
+                await Task.Delay(10);
+                await set_keyword_combo_list();
+
+                Debug.WriteLine("data Transform change_keyword_Click -> set_keyword_combo_list 설정 완료");
 
 
                 await progressForm.UpdateProgressHandler(90, "화면 완료...");
@@ -1500,6 +1508,9 @@ namespace FinanceTool
             {
                 dataGridView_2nd.Columns["raw_data_id"].Visible = false;
             }
+
+            
+            
         }
 
         private void check_all_keyword_list_CheckedChanged(object sender, EventArgs e)
@@ -1514,46 +1525,123 @@ namespace FinanceTool
         // User Control을 Form으로 감싸서 보여주는 방법
         public void ShowUserControlAsDialog(UserControl userControl)
         {
-            Form form = new Form();
+            Debug.WriteLine("ShowUserControlAsDialog start");
 
-            // Form 설정
-            form.Text = "Clustering 결과 확인";
-            form.StartPosition = FormStartPosition.CenterParent;
-            //form.FormBorderStyle = FormBorderStyle.FixedDialog;
-            //form.MaximizeBox = false;
-            //form.MinimizeBox = false;
+            // 폼 생성 및 기본 설정
+            Form form = new Form
+            {
+                Text = "Clustering 결과 확인",
+                StartPosition = FormStartPosition.CenterParent,
+                FormBorderStyle = FormBorderStyle.Sizable,
+                Size = new Size(1650, 900), // 적절한 초기 크기 지정
+                MinimizeBox = true,
+                MaximizeBox = true
+            };
 
-            // User Control 추가
-            userControl.Dock = DockStyle.None;  // User Control이 Form에 꽉 차게 설정
-            form.Controls.Add(userControl);
+            // 진행 상태 표시를 위한 컨트롤 추가
+            Panel loadingPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = System.Drawing.Color.White
+            };
 
-            // Form 크기를 User Control 크기에 맞게 조정
-            form.ClientSize = new Size(userControl.Width, userControl.Height);
+            Label loadingLabel = new Label
+            {
+                Text = "데이터 렌더링 중...",
+                Font = new System.Drawing.Font("맑은 고딕", 14),
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Dock = DockStyle.Fill
+            };
 
-            // 모달 다이얼로그로 표시
-            form.ShowDialog();
+            loadingPanel.Controls.Add(loadingLabel);
+            form.Controls.Add(loadingPanel);
+
+            // UserControl을 form에 추가하기 전에 먼저 폼 표시 (비모달 방식)
+            Debug.WriteLine("ShowUserControlAsDialog - Show form");
+            form.Show();
+
+            // 백그라운드 작업으로 데이터 렌더링 및 컨트롤 초기화 완료
+            Task.Run(() => {
+                // 약간의 지연을 통해 로딩 메시지가 먼저 표시될 수 있도록 함
+                Task.Delay(100).Wait();
+
+                form.Invoke((MethodInvoker)delegate {
+                    Debug.WriteLine("ShowUserControlAsDialog - Adding UserControl");
+
+                    // 이미 초기화된 UserControl을 Form에 추가
+                    userControl.Dock = DockStyle.Fill;
+                    form.Controls.Add(userControl);
+
+                    // 로딩 패널 제거
+                    form.Controls.Remove(loadingPanel);
+                    loadingPanel.Dispose();
+
+                    // 필요시 폼 크기 조정
+                    form.ClientSize = new Size(
+                        Math.Min(Screen.PrimaryScreen.WorkingArea.Width - 100, userControl.Width),
+                        Math.Min(Screen.PrimaryScreen.WorkingArea.Height - 100, userControl.Height)
+                    );
+
+                    Debug.WriteLine("ShowUserControlAsDialog - UserControl added and rendered");
+                });
+            });
+
+            Debug.WriteLine("ShowUserControlAsDialog - immediate return");
+
+            // 이 메서드는 즉시 반환됨 (비모달)
         }
 
         private async void button2_Click(object sender, EventArgs e)
         {
-            //Data Clustering
-            //데이터가 없을 경우 신규 생성
-            if (DataHandler.firstClusteringData.Rows.Count == 0)
+            try
             {
-                DataHandler.firstClusteringData = await DataHandler.CreateSetGroupDataTableAsync(originDataTable, DataHandler.moneyDataTable);
+                // 간단한 로딩 메시지만 표시
+                using (var waitCursor = new WaitCursor())
+                {
+                    // 데이터 로드 작업을 백그라운드 스레드에서 처리
+                    await Task.Run(async () => {
+                        if (DataHandler.firstClusteringData.Rows.Count == 0)
+                        {
+                            DataHandler.firstClusteringData = await DataHandler.CreateSetGroupDataTableAsync(originDataTable, DataHandler.moneyDataTable);
+                        }
+                        if (DataHandler.secondClusteringData.Rows.Count == 0)
+                        {
+                            DataHandler.secondClusteringData = await DataHandler.CreateSetGroupDataTableAsync(transformDataTable, DataHandler.moneyDataTable, true);
+                        }
+                    });
+
+                    // 팝업 컨트롤 생성 및 초기화 (UI 스레드에서)
+                    uc_clusteringPopup popup_control = new uc_clusteringPopup();
+                    popup_control.initUI();
+
+                    // 비모달 방식으로 팝업 표시
+                    ShowUserControlAsDialog(popup_control);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"클러스터링 팝업 표시 중 오류: {ex.Message}");
+                MessageBox.Show($"데이터 처리 중 오류가 발생했습니다: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // 간단한 대기 커서 클래스
+        public class WaitCursor : IDisposable
+        {
+            private Cursor _previousCursor;
+
+            public WaitCursor()
+            {
+                _previousCursor = Cursor.Current;
+                Cursor.Current = Cursors.WaitCursor;
             }
 
-            if (DataHandler.secondClusteringData.Rows.Count == 0)
+            public void Dispose()
             {
-                DataHandler.secondClusteringData = await DataHandler.CreateSetGroupDataTableAsync(transformDataTable, DataHandler.moneyDataTable, true);
+                Cursor.Current = _previousCursor;
             }
-
-
-            uc_clusteringPopup popup_control = new uc_clusteringPopup();
-
-            popup_control.initUI();
-
-            ShowUserControlAsDialog(popup_control);
         }
 
         private async void button5_Click(object sender, EventArgs e)

@@ -761,7 +761,10 @@ namespace FinanceTool
         // 다이나믹 접근 방식 또는 메서드를 사용하여 ID를 가져오는 로직
         public static async Task<DataTable> CreateSetGroupDataTableAsync(DataTable sourceTable, DataTable referenceTable, bool secondyn = false)
         {
+            Debug.WriteLine($"CreateSetGroupDataTableAsync start secondyn : {secondyn}");
+            
             // 결과 DataTable 생성 (동일)
+            
             DataTable resultTable = new DataTable();
             resultTable.Columns.Add("ID", typeof(int));
             resultTable.Columns.Add("ClusterID", typeof(int));
@@ -975,7 +978,7 @@ namespace FinanceTool
                 throw;
             }
 
-            Debug.WriteLine("CreateSetGroupDataTable 수행완료");
+            Debug.WriteLine($"CreateSetGroupDataTable 수행완료 secondyn : {secondyn}");
             Debug.WriteLine($"result Table count: {resultTable.Rows.Count}");
             return resultTable;
         }
