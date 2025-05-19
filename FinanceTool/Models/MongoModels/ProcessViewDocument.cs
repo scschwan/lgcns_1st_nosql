@@ -24,13 +24,21 @@ namespace FinanceTool.MongoModels
         [BsonRepresentation(BsonType.ObjectId)]
         public string RawDataId { get; set; }
 
-        // 키워드 관련 정보 (수정됨)
+        // 키워드 관련 정보
         [BsonElement("keywords")]
         public KeywordInfo Keywords { get; set; } = new KeywordInfo();
 
-        // 금액 정보 (신규)
+        // 금액 정보
         [BsonElement("money")]
         public object Money { get; set; }
+
+        // 부서 정보 (신규)
+        [BsonElement("department")]
+        public string Department { get; set; }
+
+        // 공급업체 정보 (신규)
+        [BsonElement("supplier")]
+        public string Supplier { get; set; }
 
         // 마지막 수정 일자
         [BsonElement("last_modified_date")]
@@ -38,7 +46,7 @@ namespace FinanceTool.MongoModels
     }
 
     /// <summary>
-    /// 키워드 정보 하위 문서 (수정됨)
+    /// 키워드 정보 하위 문서
     /// </summary>
     public class KeywordInfo
     {

@@ -1,4 +1,14 @@
-﻿using System;
+﻿using ClosedXML.Excel;
+// 파일 상단에 추가할 네임스페이스
+using FinanceTool.Models.MongoModels;
+using FinanceTool.MongoModels;
+using FinanceTool.Repositories;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using Newtonsoft.Json
+    ;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -8,15 +18,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using ClosedXML.Excel;
-using Newtonsoft.Json
-    ;
-// 파일 상단에 추가할 네임스페이스
-using FinanceTool.Models.MongoModels;
-using FinanceTool.Repositories;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using FinanceTool.MongoModels;
 
 
 namespace FinanceTool
@@ -754,17 +755,15 @@ namespace FinanceTool
         //2025.02.13
         //dataTable Clustering 함수 구현
         //2025.05.12 -> mongodb 변환에 따라 삭제 예정
-        
-        //2025.05.12
-        //CreateSetGroupDataTable 대체 함수 (기존 함수 삭제 예정)
-        // MongoDB 문서 모델 객체에 직접 접근하는 방식 대신
-        // 다이나믹 접근 방식 또는 메서드를 사용하여 ID를 가져오는 로직
-        public static async Task<DataTable> CreateSetGroupDataTableAsync(DataTable sourceTable, DataTable referenceTable, bool secondyn = false)
+
+        public static async Task<DataTable> CreateSetGroupDataTableAsync(DataTable sourceTable, DataTable moneyDataTable, bool secondyn = false)
         {
-            Debug.WriteLine($"CreateSetGroupDataTableAsync start secondyn : {secondyn}");
-            
-            // 결과 DataTable 생성 (동일)
-            
+            // 시작 시간 측정 (성능 모니터링용)
+            var stopwatch = Stopwatch.StartNew();
+            Debug.WriteLine("CreateSetGroupDataTableAsync 수행 시작");
+            Debug.WriteLine($"sourceTable 행 수: {sourceTable.Rows.Count}");
+
+            // 결과 DataTable 생성
             DataTable resultTable = new DataTable();
             resultTable.Columns.Add("ID", typeof(int));
             resultTable.Columns.Add("ClusterID", typeof(int));
@@ -774,212 +773,262 @@ namespace FinanceTool
             resultTable.Columns.Add("합산금액", typeof(decimal));
             resultTable.Columns.Add("dataIndex", typeof(string));
 
-            // referenceTable의 0번 컬럼명 가져오기 (금액 컬럼)
-            string moneyColumnName = referenceTable.Columns[0].ColumnName;
-
-            // 금액 정보와 데이터 인덱스를 저장할 딕셔너리
-            Dictionary<string, decimal> moneyLookup = new Dictionary<string, decimal>();
-            Dictionary<string, string> deptLookup = new Dictionary<string, string>();
-            Dictionary<string, string> prodLookup = new Dictionary<string, string>();
-
-            // 집합 셋 관리를 위한 딕셔너리
-            Dictionary<string, (int ID, int Count, decimal SumValue, List<string> SourceIndices)> setGroups =
-                new Dictionary<string, (int, int, decimal, List<string>)>();
-
             try
             {
-                // MongoDB 컬렉션 데이터 가져오기
-                if (secondyn)
+                // 금액 컬럼명 가져오기
+                string moneyColumnName = moneyDataTable.Columns[0].ColumnName;
+
+                // 금액 정보를 캐싱 (병렬 처리를 위해 ConcurrentDictionary 사용)
+                ConcurrentDictionary<string, decimal> moneyLookup = new ConcurrentDictionary<string, decimal>();
+
+                // 병렬로 금액 데이터 로드
+                await Task.Run(() => {
+                    // 시스템 리소스에 맞게 병렬 처리 최적화
+                    int processorCount = Environment.ProcessorCount;
+                    int maxDegreeOfParallelism = Math.Max(1, processorCount - 1); // 한 코어는 UI용으로 남김
+
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
+
+                    Parallel.ForEach(moneyDataTable.AsEnumerable(), options, row => {
+                        if (row["raw_data_id"] != DBNull.Value && row[moneyColumnName] != DBNull.Value)
+                        {
+                            string rawDataId = row["raw_data_id"].ToString();
+                            if (decimal.TryParse(row[moneyColumnName].ToString(), out decimal money))
+                            {
+                                moneyLookup.TryAdd(rawDataId, money);
+                            }
+                        }
+                    });
+                });
+
+                Debug.WriteLine($"금액 정보 로드 완료: {moneyLookup.Count}개, 소요 시간: {stopwatch.ElapsedMilliseconds}ms");
+
+                // 부서/공급업체 정보를 위한 딕셔너리
+                ConcurrentDictionary<string, string> deptLookup = new ConcurrentDictionary<string, string>();
+                ConcurrentDictionary<string, string> prodLookup = new ConcurrentDictionary<string, string>();
+
+                // 부서/공급업체 정보가 필요한 경우에만 MongoDB에서 로드
+                if (secondyn && (dept_col_yn || prod_col_yn))
                 {
-                    // ProcessData 컬렉션 조회
-                    var processData = await processDataRepo.GetAllAsync();
+                    // MongoDB 연결 확인
+                    await Data.MongoDBManager.Instance.EnsureInitializedAsync();
 
-                    // 금액 데이터 조회
-                    var moneyData = await rawDataRepo.GetAllAsync();
-                    foreach (var doc in moneyData)
+                    // ProcessView 저장소에서 부서/공급업체 정보 로드
+                    var processViewRepo = new Repositories.ProcessViewRepository();
+                    var processViewDocs = await processViewRepo.GetAllAsync();
+
+                    await Task.Run(() => {
+                        var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1) };
+
+                        // 병렬로 부서/공급업체 정보 캐싱
+                        Parallel.ForEach(processViewDocs, options, doc => {
+                            if (!string.IsNullOrEmpty(doc.RawDataId))
+                            {
+                                // 부서 정보 처리
+                                if (dept_col_yn && !string.IsNullOrEmpty(doc.Department))
+                                {
+                                    deptLookup.TryAdd(doc.RawDataId, doc.Department);
+                                }
+
+                                // 공급업체 정보 처리
+                                if (prod_col_yn && !string.IsNullOrEmpty(doc.Supplier))
+                                {
+                                    prodLookup.TryAdd(doc.RawDataId, doc.Supplier);
+                                }
+                            }
+                        });
+                    });
+
+                    Debug.WriteLine($"부서 정보 캐싱: {deptLookup.Count}개, 공급업체 정보 캐싱: {prodLookup.Count}개, 소요 시간: {stopwatch.ElapsedMilliseconds}ms");
+
+                    // ProcessView 컬렉션에 부서/공급업체 정보가 없는 경우, 원본 ProcessData에서 직접 로드
+                    if ((dept_col_yn && deptLookup.Count < sourceTable.Rows.Count / 2) ||
+                        (prod_col_yn && prodLookup.Count < sourceTable.Rows.Count / 2))
                     {
-                        string docId = doc.Id.ToString(); // ID를 문자열로 변환하여 사용
+                        Debug.WriteLine("부서/공급업체 정보 부족, ProcessData에서 직접 로드 시도");
 
-                        // 금액 필드 추출 (다이나믹 접근)
-                        if (doc.Data != null && doc.Data.ContainsKey(moneyColumnName))
-                        {
-                            var moneyValue = doc.Data[moneyColumnName];
-                            if (moneyValue != null)
-                            {
-                                if (decimal.TryParse(moneyValue.ToString(), out decimal value))
+                        var processDataRepo = new Repositories.ProcessDataRepository();
+                        var processDataDocs = await processDataRepo.GetAllAsync();
+
+                        await Task.Run(() => {
+                            var options = new ParallelOptions { MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount - 1) };
+
+                            Parallel.ForEach(processDataDocs, options, doc => {
+                                if (!string.IsNullOrEmpty(doc.RawDataId) && doc.Data != null)
                                 {
-                                    moneyLookup[docId] = value;
+                                    // 부서 정보 처리
+                                    if (dept_col_yn && doc.Data.ContainsKey(dept_col_name) && !deptLookup.ContainsKey(doc.RawDataId))
+                                    {
+                                        string deptValue = doc.Data[dept_col_name]?.ToString();
+                                        if (!string.IsNullOrEmpty(deptValue))
+                                        {
+                                            deptLookup.TryAdd(doc.RawDataId, deptValue);
+                                        }
+                                    }
+
+                                    // 공급업체 정보 처리
+                                    if (prod_col_yn && doc.Data.ContainsKey(prod_col_name) && !prodLookup.ContainsKey(doc.RawDataId))
+                                    {
+                                        string prodValue = doc.Data[prod_col_name]?.ToString();
+                                        if (!string.IsNullOrEmpty(prodValue))
+                                        {
+                                            prodLookup.TryAdd(doc.RawDataId, prodValue);
+                                        }
+                                    }
                                 }
-                            }
-                        }
-                    }
+                            });
+                        });
 
-                    // 부서/제품 정보 준비
-                    if (dept_col_yn || prod_col_yn)
-                    {
-                        foreach (var doc in processData)
-                        {
-                            string rawId = doc.RawDataId.ToString(); // raw_data_id를 문자열로
-
-                            if (dept_col_yn && doc.Data != null && doc.Data.ContainsKey(dept_col_name))
-                            {
-                                var deptValue = doc.Data[dept_col_name];
-                                if (deptValue != null)
-                                {
-                                    deptLookup[rawId] = deptValue.ToString();
-                                }
-                            }
-
-                            if (prod_col_yn && doc.Data != null && doc.Data.ContainsKey(prod_col_name))
-                            {
-                                var prodValue = doc.Data[prod_col_name];
-                                if (prodValue != null)
-                                {
-                                    prodLookup[rawId] = prodValue.ToString();
-                                }
-                            }
-                        }
-                    }
-
-                    // 클러스터링을 위한 데이터 처리
-                    foreach (var doc in processData)
-                    {
-                        string docId = doc.Id.ToString(); // 문서 ID
-                        string rawId = doc.RawDataId.ToString(); // raw_data_id
-
-                        List<string> setElements = new List<string>();
-
-                        // 데이터에서 키워드 추출
-                        if (doc.Data != null)
-                        {
-                            foreach (var kvp in doc.Data)
-                            {
-                                if (kvp.Value != null && !string.IsNullOrWhiteSpace(kvp.Value.ToString()))
-                                {
-                                    setElements.Add(kvp.Value.ToString());
-                                }
-                            }
-                        }
-
-                        // 부서/제품 정보 추가
-                        if (dept_col_yn && deptLookup.ContainsKey(rawId))
-                        {
-                            setElements.Add(deptLookup[rawId]);
-                        }
-
-                        if (prod_col_yn && prodLookup.ContainsKey(rawId))
-                        {
-                            setElements.Add(prodLookup[rawId]);
-                        }
-
-                        // 집합 셋 생성
-                        setElements.Sort();
-                        string setKey = string.Join(",", setElements);
-
-                        // 금액 정보 조회
-                        decimal refValue = 0;
-                        if (moneyLookup.ContainsKey(rawId))
-                        {
-                            refValue = moneyLookup[rawId];
-                        }
-
-                        // 집합에 추가
-                        if (setGroups.ContainsKey(setKey))
-                        {
-                            var existing = setGroups[setKey];
-                            existing.SourceIndices.Add(rawId);
-                            setGroups[setKey] = (existing.ID, existing.Count + 1, existing.SumValue + refValue, existing.SourceIndices);
-                        }
-                        else
-                        {
-                            setGroups.Add(setKey, (setGroups.Count, 1, refValue, new List<string> { rawId }));
-                        }
-                    }
-                }
-                else
-                {
-                    // RawData 컬렉션 조회
-                    var rawData = await rawDataRepo.GetAllAsync();
-
-                    // 금액 데이터 및 키워드 처리
-                    foreach (var doc in rawData)
-                    {
-                        string docId = doc.Id.ToString(); // ID를 문자열로 변환
-
-                        // 금액 필드 추출
-                        if (doc.Data != null && doc.Data.ContainsKey(moneyColumnName))
-                        {
-                            var moneyValue = doc.Data[moneyColumnName];
-                            if (moneyValue != null)
-                            {
-                                if (decimal.TryParse(moneyValue.ToString(), out decimal value))
-                                {
-                                    moneyLookup[docId] = value;
-                                }
-                            }
-                        }
-
-                        // 키워드 셋 처리
-                        List<string> setElements = new List<string>();
-
-                        if (doc.Data != null)
-                        {
-                            foreach (var kvp in doc.Data)
-                            {
-                                if (kvp.Value != null && !string.IsNullOrWhiteSpace(kvp.Value.ToString()))
-                                {
-                                    setElements.Add(kvp.Value.ToString());
-                                }
-                            }
-                        }
-
-                        setElements.Sort();
-                        string setKey = string.Join(",", setElements);
-
-                        // 금액 정보 조회
-                        decimal refValue = 0;
-                        if (moneyLookup.ContainsKey(docId))
-                        {
-                            refValue = moneyLookup[docId];
-                        }
-
-                        // 집합에 추가
-                        if (setGroups.ContainsKey(setKey))
-                        {
-                            var existing = setGroups[setKey];
-                            existing.SourceIndices.Add(docId);
-                            setGroups[setKey] = (existing.ID, existing.Count + 1, existing.SumValue + refValue, existing.SourceIndices);
-                        }
-                        else
-                        {
-                            setGroups.Add(setKey, (setGroups.Count, 1, refValue, new List<string> { docId }));
-                        }
+                        Debug.WriteLine($"ProcessData에서 보강 후: 부서 정보 {deptLookup.Count}개, 공급업체 정보 {prodLookup.Count}개");
                     }
                 }
 
-                // 결과 테이블 생성
-                foreach (var group in setGroups)
-                {
-                    string[] elements = group.Key.Split(',');
-                    DataRow newRow = resultTable.NewRow();
-                    newRow["ID"] = group.Value.ID;
-                    newRow["ClusterID"] = -1;
-                    newRow["클러스터명"] = string.Join("_", elements);
-                    newRow["키워드목록"] = group.Key;
-                    newRow["Count"] = group.Value.Count;
-                    newRow["합산금액"] = group.Value.SumValue;
-                    newRow["dataIndex"] = string.Join(",", group.Value.SourceIndices);
-                    resultTable.Rows.Add(newRow);
-                }
+                // 집합 셋을 관리할 딕셔너리 (스레드 안전한 ConcurrentDictionary 사용)
+                ConcurrentDictionary<string, (int ID, int Count, decimal SumValue, ConcurrentBag<string> SourceIndices)> setGroups =
+                    new ConcurrentDictionary<string, (int, int, decimal, ConcurrentBag<string>)>();
+
+                // 그룹 ID 카운터 (스레드 안전)
+                int nextGroupId = 0;
+
+                // 시스템 리소스에 따른 병렬 처리 최적화
+                int processorCount = Environment.ProcessorCount;
+                int maxDegreeOfParallelism = Math.Max(1, processorCount - 1); // 한 코어는 UI용으로 남김
+
+                // 데이터 크기에 따른 배치 크기 계산
+                int totalRows = sourceTable.Rows.Count;
+                int batchSize = Math.Max(100, totalRows / (processorCount * 10));
+
+                Debug.WriteLine($"병렬 처리 설정: 최대 {maxDegreeOfParallelism}개 스레드, 배치 크기 {batchSize}");
+
+                // 병렬로 데이터 그룹화
+                await Task.Run(() => {
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
+
+                    // 데이터 범위를 배치로 분할
+                    var batches = new List<(int start, int end)>();
+                    for (int i = 0; i < totalRows; i += batchSize)
+                    {
+                        int end = Math.Min(i + batchSize, totalRows);
+                        batches.Add((i, end));
+                    }
+
+                    // 병렬로 배치 처리
+                    Parallel.ForEach(batches, options, batch => {
+                        for (int rowIndex = batch.start; rowIndex < batch.end; rowIndex++)
+                        {
+                            DataRow row = sourceTable.Rows[rowIndex];
+
+                            // raw_data_id 가져오기
+                            if (row["raw_data_id"] == DBNull.Value)
+                                continue;
+
+                            string rawDataId = row["raw_data_id"].ToString();
+
+                            // 키워드 집합 생성
+                            List<string> setElements = new List<string>();
+
+                            // 키워드 컬럼 처리 (Column으로 시작하는 컬럼들)
+                            foreach (DataColumn col in sourceTable.Columns)
+                            {
+                                // raw_data_id, id, process_data_id, import_date 등 메타데이터 컬럼 제외
+                                if (col.ColumnName == "raw_data_id" ||
+                                    col.ColumnName == "id" ||
+                                    col.ColumnName == "process_data_id" ||
+                                    col.ColumnName == "import_date")
+                                    continue;
+
+                                if (row[col] != DBNull.Value && !string.IsNullOrWhiteSpace(row[col].ToString()))
+                                {
+                                    setElements.Add(row[col].ToString().Trim());
+                                }
+                            }
+
+                            // 부서/공급업체 정보 추가 (필요시)
+                            if (secondyn && dept_col_yn && deptLookup.TryGetValue(rawDataId, out string deptValue))
+                            {
+                                setElements.Add(deptValue);
+                            }
+
+                            if (secondyn && prod_col_yn && prodLookup.TryGetValue(rawDataId, out string prodValue))
+                            {
+                                setElements.Add(prodValue);
+                            }
+
+                            // 키워드가 없는 경우 건너뛰기
+                            if (setElements.Count == 0)
+                                continue;
+
+                            // 집합을 정렬하여 일관성 유지
+                            setElements.Sort();
+
+                            // 집합 셋 문자열 생성
+                            string setKey = string.Join(",", setElements);
+
+                            // 금액 정보 조회
+                            decimal refValue = 0;
+                            moneyLookup.TryGetValue(rawDataId, out refValue);
+
+                            // 집합 셋에 추가 또는 업데이트 (스레드 안전하게)
+                            setGroups.AddOrUpdate(
+                                setKey,
+                                key => {
+                                    int id = Interlocked.Increment(ref nextGroupId) - 1;
+                                    return (id, 1, refValue, new ConcurrentBag<string> { rawDataId });
+                                },
+                                (key, existing) => {
+                                    existing.SourceIndices.Add(rawDataId);
+                                    return (existing.ID, existing.Count + 1, existing.SumValue + refValue, existing.SourceIndices);
+                                }
+                            );
+                        }
+                    });
+                });
+
+                Debug.WriteLine($"데이터 그룹화 완료: {setGroups.Count}개 그룹, 소요 시간: {stopwatch.ElapsedMilliseconds}ms");
+
+                // 결과 DataTable에 추가
+                await Task.Run(() => {
+                    // ConcurrentBag으로 병렬 처리
+                    var resultRows = new ConcurrentBag<DataRow>();
+
+                    var options = new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism };
+
+                    Parallel.ForEach(setGroups, options, group => {
+                        // 그룹 요소 배열
+                        string[] elements = group.Key.Split(',');
+
+                        // 새 행 생성
+                        DataRow newRow = resultTable.NewRow();
+                        newRow["ID"] = group.Value.ID;
+                        newRow["ClusterID"] = -1;
+                        newRow["클러스터명"] = string.Join("_", elements);
+                        newRow["키워드목록"] = group.Key;
+                        newRow["Count"] = group.Value.Count;
+                        newRow["합산금액"] = group.Value.SumValue;
+                        newRow["dataIndex"] = string.Join(",", group.Value.SourceIndices);
+
+                        resultRows.Add(newRow);
+                    });
+
+                    // 결과 정렬 (ID 기준)
+                    var sortedRows = resultRows
+                        .OrderBy(row => (int)row["ID"])
+                        .ToList();
+
+                    // 순차적으로 결과 테이블에 추가
+                    foreach (var row in sortedRows)
+                    {
+                        resultTable.Rows.Add(row);
+                    }
+                });
+
+                Debug.WriteLine($"결과 테이블 생성 완료: {resultTable.Rows.Count}개 행, 총 소요 시간: {stopwatch.ElapsedMilliseconds}ms");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"CreateSetGroupDataTableAsync 오류: {ex.Message}");
-                throw;
+                Debug.WriteLine($"CreateSetGroupDataTableAsync 오류: {ex.Message}\n{ex.StackTrace}");
             }
 
-            Debug.WriteLine($"CreateSetGroupDataTable 수행완료 secondyn : {secondyn}");
-            Debug.WriteLine($"result Table count: {resultTable.Rows.Count}");
             return resultTable;
         }
 
@@ -1039,65 +1088,10 @@ namespace FinanceTool
             dgv.AllowUserToDeleteRows = false;
 
             // MongoDB 컬렉션에 클러스터링 결과 저장
-            SaveClusteringResultsToMongoDB(filteredData);
+            //SaveClusteringResultsToMongoDB(filteredData);
         }
 
-        // MongoDB에 클러스터링 결과 저장하는 새 메서드
-        private static async void SaveClusteringResultsToMongoDB(DataTable clusteringData)
-        {
-            try
-            {
-                if (clusteringRepo == null)
-                {
-                    clusteringRepo = new ClusteringRepository();
-                }
-
-                foreach (DataRow row in clusteringData.Rows)
-                {
-                    try
-                    {
-                        // 데이터 인덱스 문자열 그대로 사용
-                        string dataIndexStr = row["dataIndex"].ToString();
-                        List<string> dataIndices = new List<string>();
-
-                        if (!string.IsNullOrEmpty(dataIndexStr))
-                        {
-                            dataIndices = dataIndexStr.Split(',')
-                                .Where(id => !string.IsNullOrWhiteSpace(id))
-                                .Select(id => id.Trim())
-                                .ToList();
-                        }
-
-                        // 클러스터링 결과 문서 생성
-                        var clusteringResult = new FinanceTool.MongoModels.ClusteringResultDocument
-                        {
-                            // Id는 자동 생성되므로 설정 안함
-                            ClusterId = Convert.ToInt32(row["ID"]),
-                            ClusterName = row["클러스터명"].ToString(),
-                            Keywords = row["키워드목록"].ToString().Split(',').ToList(),
-                            Count = Convert.ToInt32(row["Count"]),
-                            TotalAmount = Convert.ToDecimal(row["합산금액"]),
-                            DataIndices = dataIndices,
-                            CreatedAt = DateTime.Now
-                        };
-
-                        // 비동기 메서드 호출
-                        await clusteringRepo.CreateAsync(clusteringResult);
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"클러스터링 결과 처리 중 오류 (행 {row["ID"]}): {ex.Message}");
-                        // 오류가 있어도 계속 진행
-                        continue;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"MongoDB에 클러스터링 결과 저장 중 오류: {ex.Message}");
-            }
-        }
-
+       
 
         private static bool isProcessingSelection = false;
 

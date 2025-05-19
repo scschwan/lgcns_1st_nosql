@@ -767,15 +767,6 @@ namespace FinanceTool
             }
         }
 
-        /// <summary>
-        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장 (개선 버전)
-        /// </summary>
-        /// <summary>
-        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장 (개선 버전)
-        /// </summary>
-        /// <summary>
-        /// DataTable의 데이터를 MongoDB process_view_data 컬렉션에 병렬로 저장 (개선 버전)
-        /// </summary>
         private async Task SaveProcessDataToMongoDBAsync(DataTable dataTable, ProcessProgressForm.UpdateProgressDelegate progress)
         {
             try
@@ -789,6 +780,7 @@ namespace FinanceTool
                 // 프로세스 뷰 저장소 생성
                 var processViewRepo = new Repositories.ProcessViewRepository();
                 var processDataRepo = new Repositories.ProcessDataRepository();
+                var rawDataRepo = new Repositories.RawDataRepository();
 
                 // 기존 문서 수 확인
                 var emptyFilter = MongoDB.Driver.Builders<MongoModels.ProcessViewDocument>.Filter.Empty;
@@ -808,6 +800,45 @@ namespace FinanceTool
                     Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] dataGridView_applied가 비어있습니다. 저장할 데이터가 없습니다.");
                     await progress(100, "저장할 데이터가 없습니다.");
                     return;
+                }
+
+                // 부서/공급업체 정보 캐싱
+                Dictionary<string, string> deptCache = new Dictionary<string, string>();
+                Dictionary<string, string> prodCache = new Dictionary<string, string>();
+
+                // 부서/공급업체 정보가 필요한 경우 미리 로드
+                if (DataHandler.dept_col_yn || DataHandler.prod_col_yn)
+                {
+                    await progress(25, "부서/공급업체 정보 로드 중...");
+
+                    // RawData 컬렉션에서 부서/공급업체 정보 로드
+                    var processDataDocs = await processDataRepo.GetAllAsync();
+
+                    foreach (var doc in processDataDocs)
+                    {
+                        if (!string.IsNullOrEmpty(doc.RawDataId) && doc.Data != null)
+                        {
+                            if (DataHandler.dept_col_yn && doc.Data.ContainsKey(DataHandler.dept_col_name))
+                            {
+                                string deptValue = doc.Data[DataHandler.dept_col_name]?.ToString();
+                                if (!string.IsNullOrEmpty(deptValue))
+                                {
+                                    deptCache[doc.RawDataId] = deptValue;
+                                }
+                            }
+
+                            if (DataHandler.prod_col_yn && doc.Data.ContainsKey(DataHandler.prod_col_name))
+                            {
+                                string prodValue = doc.Data[DataHandler.prod_col_name]?.ToString();
+                                if (!string.IsNullOrEmpty(prodValue))
+                                {
+                                    prodCache[doc.RawDataId] = prodValue;
+                                }
+                            }
+                        }
+                    }
+
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 부서 정보 캐싱: {deptCache.Count}개, 공급업체 정보 캐싱: {prodCache.Count}개");
                 }
 
                 int processedRows = 0;
@@ -959,7 +990,6 @@ namespace FinanceTool
                         if (processDataToRawDataMap.TryGetValue(processDataId, out string mappedRawDataId))
                         {
                             rawDataId = mappedRawDataId;
-                            //Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex}: process_data_id로부터 rawDataId 복구: {rawDataId}");
                         }
                     }
                     else if (!string.IsNullOrEmpty(rawDataId) && string.IsNullOrEmpty(processDataId))
@@ -967,7 +997,6 @@ namespace FinanceTool
                         if (rawDataToProcessDataMap.TryGetValue(rawDataId, out string mappedProcessDataId))
                         {
                             processDataId = mappedProcessDataId;
-                            //Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex}: raw_data_id로부터 processDataId 복구: {processDataId}");
                         }
                     }
 
@@ -1029,13 +1058,26 @@ namespace FinanceTool
                         LastModifiedDate = DateTime.Now
                     };
 
+                    // 부서/공급업체 정보 추가
+                    if (DataHandler.dept_col_yn && deptCache.TryGetValue(rawDataId, out string deptValue))
+                    {
+                        processViewDoc.Department = deptValue;
+                    }
+
+                    if (DataHandler.prod_col_yn && prodCache.TryGetValue(rawDataId, out string prodValue))
+                    {
+                        processViewDoc.Supplier = prodValue;
+                    }
+
                     // 디버그 로깅 
                     if (processViewDocuments.Count < 5)
                     {
                         Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 생성된 문서 샘플 #{processViewDocuments.Count + 1}: " +
                                       $"ProcessDataId={processDataId}, RawDataId={rawDataId}, " +
                                       $"Keywords={string.Join(", ", finalKeywords)}, " +
-                                      $"Money={moneyValue}");
+                                      $"Money={moneyValue}, " +
+                                      $"Department={processViewDoc.Department}, " +
+                                      $"Supplier={processViewDoc.Supplier}");
                     }
 
                     processViewDocuments.Add(processViewDoc);
