@@ -1533,7 +1533,7 @@ namespace FinanceTool
                 Text = "Clustering 결과 확인",
                 StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.Sizable,
-                Size = new Size(1650, 900), // 적절한 초기 크기 지정
+                Size = new Size(1900, 1000), // 적절한 초기 크기 지정
                 MinimizeBox = true,
                 MaximizeBox = true
             };
