@@ -14,9 +14,8 @@ namespace FinanceTool.Repositories
     {
         protected IMongoCollection<T> _collection;
         protected readonly Data.MongoDBManager _dbManager;
-
-
-        private readonly string _collectionName;
+        protected readonly string _collectionName;
+        private bool _initialized = false;
 
 
         public BaseRepository(string collectionName)
@@ -38,7 +37,21 @@ namespace FinanceTool.Repositories
 
         public async Task InitializeAsync()
         {
-            _collection = await _dbManager.GetCollectionAsync<T>(_collectionName);
+            if (_initialized) return;
+
+            try
+            {
+                // MongoDBManager가 초기화되었는지 확인
+                await _dbManager.EnsureInitializedAsync();
+
+                // 컬렉션 가져오기
+                _collection = await _dbManager.GetCollectionAsync<T>(_collectionName);
+                _initialized = true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"BaseRepository 초기화 오류: {ex.Message}");
+            }
         }
 
         /// <summary>

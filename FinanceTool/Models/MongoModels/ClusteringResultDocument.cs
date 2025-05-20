@@ -14,6 +14,15 @@ namespace FinanceTool.MongoModels
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; }
 
+        /// <summary>
+        /// 정수 기반 클러스터 번호 (기존 ID 체계와 호환)
+        /// </summary>
+        [BsonElement("cluster_number")]
+        public int ClusterNumber { get; set; }
+
+        /// <summary>
+        /// 소속된 클러스터 ID (-1: 미병합, 양수: 병합된 클러스터의 클러스터 번호)
+        /// </summary>
         [BsonElement("cluster_id")]
         public int ClusterId { get; set; }
 
@@ -36,5 +45,14 @@ namespace FinanceTool.MongoModels
 
         [BsonElement("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// 이 문서가 병합된 클러스터인지 여부
+        /// </summary>
+        [BsonIgnore]
+        public bool IsMergedCluster
+        {
+            get { return ClusterId > 0 && ClusterId == ClusterNumber; }
+        }
     }
 }
