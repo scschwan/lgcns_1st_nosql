@@ -5,6 +5,7 @@ using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
 using Microsoft.VisualBasic.Devices;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
@@ -41,9 +42,68 @@ namespace FinanceTool
         // 전역 인스턴스 생성
         private static RecomandKeywordManager _recomandKeywordManager;
 
+
+
         public uc_Clustering()
         {
             InitializeComponent();
+
+           
+
+            // 통화 단위가 변경될 때 팝업에도 적용
+            decimal_combo.SelectedIndexChanged += (s, e) =>
+            {
+                double divider = Math.Pow(1000, decimal_combo.SelectedIndex);
+                if (decimal_combo.SelectedIndex == 3)
+                    divider = divider / 10; // 억 원은 10 나누기
+
+                
+            };
+
+            // 컨텍스트 메뉴 초기화
+            InitializeContextMenu();
+        }
+
+        // 4. 컨텍스트 메뉴 초기화
+        private void InitializeContextMenu()
+        {
+            // 컨텍스트 메뉴 생성
+            ContextMenuStrip contextMenu = new ContextMenuStrip();
+            ToolStripMenuItem viewDetailsItem = new ToolStripMenuItem("세부 정보 보기");
+
+            viewDetailsItem.Click += (s, e) =>
+            {
+                // merge_check_table에서 체크된 항목이 있는지 확인
+                bool hasCheckedItems = false;
+                foreach (DataGridViewRow row in merge_check_table.Rows)
+                {
+                    if (row.Cells["CheckBox"].Value != null && Convert.ToBoolean(row.Cells["CheckBox"].Value))
+                    {
+                        hasCheckedItems = true;
+                        break;
+                    }
+                }
+
+                if (hasCheckedItems)
+                {
+                    ShowMergeClusterDetail();
+                }
+                else if (merge_check_table.SelectedRows.Count > 0)
+                {
+                    // 선택된 행이 있으면 해당 행을 체크하고 세부 정보 표시
+                    DataGridViewRow row = merge_check_table.SelectedRows[0];
+                    row.Cells["CheckBox"].Value = true;
+                    ShowMergeClusterDetail();
+                }
+                else
+                {
+                    MessageBox.Show("세부 정보를 확인할 클러스터를 선택해주세요.", "알림",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            };
+
+            contextMenu.Items.Add(viewDetailsItem);
+            merge_check_table.ContextMenuStrip = contextMenu;
         }
 
         public async void initUI()
@@ -255,6 +315,7 @@ namespace FinanceTool
                 HeaderText = "",
                 Width = 50,
                 ThreeState = false,
+                Frozen = true,
                 FillWeight = 20
             };
             dgv.Columns.Add(checkColumn);
@@ -1023,6 +1084,7 @@ namespace FinanceTool
             checkColumn.HeaderText = "";
             checkColumn.Width = 50;
             checkColumn.ThreeState = false;
+            checkColumn.Frozen = true;
             checkColumn.FillWeight = 20;  // 다른 컬럼들보다 작은 값 설정
 
             dgv.Columns.Add(checkColumn);
@@ -1336,6 +1398,7 @@ namespace FinanceTool
             checkColumn.HeaderText = "";
             checkColumn.Width = 50;
             checkColumn.ThreeState = false;
+            checkColumn.Frozen = true;
             checkColumn.FillWeight = 20;  // 다른 컬럼들보다 작은 값 설정
 
             dgv.Columns.Add(checkColumn);
@@ -1833,50 +1896,6 @@ namespace FinanceTool
                 MessageBox.Show($"클러스터 삭제 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-        // MongoDB에서 클러스터 삭제 및 하위 클러스터 상태 초기화
-        private async Task DeleteClusterFromMongoDBAsync(List<int> clusterNumbers)
-        {
-            try
-            {
-                var clusteringRepo = new ClusteringRepository();
-
-                foreach (int clusterNumber in clusterNumbers)
-                {
-                    // 1. 삭제할 클러스터 정보 조회
-                    var clusterToDelete = await clusteringRepo.GetByClusterNumberAsync(clusterNumber);
-
-                    if (clusterToDelete != null)
-                    {
-                        Debug.WriteLine($"클러스터 {clusterNumber} 삭제 진행: {clusterToDelete.ClusterName}");
-
-                        // 2. 병합된 하위 클러스터들 찾기
-                        var childClusters = await clusteringRepo.GetByParentClusterNumberAsync(clusterNumber);
-                        Debug.WriteLine($"하위 클러스터 수: {childClusters.Count}");
-
-                        // 3. 하위 클러스터들의 ClusterId 초기화
-                        foreach (var child in childClusters)
-                        {
-                            await clusteringRepo.UpdateClusterIdAsync(child.ClusterNumber, -1);
-                        }
-
-                        // 4. 병합 클러스터 삭제
-                        await clusteringRepo.DeleteByClusterNumberAsync(clusterNumber);
-                        Debug.WriteLine($"클러스터 {clusterNumber} 삭제 완료");
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"클러스터 {clusterNumber}을(를) 찾을 수 없습니다.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"MongoDB 클러스터 삭제 오류: {ex.Message}");
-                throw;
-            }
-        }
-
 
         private void merge_search_button_Click(object sender, EventArgs e)
         {
@@ -2934,83 +2953,140 @@ namespace FinanceTool
             }
         }
 
-
-        private async void ShowMergeClusterDetail()
+        // 5. 클러스터 세부 정보 표시 메서드 추가
+        // 5. ShowMergeClusterDetail 함수 수정
+        private void ShowMergeClusterDetail()
         {
+            // 체크된 행에서 클러스터 ID 가져오기
+            List<int> checkedClusterIds = new List<int>();
+
+            foreach (DataGridViewRow row in merge_check_table.Rows)
+            {
+                if (row.Cells["CheckBox"].Value != null &&
+                    Convert.ToBoolean(row.Cells["CheckBox"].Value) == true)
+                {
+                    if (row.Cells["ID"] != null && row.Cells["ID"].Value != null)
+                    {
+                        int clusterId = Convert.ToInt32(row.Cells["ID"].Value);
+
+                        // 클러스터 ID가 자신과 동일한지 확인 (병합된 클러스터인 경우)
+                        if (row.Cells["ClusterID"] != null && row.Cells["ClusterID"].Value != null)
+                        {
+                            int clusterID = Convert.ToInt32(row.Cells["ClusterID"].Value);
+                            if (clusterId == clusterID)
+                            {
+                                checkedClusterIds.Add(clusterId);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (checkedClusterIds.Count == 0)
+            {
+                MessageBox.Show("세부 정보를 확인할 병합된 클러스터를 선택해주세요.", "알림",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (checkedClusterIds.Count > 1)
+            {
+                MessageBox.Show("세부 정보는 한 번에 하나의 클러스터만 확인할 수 있습니다.\n여러 클러스터가 선택되었습니다.", "알림",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // 선택된 클러스터 ID로 세부 정보 표시
+            int selectedClusterId = checkedClusterIds[0];
+
             try
             {
-                // 선택된 행(클러스터) 가져오기
-                int selectedClusterId = -1;
-                foreach (DataGridViewRow row in merge_check_table.SelectedRows)
+                // 새 팝업 창 생성
+                using (ClusterDetailPopup popup = new ClusterDetailPopup())
                 {
-                    if (row.Cells["ID"].Value != null)
+                    // 통화 단위 설정
+                    double divider = Math.Pow(1000, decimal_combo.SelectedIndex);
+                    if (decimal_combo.SelectedIndex == 3)
+                        divider = divider / 10; // 억 원은 10 나누기
+
+                    popup.SetDecimalDivider((decimal)divider, decimal_combo.SelectedItem.ToString());
+
+                    // 병합 해제 이벤트 등록 - 이 부분이 중요합니다!
+                    popup.UnmergeCompleted += async (sender, e) =>
                     {
-                        selectedClusterId = Convert.ToInt32(row.Cells["ID"].Value);
-                        break;
-                    }
-                }
+                        // UI 갱신
+                        if (e.RefreshRequired)
+                        {
+                            // 메모리 데이터는 이미 업데이트되었으므로 UI만 갱신
+                            Debug.WriteLine("popup.UnmergeCompleted start");
 
-                if (selectedClusterId == -1)
-                {
-                    MessageBox.Show("클러스터를 선택해주세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
+                            // 이 부분이 중요합니다!
+                            mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
-                // MongoDB에서 선택된 클러스터에 병합된 하위 클러스터 찾기
-                var clusteringRepo = new ClusteringRepository();
-                var mergedClusters = await clusteringRepo.GetChildClustersAsync(selectedClusterId);
+                            // UI 스레드에서 실행
+                            if (this.InvokeRequired)
+                            {
+                                Debug.WriteLine("this.InvokeRequired => true");
+                                this.Invoke(new Action(() =>
+                                {
+                                    // 화면 갱신
+                                    Debug.WriteLine("this.InvokeRequired => true => set_keyword_combo_list();");
+                                    set_keyword_combo_list();
 
-                if (mergedClusters.Count == 0)
-                {
-                    MessageBox.Show("이 클러스터에 병합된 항목이 없습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
+                                    Debug.WriteLine("this.InvokeRequired => true => create_merge_keyword_list();");
+                                    create_merge_keyword_list(true);
 
-                // DataTable로 변환
-                DataTable mergedClusterTable = new DataTable();
-                mergedClusterTable.Columns.Add("클러스터번호", typeof(int));
-                mergedClusterTable.Columns.Add("클러스터명", typeof(string));
-                mergedClusterTable.Columns.Add("카운트", typeof(int));
-                mergedClusterTable.Columns.Add("금액", typeof(string));
+                                    Debug.WriteLine("this.InvokeRequired => true => create_check_keyword_list();");
+                                    create_check_keyword_list();
 
-                foreach (var cluster in mergedClusters)
-                {
-                    DataRow row = mergedClusterTable.NewRow();
-                    //row["클러스터번호"] = cluster.ClusterNumber;
-                    row["클러스터명"] = cluster.ClusterName;
-                    row["카운트"] = cluster.Count;
-                    row["금액"] = FormatToKoreanUnit(cluster.TotalAmount);
-                    mergedClusterTable.Rows.Add(row);
-                }
+                                    Debug.WriteLine("this.InvokeRequired => true => change_row_count();");
+                                    // 행 수 갱신
+                                    change_row_count();
 
-                // 결과 표시
-                if (mergedClusterTable.Rows.Count > 0)
-                {
-                    // 팝업 창에 표시
-                    using (var form = new Form())
-                    {
-                        form.Text = $"클러스터 {selectedClusterId}에 병합된 항목";
-                        form.Size = new Size(800, 600);
+                                    Debug.WriteLine("this.InvokeRequired => true => UpdateModifiedDataGridView();");
 
-                        var grid = new DataGridView();
-                        grid.Dock = DockStyle.Fill;
-                        grid.DataSource = mergedClusterTable;
-                        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                        grid.ReadOnly = true;
-                        grid.AllowUserToAddRows = false;
+                                    // 병합 작업 후 업데이트
+                                    UpdateModifiedDataGridView();
+                                }));
+                            }
+                            else
+                            {
+                                Debug.WriteLine("this.InvokeRequired => false");
+                                // 화면 갱신
+                                Debug.WriteLine("this.InvokeRequired => false =>set_keyword_combo_list()");
+                                set_keyword_combo_list();
+                                Debug.WriteLine("this.InvokeRequired => false =>create_merge_keyword_list()");
+                                create_merge_keyword_list(true);
 
-                        form.Controls.Add(grid);
-                        form.ShowDialog();
-                    }
+                                Debug.WriteLine("this.InvokeRequired => false =>create_check_keyword_list()");
+                                create_check_keyword_list();
+
+                                Debug.WriteLine("this.InvokeRequired => false =>change_row_count()");
+                                // 행 수 갱신
+                                change_row_count();
+
+                                Debug.WriteLine("this.InvokeRequired => false =>UpdateModifiedDataGridView()");
+                                // 병합 작업 후 업데이트
+                                UpdateModifiedDataGridView();
+                            }
+                        }
+
+                        Debug.WriteLine("e.RefreshRequired finished");
+                    };
+
+                    Debug.WriteLine("popup.ShowClusterDetail(selectedClusterId).ConfigureAwait(false);");
+                    // 세부 정보 표시 및 팝업 표시
+                    popup.ShowClusterDetail(selectedClusterId).ConfigureAwait(false);
+                    popup.ShowDialog(this);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"병합 클러스터 정보 표시 오류: {ex.Message}");
-                MessageBox.Show($"병합 클러스터 정보를 가져오는 중 오류가 발생했습니다: {ex.Message}", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Debug.WriteLine($"클러스터 세부 정보 표시 오류: {ex.Message}");
+                MessageBox.Show($"클러스터 세부 정보를 불러오는 중 오류가 발생했습니다.\n{ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
 
 
         private void button2_Click(object sender, EventArgs e)
