@@ -1,4 +1,7 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
+using FinanceTool.MongoModels;
+using FinanceTool.Repositories;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -32,161 +35,156 @@ namespace FinanceTool
             //lb_priority.Items.Add("총 금액");
         }
 
+        // uc_Classification.cs의 initUI 메서드 - MongoDB 활용
         public async void initUI()
         {
-
-
-            //visible column list 조회
-            GetColumnList();
-
-            // DataHandler.finalClusteringData를 확장한 DataTable 생성
-            DataTable enhancedClusteringData = await CreateEnhancedClusteringData();
-
-
-            // 메인 UI 스레드로 돌아가서 DataHandler 등록
-            await Task.Run(() =>
+            try
             {
-                if (Application.OpenForms.Count > 0)
+                // 1. MongoDB에서 visible 컬럼 목록 가져오기
+                await GetColumnListAsync();
+
+                // 2. 클러스터링 데이터 로드 및 강화
+                DataTable enhancedClusteringData = await CreateEnhancedClusteringDataAsync();
+
+                // 3. UI 컴포넌트 초기화 및 데이터 바인딩
+                await Task.Run(() =>
                 {
-                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                    if (Application.OpenForms.Count > 0)
                     {
+                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                        {
+                            // 페이징된 데이터 로드
+                            LoadPagedDataAsync();
 
-                        LoadPagedDataAsync();
+                            // 클러스터링 데이터를 DataGridView에 표시
+                            CreateCheckDataGridView(dataGridView_classify, enhancedClusteringData);
 
-                        Debug.WriteLine("");
-
-                        //CreateCheckDataGridView(dataGridView_classify, DataHandler.finalClusteringData);
-
-
-                        // 확장된 DataTable을 이용하여 dataGridView_classify 구성
-                        CreateCheckDataGridView(dataGridView_classify, enhancedClusteringData);
-
-
-                        //dataGridView_classify 이벤트 추가
-
-
-                        AddSelectedColumnToGrid(dataGridView_delete_col2, dataGridView_keyword);
-
-                        InitializePagingControls(true);
-
-                        DataHandler.SyncDataGridViewSelections(dataGridView_origin, dataGridView_keyword);
-                    });
-                }
-            });
-
+                            // 나머지 UI 컴포넌트 설정
+                            AddSelectedColumnToGrid(dataGridView_delete_col2, dataGridView_keyword);
+                            InitializePagingControls(true);
+                            DataHandler.SyncDataGridViewSelections(dataGridView_origin, dataGridView_keyword);
+                        });
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"initUI 메서드 오류: {ex.Message}");
+                MessageBox.Show($"초기화 중 오류가 발생했습니다: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
-        private async Task<DataTable> CreateEnhancedClusteringData()
+
+        // 클러스터링 데이터 강화 메서드 (MongoDB 사용)
+        // 클러스터링 데이터 로드 및 raw_data 정보로 강화
+        private async Task<DataTable> CreateEnhancedClusteringDataAsync()
         {
-            // 원본 데이터 복사
-            DataTable enhancedTable = DataHandler.finalClusteringData.Copy();
+            // 1. 클러스터링 데이터 로드 (메모리 또는 MongoDB에서)
+            DataTable clusteringData;
+            var clusteringRepo = new ClusteringRepository();
 
-            // 공급업체명과 부서명 컬럼 추가
-            enhancedTable.Columns.Add(DataHandler.prod_col_name, typeof(string));
-            enhancedTable.Columns.Add(DataHandler.dept_col_name, typeof(string));
-
-            // ClusterID 기반으로 dataIndex 그룹화
-            var clusterGroups = DataHandler.finalClusteringData.AsEnumerable()
-                .GroupBy(row => row.Field<int>("ClusterID"))
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            // 각 ClusterID에 대한 dataIndex 수집
-            Dictionary<int, List<int>> clusterToDataIndices = new Dictionary<int, List<int>>();
-
-            foreach (var clusterGroup in clusterGroups)
+            // 메모리에 있는 경우 활용
+            if (DataHandler.finalClusteringData != null && DataHandler.finalClusteringData.Rows.Count > 0)
             {
-                int clusterId = clusterGroup.Key;
-                List<int> dataIndices = new List<int>();
-
-                foreach (var row in clusterGroup.Value)
-                {
-                    string dataIndexStr = row["dataIndex"].ToString();
-                    if (!string.IsNullOrEmpty(dataIndexStr))
-                    {
-                        // 쉼표로 구분된 dataIndex 파싱
-                        string[] indices = dataIndexStr.Split(',');
-                        foreach (string indexStr in indices)
-                        {
-                            if (int.TryParse(indexStr.Trim(), out int index))
-                            {
-                                dataIndices.Add(index);
-                            }
-                        }
-                    }
-                }
-
-                // 중복 제거
-                clusterToDataIndices[clusterId] = dataIndices.Distinct().ToList();
+                Debug.WriteLine("메모리에 캐싱된 클러스터링 데이터 사용");
+                clusteringData = DataHandler.finalClusteringData.Copy();
+            }
+            else
+            {
+                // MongoDB에서 로드
+                Debug.WriteLine("MongoDB에서 클러스터링 데이터 로드");
+                clusteringData = await clusteringRepo.ToDataTableAsync();
+                DataHandler.finalClusteringData = clusteringData.Copy();
             }
 
-            // 각 ClusterID에 대한 공급업체명과 부서명 조회 및 설정
-            foreach (var kvp in clusterToDataIndices)
+            // 2. 강화된 데이터 테이블 생성
+            DataTable enhancedTable = clusteringData.Copy();
+
+            // 공급업체명과 부서명 컬럼 추가 (없는 경우)
+            if (!enhancedTable.Columns.Contains(DataHandler.prod_col_name))
+                enhancedTable.Columns.Add(DataHandler.prod_col_name, typeof(string));
+
+            if (!enhancedTable.Columns.Contains(DataHandler.dept_col_name))
+                enhancedTable.Columns.Add(DataHandler.dept_col_name, typeof(string));
+
+            // 3. 클러스터별 dataIndex 수집
+            Dictionary<int, List<string>> clusterToDataIndices = new Dictionary<int, List<string>>();
+
+            foreach (DataRow row in enhancedTable.Rows)
             {
-                int clusterId = kvp.Key;
-                List<int> dataIndices = kvp.Value;
+                if (row.IsNull("ClusterID")) continue;
 
-                if (dataIndices.Count == 0)
-                    continue;
+                int clusterId = Convert.ToInt32(row["ClusterID"]);
+                string dataIndexStr = row["dataIndex"]?.ToString();
 
-                // ID 목록 문자열 생성
-                string idListStr = string.Join(",", dataIndices);
+                if (string.IsNullOrEmpty(dataIndexStr)) continue;
 
-                // 공급업체명 및 부서명 조회
-                string query = $@"
-            SELECT DISTINCT {DataHandler.prod_col_name}, {DataHandler.dept_col_name}
-            FROM raw_data
-            WHERE id IN ({idListStr})";
+                if (!clusterToDataIndices.ContainsKey(clusterId))
+                    clusterToDataIndices[clusterId] = new List<string>();
 
-                DataTable resultTable = dbmanager.Instance.ExecuteQuery(query);
+                foreach (string indexStr in dataIndexStr.Split(','))
+                {
+                    string trimmedIndex = indexStr.Trim();
+                    if (!string.IsNullOrEmpty(trimmedIndex))
+                        clusterToDataIndices[clusterId].Add(trimmedIndex);
+                }
+            }
 
-                // 결과가 없으면 다음으로
-                if (resultTable.Rows.Count == 0)
-                    continue;
+            // 4. MongoDB에서 raw_data 정보로 강화
+            // 각 클러스터에 대해 raw_data 정보 조회 및 추가
+            var rawDataRepo = new RawDataRepository();
 
-                // 공급업체명 및 부서명 집계
+            foreach (var entry in clusterToDataIndices)
+            {
+                int clusterId = entry.Key;
+                List<string> dataIndices = entry.Value;
+
+                if (dataIndices.Count == 0) continue;
+
+                var filter = Builders<RawDataDocument>.Filter.In(d => d.Id, dataIndices);
+                var rawDataDocs = await rawDataRepo.FindDocumentsAsync(filter);
+
+                // 공급업체 및 부서명 추출
                 HashSet<string> uniqueProds = new HashSet<string>();
                 HashSet<string> uniqueDepts = new HashSet<string>();
 
-                foreach (DataRow resultRow in resultTable.Rows)
+                foreach (var doc in rawDataDocs)
                 {
-                    string prod = resultRow[DataHandler.prod_col_name]?.ToString();
-                    string dept = resultRow[DataHandler.dept_col_name]?.ToString();
+                    // 공급업체명
+                    if (doc.Data.TryGetValue(DataHandler.prod_col_name, out var prod) && prod != null)
+                        uniqueProds.Add(prod.ToString());
 
-                    if (!string.IsNullOrEmpty(prod))
-                        uniqueProds.Add(prod);
-
-                    if (!string.IsNullOrEmpty(dept))
-                        uniqueDepts.Add(dept);
+                    // 부서명
+                    if (doc.Data.TryGetValue(DataHandler.dept_col_name, out var dept) && dept != null)
+                        uniqueDepts.Add(dept.ToString());
                 }
 
                 // 쉼표로 구분된 문자열로 변환
                 string combinedProds = string.Join(",", uniqueProds);
                 string combinedDepts = string.Join(",", uniqueDepts);
 
-                //32,767자가 넘을 경우 삭제
-                if (combinedDepts.Length > 32767)
-                {
-                    combinedDepts = combinedDepts.Substring(0, 32767);
-                }
-
+                // 문자열 길이 제한
                 if (combinedProds.Length > 32767)
-                {
                     combinedProds = combinedProds.Substring(0, 32767);
-                }
 
-                // enhancedTable에 해당 ClusterID를 가진 모든 행에 값 설정
-                foreach (DataRow enhancedRow in enhancedTable.Rows)
+                if (combinedDepts.Length > 32767)
+                    combinedDepts = combinedDepts.Substring(0, 32767);
+
+                // enhancedTable에 값 설정
+                foreach (DataRow row in enhancedTable.Rows)
                 {
-                    if (!enhancedRow.IsNull("ClusterID") && enhancedRow.Field<int>("ClusterID") == clusterId)
+                    if (!row.IsNull("ClusterID") && Convert.ToInt32(row["ClusterID"]) == clusterId)
                     {
-                        enhancedRow[DataHandler.prod_col_name] = combinedProds;
-                        enhancedRow[DataHandler.dept_col_name] = combinedDepts;
+                        row[DataHandler.prod_col_name] = combinedProds;
+                        row[DataHandler.dept_col_name] = combinedDepts;
                     }
                 }
             }
 
             return enhancedTable;
         }
+
 
 
         private void InitializePagingControls(bool attachEvents)
@@ -691,35 +689,33 @@ namespace FinanceTool
 
         }
 
-        public void GetColumnList()
+        // MongoDB에서 visible 컬럼 목록 가져오기
+        private async Task GetColumnListAsync()
         {
-            List<string> columnList = new List<string>();
-
-            // 1. is_visible=1인 컬럼 목록 가져오기
-            string columnsQuery = @"
-                                    SELECT original_name 
-                                    FROM column_mapping 
-                                    WHERE is_visible = 1 
-                                    ORDER BY sequence";
-
-            DataTable visibleColumnsTable = dbmanager.Instance.ExecuteQuery(columnsQuery);
-            List<string> visibleColumns = visibleColumnsTable.AsEnumerable()
-                .Select(row => row["original_name"].ToString())
-                .ToList();
-
-            foreach (string columnName in visibleColumns)
+            try
             {
-                columnList.Add(columnName);
+                process_col_list = new List<string>();
+
+                // MongoDB의 column_mapping 컬렉션에서 visible 컬럼 가져오기
+                var columnMappingRepo = new ColumnMappingRepository();
+                var visibleColumns = await columnMappingRepo.GetVisibleColumnsAsync();
+
+                foreach (var column in visibleColumns)
+                {
+                    process_col_list.Add(column.OriginalName);
+                }
+
+                // import_date 제외 (필요한 경우)
+                process_col_list.Remove("import_date");
+                Debug.WriteLine($"process_col_list count: {process_col_list.Count}");
             }
-            process_col_list = columnList;
-
-            //import_date 삭제
-            process_col_list.Remove("import_date");
-            //Debug.WriteLine($"process_col_list : {process_col_list.ToList()}");
-
-            Debug.WriteLine($"process_col_list count : {process_col_list.Count}");
-
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 목록 조회 중 오류: {ex.Message}");
+                throw; // 상위 메서드에서 처리하도록 예외 전파
+            }
         }
+
 
 
         public List<string> GetCheckedRowsData(DataGridView dgv)
@@ -786,7 +782,7 @@ namespace FinanceTool
         }
 
 
-        private void restore_col_btn_Click(object sender, EventArgs e)
+        private async void restore_col_btn_Click(object sender, EventArgs e)
         {
             List<string> restore_list = GetCheckedRowsData(dataGridView_delete_col2);
 
@@ -827,7 +823,7 @@ namespace FinanceTool
                 }
             }
 
-            GetColumnList();
+            await GetColumnListAsync();
 
         }
 
@@ -903,110 +899,84 @@ namespace FinanceTool
             await LoadPagedDataAsync();
         }
 
-
-        // 페이지 크기 변경
-        private async void cmb_pageSize_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (cmb_pageSize.SelectedItem != null)
-            {
-                pageSize = Convert.ToInt32(cmb_pageSize.SelectedItem);
-                currentPage = 1; // 페이지 크기 변경 시 첫 페이지로
-                await LoadPagedDataAsync();
-            }
-        }
-
+        // 페이징된 데이터 로드 (MongoDB 사용)
         private async Task LoadPagedDataAsync()
         {
-
             if (isProcessingSearch) return;
 
             try
             {
-                //재귀 호출 방지
                 isProcessingSearch = true;
-
-                // dataConverter가 null인지 확인하고 필요한 경우 초기화
-                if (dataConverter == null)
-                {
-                    dataConverter = new DataConverter();
-                }
 
                 using (var loadingForm = new ProcessProgressForm())
                 {
                     loadingForm.Show();
-                    loadingForm.UpdateProgressHandler(10);
-
+                    await loadingForm.UpdateProgressHandler(10, "데이터 로드 준비 중...");
                     await Task.Delay(10);
 
-                    // 페이징된 데이터 가져오기
                     DataTable pageData = null;
-                    DataTable processPageData = null;
+                    DataTable processDataWithClusters = null;
 
-                    await Task.Run(() =>
+                    await Task.Run(async () =>
                     {
-                        pageData = dataConverter.GetPagedRawData(currentPage, pageSize, DataHandler.hiddenData);
-                        Task.Delay(10);
-                        Debug.WriteLine("origin page load complete");
-                        loadingForm.UpdateProgressHandler(40);
-                        processPageData = GetPagedRawDataWithClusters(currentPage, pageSize, process_col_list, DataHandler.hiddenData);
+                        // 1. MongoDB에서 raw_data 로드
+                        var rawDataRepo = new RawDataRepository();
+                        var filter = !DataHandler.hiddenData ?
+                            Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false) :
+                            Builders<RawDataDocument>.Filter.Empty;
 
-                        Debug.WriteLine("process page load complete");
+                        var sort = Builders<RawDataDocument>.Sort.Descending(d => d.ImportDate);
+                        int skip = (currentPage - 1) * pageSize;
 
-                        Task.Delay(10);
+                        var rawDocs = await rawDataRepo.FindDocumentsAsync(filter, sort, skip, pageSize);
+                        long totalCount = await rawDataRepo.CountDocumentsAsync(filter);
 
-                        loadingForm.UpdateProgressHandler(70);
+                        // 메타데이터 계산
+                        totalRows = (int)totalCount;
+                        totalPages = (int)Math.Ceiling((double)totalRows / pageSize);
+
+                        // MongoDB 문서를 DataTable로 변환
+                        pageData = ConvertRawDocumentsToDataTable(rawDocs);
+
+                        await loadingForm.UpdateProgressHandler(40, "원본 데이터 로드 완료");
+                        await Task.Delay(10);
+
+                        // 2. MongoDB에서 process_data 로드
+                        var processDataRepo = new ProcessDataRepository();
+                        var processFilter = !DataHandler.hiddenData ?
+                            Builders<ProcessDataDocument>.Filter.Eq("is_hidden", false) :
+                            Builders<ProcessDataDocument>.Filter.Empty;
+
+                        var processDocs = await processDataRepo.GetWithPaginationAsync(
+                            currentPage,
+                            pageSize,
+                            p => p.ProcessedDate);
+
+                        // process_data 문서를 DataTable로 변환
+                        var processDataTable = ConvertProcessDocumentsToDataTable(processDocs);
+
+                        // 클러스터링 정보 추가
+                        processDataWithClusters = await AddClusteringInfoToDataTableAsync(processDataTable);
+
+                        await loadingForm.UpdateProgressHandler(70, "처리 데이터 로드 완료");
+                        await Task.Delay(10);
                     });
 
-
+                    await loadingForm.UpdateProgressHandler(80, "UI 업데이트 중...");
                     await Task.Delay(10);
 
-                    // 페이징 메타데이터 추출
-                    if (pageData != null && pageData.ExtendedProperties.Contains("Paging"))
-                    {
-                        DataTable metaData = pageData.ExtendedProperties["Paging"] as DataTable;
-                        if (metaData != null && metaData.Rows.Count > 0)
-                        {
-                            totalRows = Convert.ToInt32(metaData.Rows[0]["TotalRows"]);
-                            totalPages = Convert.ToInt32(metaData.Rows[0]["TotalPages"]);
-                            currentPage = Convert.ToInt32(metaData.Rows[0]["CurrentPage"]);
-                        }
-                    }
-
-                    Debug.WriteLine("page infoamtion extract complete");
-
-                    loadingForm.UpdateProgressHandler(80);
-
-                    await Task.Delay(10);
-
-                    // UI 업데이트는 메인 스레드에서 수행
+                    // UI 업데이트
                     this.BeginInvoke(new Action(() =>
                     {
-                        //dataGridView_target.DataSource = pageData;
-                        //dataGridView_process.DataSource = pageData;
-                        DataHandler.ConfigureDataGridViewAsync(pageData, dataGridView_origin);
-                        DataHandler.ConfigureDataGridViewAsync(processPageData, dataGridView_keyword);
+                        // DataGridView 업데이트
+                        ConfigureDataGridView(pageData, dataGridView_origin);
+                        ConfigureDataGridView(processDataWithClusters, dataGridView_keyword);
 
-                        Debug.WriteLine("ConfigureDataGridView complete");
                         UpdatePaginationInfo();
-
-                        Debug.WriteLine("UpdatePaginationInfo complete");
-
-                        //header style comple
                         ApplyGridFormatting();
-                        Debug.WriteLine("ApplyGridFormattingt complete");
-
-                        // 숨겨진 행 상태 적용
-                        /*
-                        if (hiddenRows.Count > 0)
-                        {
-                            ApplyHiddenRowsToGrids();
-                        }
-                        */
                     }));
 
-                    Debug.WriteLine("page infoamtion extract complete");
-
-                    loadingForm.UpdateProgressHandler(100);
+                    await loadingForm.UpdateProgressHandler(100, "데이터 로드 완료");
                     await Task.Delay(100);
                     loadingForm.Close();
                 }
@@ -1019,11 +989,294 @@ namespace FinanceTool
             }
             finally
             {
-
                 isProcessingSearch = false;
             }
         }
 
+        // MongoDB RawDataDocument를 DataTable로 변환
+        private DataTable ConvertRawDocumentsToDataTable(List<RawDataDocument> documents)
+        {
+            DataTable dataTable = new DataTable();
+
+            // 기본 컬럼 추가
+            dataTable.Columns.Add("id", typeof(string));
+            dataTable.Columns.Add("import_date", typeof(DateTime));
+            dataTable.Columns.Add("is_hidden", typeof(bool));
+
+            // 동적 컬럼 추가
+            if (documents.Count > 0 && documents[0].Data != null)
+            {
+                foreach (var key in documents[0].Data.Keys)
+                {
+                    if (!dataTable.Columns.Contains(key))
+                    {
+                        dataTable.Columns.Add(key);
+                    }
+                }
+            }
+
+            // 문서 데이터 추가
+            foreach (var doc in documents)
+            {
+                DataRow row = dataTable.NewRow();
+                row["id"] = doc.Id;
+                row["import_date"] = doc.ImportDate;
+                row["is_hidden"] = doc.IsHidden;
+
+                // 동적 데이터 필드 추가
+                if (doc.Data != null)
+                {
+                    foreach (var kvp in doc.Data)
+                    {
+                        if (dataTable.Columns.Contains(kvp.Key))
+                        {
+                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+                }
+
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+        // MongoDB ProcessDataDocument를 DataTable로 변환
+        private DataTable ConvertProcessDocumentsToDataTable(List<ProcessDataDocument> documents)
+        {
+            DataTable dataTable = new DataTable();
+
+            // 기본 컬럼 추가
+            dataTable.Columns.Add("id", typeof(string));
+            dataTable.Columns.Add("raw_data_id", typeof(string));
+            dataTable.Columns.Add("import_date", typeof(DateTime));
+            dataTable.Columns.Add("processed_date", typeof(DateTime));
+            dataTable.Columns.Add("cluster_id", typeof(int));
+            dataTable.Columns.Add("cluster_name", typeof(string));
+            dataTable.Columns.Add("클러스터명", typeof(string)); // 클러스터명 컬럼 추가
+
+            // 동적 컬럼 추가
+            HashSet<string> columnSet = new HashSet<string>();
+            foreach (var doc in documents)
+            {
+                if (doc.Data != null)
+                {
+                    foreach (var key in doc.Data.Keys)
+                    {
+                        columnSet.Add(key);
+                    }
+                }
+            }
+
+            // 컬럼 추가
+            foreach (var columnName in columnSet)
+            {
+                if (!dataTable.Columns.Contains(columnName))
+                {
+                    dataTable.Columns.Add(columnName);
+                }
+            }
+
+            // 문서 데이터 추가
+            foreach (var doc in documents)
+            {
+                DataRow row = dataTable.NewRow();
+                row["id"] = doc.Id;
+                row["raw_data_id"] = doc.RawDataId;
+                row["import_date"] = doc.ImportDate;
+                row["processed_date"] = doc.ProcessedDate;
+
+                // 클러스터 정보
+                if (doc.ClusterId.HasValue)
+                {
+                    row["cluster_id"] = doc.ClusterId.Value;
+                }
+                else
+                {
+                    row["cluster_id"] = DBNull.Value;
+                }
+
+                row["cluster_name"] = doc.ClusterName ?? "";
+                row["클러스터명"] = doc.ClusterName ?? ""; // 동일한 값 설정
+
+                // 동적 데이터 필드 추가
+                if (doc.Data != null)
+                {
+                    foreach (var kvp in doc.Data)
+                    {
+                        if (dataTable.Columns.Contains(kvp.Key))
+                        {
+                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+                }
+
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+        // DataTable에 클러스터링 정보 추가
+        private async Task<DataTable> AddClusteringInfoToDataTableAsync(DataTable dataTable)
+        {
+            try
+            {
+                // 클러스터명 컬럼이 없으면 추가
+                if (!dataTable.Columns.Contains("클러스터명"))
+                {
+                    dataTable.Columns.Add("클러스터명", typeof(string));
+                }
+
+                // 메모리 캐싱된 클러스터링 데이터 활용
+                DataTable clusteringData;
+                if (DataHandler.finalClusteringData != null && DataHandler.finalClusteringData.Rows.Count > 0)
+                {
+                    Debug.WriteLine("메모리에 캐싱된 클러스터링 데이터 사용");
+                    clusteringData = DataHandler.finalClusteringData;
+                }
+                else
+                {
+                    // MongoDB에서 클러스터링 데이터 가져오기
+                    Debug.WriteLine("MongoDB에서 클러스터링 데이터 로드");
+                    var clusteringRepo = new ClusteringRepository();
+                    clusteringData = await clusteringRepo.ToDataTableAsync();
+
+                    // 데이터를 메모리에 캐싱
+                    DataHandler.finalClusteringData = clusteringData.Copy();
+                }
+
+                // 클러스터 ID와 이름 매핑 생성
+                Dictionary<int, string> clusterNameMap = new Dictionary<int, string>();
+                foreach (DataRow row in clusteringData.Rows)
+                {
+                    if (row["ID"] != DBNull.Value && row["ClusterID"] != DBNull.Value)
+                    {
+                        int id = Convert.ToInt32(row["ID"]);
+                        int clusterId = Convert.ToInt32(row["ClusterID"]);
+
+                        if (id == clusterId) // ID와 ClusterID가 일치하는 경우만
+                        {
+                            string clusterName = row["클러스터명"]?.ToString();
+                            if (!string.IsNullOrEmpty(clusterName))
+                            {
+                                clusterNameMap[id] = clusterName;
+                            }
+                        }
+                    }
+                }
+
+                // 클러스터 ID와 dataIndex 매핑 생성
+                Dictionary<int, HashSet<string>> clusterDataIndices = new Dictionary<int, HashSet<string>>();
+                foreach (DataRow row in clusteringData.Rows)
+                {
+                    if (row["ClusterID"] != DBNull.Value)
+                    {
+                        int clusterId = Convert.ToInt32(row["ClusterID"]);
+                        string dataIndices = row["dataIndex"]?.ToString();
+
+                        if (!string.IsNullOrEmpty(dataIndices))
+                        {
+                            if (!clusterDataIndices.ContainsKey(clusterId))
+                            {
+                                clusterDataIndices[clusterId] = new HashSet<string>();
+                            }
+
+                            foreach (string index in dataIndices.Split(',').Select(s => s.Trim()))
+                            {
+                                if (!string.IsNullOrEmpty(index))
+                                {
+                                    clusterDataIndices[clusterId].Add(index);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // dataTable의 각 행에 클러스터명 설정
+                foreach (DataRow row in dataTable.Rows)
+                {
+                    if (row["raw_data_id"] != DBNull.Value)
+                    {
+                        string rawDataId = row["raw_data_id"].ToString();
+
+                        // 각 클러스터 ID에 대해 확인
+                        foreach (var entry in clusterDataIndices)
+                        {
+                            int clusterId = entry.Key;
+                            var dataIndices = entry.Value;
+
+                            if (dataIndices.Contains(rawDataId) && clusterNameMap.ContainsKey(clusterId))
+                            {
+                                row["클러스터명"] = clusterNameMap[clusterId];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                return dataTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"클러스터링 정보 추가 중 오류: {ex.Message}");
+                return dataTable; // 오류 시 원본 데이터 반환
+            }
+        }
+
+        // DataGridView 설정 및 구성
+        private void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)
+        {
+            if (dataTable == null) return;
+
+            // DataSource 설정
+            dataGridView.DataSource = dataTable;
+
+            // 특정 컬럼 숨기기
+            string[] columnsToHide = { "id", "import_date", "is_hidden", "raw_data_id", "processed_date", "cluster_id", "cluster_name" };
+            foreach (string column in columnsToHide)
+            {
+                if (dataGridView.Columns.Contains(column))
+                {
+                    dataGridView.Columns[column].Visible = false;
+                }
+            }
+
+            // 행 스타일 적용 (숨겨진 행)
+            foreach (DataGridViewRow row in dataGridView.Rows)
+            {
+                bool isHidden = false;
+
+                // is_hidden 컬럼 확인
+                if (dataGridView.Columns.Contains("is_hidden") &&
+                    row.Cells["is_hidden"].Value != null)
+                {
+                    isHidden = Convert.ToBoolean(row.Cells["is_hidden"].Value);
+                }
+
+                // 숨겨진 행이면 회색 스타일 적용
+                if (isHidden)
+                {
+                    row.DefaultCellStyle.BackColor = System.Drawing.Color.LightGray;
+                    row.DefaultCellStyle.ForeColor = System.Drawing.Color.DarkGray;
+                }
+            }
+        }
+
+        // 페이지 크기 변경
+        private async void cmb_pageSize_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (cmb_pageSize.SelectedItem != null)
+            {
+                pageSize = Convert.ToInt32(cmb_pageSize.SelectedItem);
+                currentPage = 1; // 페이지 크기 변경 시 첫 페이지로
+                await LoadPagedDataAsync();
+            }
+        }
+
+        // 페이징된 데이터 로드 메서드 (MongoDB 사용)
+        // uc_Classification.cs에 추가할 LoadPagedDataAsync 메서드 (MongoDB 활용)
+      
         public void AddSelectedColumnToGrid(DataGridView targetDgv, DataGridView sourceDgv)
         {
 

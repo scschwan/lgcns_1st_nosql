@@ -38,13 +38,6 @@
             panel_top.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)detail_grid_view).BeginInit();
             SuspendLayout();
-
-            // 폼 크기 조정
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1600, 900); // 크기 증가
-            this.Controls.Add(this.detail_grid_view);
-            this.Controls.Add(this.panel_top);
             // 
             // panel_top
             // 
@@ -71,7 +64,7 @@
             // status_label
             // 
             status_label.AutoSize = true;
-            status_label.Location = new Point(178, 19);
+            status_label.Location = new Point(316, 20);
             status_label.Name = "status_label";
             status_label.Size = new Size(42, 15);
             status_label.TabIndex = 3;
@@ -88,7 +81,7 @@
             // 
             // close_btn
             // 
-            close_btn.Location = new Point(894, 12);
+            close_btn.Location = new Point(1008, 12);
             close_btn.Name = "close_btn";
             close_btn.Size = new Size(75, 28);
             close_btn.TabIndex = 1;

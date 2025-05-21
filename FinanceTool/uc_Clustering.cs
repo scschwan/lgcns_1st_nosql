@@ -315,7 +315,7 @@ namespace FinanceTool
                 HeaderText = "",
                 Width = 50,
                 ThreeState = false,
-                Frozen = true,
+                //Frozen = true,
                 FillWeight = 20
             };
             dgv.Columns.Add(checkColumn);
@@ -1398,7 +1398,7 @@ namespace FinanceTool
             checkColumn.HeaderText = "";
             checkColumn.Width = 50;
             checkColumn.ThreeState = false;
-            checkColumn.Frozen = true;
+            //checkColumn.Frozen = true;
             checkColumn.FillWeight = 20;  // 다른 컬럼들보다 작은 값 설정
 
             dgv.Columns.Add(checkColumn);
