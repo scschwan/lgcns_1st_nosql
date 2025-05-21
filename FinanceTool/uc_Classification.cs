@@ -1,6 +1,7 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
 using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
@@ -36,36 +37,46 @@ namespace FinanceTool
         }
 
         // uc_Classification.cs의 initUI 메서드 - MongoDB 활용
+        // initUI 함수를 수정하여 전체 진행 과정에 프로그레스바 적용
         public async void initUI()
         {
             try
             {
-                // 1. MongoDB에서 visible 컬럼 목록 가져오기
-                await GetColumnListAsync();
-
-                // 2. 클러스터링 데이터 로드 및 강화
-                DataTable enhancedClusteringData = await CreateEnhancedClusteringDataAsync();
-
-                // 3. UI 컴포넌트 초기화 및 데이터 바인딩
-                await Task.Run(() =>
+                using (var progressForm = new ProcessProgressForm())
                 {
-                    if (Application.OpenForms.Count > 0)
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "초기화 준비 중...");
+                    await Task.Delay(10);
+
+                    // 1. MongoDB에서 visible 컬럼 목록 가져오기
+                    await progressForm.UpdateProgressHandler(20, "컬럼 정보 로드 중...");
+                    await GetColumnListAsync();
+
+                    // 2. 클러스터링 데이터 로드 및 강화
+                    await progressForm.UpdateProgressHandler(30, "클러스터링 데이터 로드 중...");
+                    DataTable enhancedClusteringData = await CreateEnhancedClusteringDataAsync();
+
+                    // 3. 페이징된 데이터 로드 (isAlreadyProgress = true로 설정)
+                    await progressForm.UpdateProgressHandler(50, "페이지 데이터 로드 중...");
+                    await LoadPagedDataAsync(true);
+
+                    // 4. 클러스터링 데이터를 DataGridView에 표시
+                    await progressForm.UpdateProgressHandler(80, "UI 컴포넌트 초기화 중...");
+                    await Task.Run(() =>
                     {
-                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                        if (Application.OpenForms.Count > 0)
                         {
-                            // 페이징된 데이터 로드
-                            LoadPagedDataAsync();
+                            Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                            {
+                                CreateCheckDataGridView(dataGridView_classify, enhancedClusteringData);
+                            });
+                        }
+                    });
 
-                            // 클러스터링 데이터를 DataGridView에 표시
-                            CreateCheckDataGridView(dataGridView_classify, enhancedClusteringData);
-
-                            // 나머지 UI 컴포넌트 설정
-                            AddSelectedColumnToGrid(dataGridView_delete_col2, dataGridView_keyword);
-                            InitializePagingControls(true);
-                            DataHandler.SyncDataGridViewSelections(dataGridView_origin, dataGridView_keyword);
-                        });
-                    }
-                });
+                    await progressForm.UpdateProgressHandler(100, "초기화 완료");
+                    await Task.Delay(100);
+                    progressForm.Close();
+                }
             }
             catch (Exception ex)
             {
@@ -254,205 +265,11 @@ namespace FinanceTool
             }
         }
 
-        public DataTable GetPagedRawDataWithClusters(int pageNumber, int pageSize, List<string> columnList, bool hiddenTableYN = false)
-        {
-            Debug.WriteLine($"columnList : {String.Join(", ", columnList)}");
+       
 
-
-            // 기존 쿼리로 데이터 가져오기
-            DataTable result = dataConverter.GetPagedProcessData(pageNumber, pageSize, columnList, hiddenTableYN);
-
-            /*
-            // 클러스터명 컬럼 추가
-            if (!result.Columns.Contains("클러스터명"))
-            {
-                result.Columns.Add("클러스터명", typeof(string));
-            }
-
-            // finalClusteringData에서 각 행의 클러스터명 찾아 설정
-            foreach (DataRow row in result.Rows)
-            {
-                int rawDataId = Convert.ToInt32(row["id"]);
-                string clusterName = FindClusterNameForRawDataId(rawDataId);
-                row["클러스터명"] = clusterName;
-            }
-            */
-            return result;
-        }
-
-        private string FindClusterNameForRawDataId(int rawDataId)
-        {
-            Dictionary<int, string> clusterNameMap = new Dictionary<int, string>();
-            foreach (DataRow row in DataHandler.finalClusteringData.Rows)
-            {
-                if (row["ID"] != DBNull.Value && row["ClusterID"] != DBNull.Value)
-                {
-                    int id = Convert.ToInt32(row["ID"]);
-                    int clusterId = Convert.ToInt32(row["ClusterID"]);
-
-                    if (id == clusterId) // ID와 ClusterID가 일치하는 경우만
-                    {
-                        string clusterName = row["클러스터명"]?.ToString();
-                        if (!string.IsNullOrEmpty(clusterName))
-                        {
-                            clusterNameMap[id] = clusterName;
-                        }
-                    }
-                }
-            }
-
-            foreach (DataRow clusterRow in DataHandler.finalClusteringData.Rows)
-            {
-                if (clusterRow["ClusterID"] == DBNull.Value) continue;
-
-                int clusterId = Convert.ToInt32(clusterRow["ClusterID"]);
-                string dataIndices = clusterRow["dataIndex"]?.ToString();
-
-                if (clusterNameMap.ContainsKey(clusterId) && !string.IsNullOrEmpty(dataIndices))
-                {
-                    string[] indexStrings = dataIndices.Split(',');
-                    foreach (string indexStr in indexStrings)
-                    {
-                        if (int.TryParse(indexStr.Trim(), out int index) && index == rawDataId)
-                        {
-                            return clusterNameMap[clusterId];
-                        }
-                    }
-                }
-            }
-
-            return string.Empty; // 클러스터명을 찾지 못한 경우
-        }
-
-        public void PopulateDataGridViewWithClusterNames(DataGridView dataGridView_keyword,
-                                              DataTable processTable,
-                                              DataTable finalClusteringData)
-        {
-            try
-            {
-                // 1. "클러스터명" 컬럼이 processTable에 없으면 추가
-                if (!processTable.Columns.Contains("클러스터명"))
-                {
-                    processTable.Columns.Add("클러스터명", typeof(string));
-                }
-
-
-                // hidden_rows에서 row_id 목록 가져오기
-                List<int> hiddenRowIds = GetHiddenRowIds();
-
-                // processTable에 hiddenYN 컬럼이 없으면 추가
-                if (!processTable.Columns.Contains("hiddenYN"))
-                {
-                    processTable.Columns.Add("hiddenYN", typeof(int));
-                }
-
-                // 모든 행에 대해 raw_data_id와 hidden 상태 비교하여 hiddenYN 값 설정
-                foreach (DataRow row in processTable.Rows)
-                {
-                    if (row["raw_data_id"] != DBNull.Value)
-                    {
-                        int rawDataId = Convert.ToInt32(row["raw_data_id"]);
-                        // hidden_rows에 있으면 0(숨김), 없으면 1(표시)
-                        row["hiddenYN"] = hiddenRowIds.Contains(rawDataId) ? 0 : 1;
-                    }
-                    else
-                    {
-                        // raw_data_id가 없는 경우 기본값으로 1(표시) 설정
-                        row["hiddenYN"] = 1;
-                    }
-                }
-
-
-                // 1.5 clusterID와 id가 일치하는 행의 클러스터명 매핑 만들기
-                Dictionary<int, string> clusterNameMap = new Dictionary<int, string>();
-                foreach (DataRow row in finalClusteringData.Rows)
-                {
-                    if (row["ID"] != DBNull.Value && row["ClusterID"] != DBNull.Value)
-                    {
-                        int id = Convert.ToInt32(row["ID"]);
-                        int clusterId = Convert.ToInt32(row["ClusterID"]);
-
-                        if (id == clusterId) // ID와 ClusterID가 일치하는 경우만
-                        {
-                            string clusterName = row["클러스터명"]?.ToString();
-                            if (!string.IsNullOrEmpty(clusterName))
-                            {
-                                clusterNameMap[id] = clusterName;
-                            }
-                        }
-                    }
-                }
-
-                // 2. finalClusteringData를 기반으로 processTable의 "클러스터명" 컬럼 채우기
-                foreach (DataRow clusterRow in finalClusteringData.Rows)
-                {
-                    if (clusterRow["ClusterID"] == DBNull.Value) continue;
-
-                    int clusterId = Convert.ToInt32(clusterRow["ClusterID"]);
-                    string dataIndices = clusterRow["dataIndex"]?.ToString();
-
-                    // 매핑된 클러스터명 찾기
-                    if (clusterNameMap.ContainsKey(clusterId) && !string.IsNullOrEmpty(dataIndices))
-                    {
-                        string clusterName = clusterNameMap[clusterId];
-
-                        // 인덱스 처리
-                        string[] indexStrings = dataIndices.Split(',');
-                        foreach (string indexStr in indexStrings)
-                        {
-                            if (int.TryParse(indexStr.Trim(), out int rawDataId))
-                            {
-                                // raw_data_id 값과 일치하는 행 찾기
-                                foreach (DataRow row in processTable.Rows)
-                                {
-
-                                    if (row["raw_data_id"] != DBNull.Value &&
-                                        Convert.ToInt32(row["raw_data_id"]) == rawDataId)
-                                    {
-                                        // 일치하는 raw_data_id를 가진 행에 클러스터명 설정
-                                        row["클러스터명"] = clusterName;
-                                        break; // 일치하는 첫 번째 행을 찾았으면 루프 종료
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 3. DataGridView에 데이터 바인딩
-                dataGridView_keyword.DataSource = processTable;
-
-                // 4. 필요시 그리드뷰 설정 추가
-                //dataGridView_keyword.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
-                //dataGridView_keyword.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                dataGridView_keyword.Columns["raw_data_id"].Visible = false;
-                dataGridView_keyword.Columns["hiddenYN"].Visible = false;
-                dataGridView_keyword.Columns["import_date"].Visible = false;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Error in PopulateDataGridViewWithClusterNames: {ex.Message}");
-                throw;
-            }
-        }
-
-        public List<int> GetHiddenRowIds()
-        {
-            dbmanager dbManager = dbmanager.Instance;
-            DataTable hiddenRowsTable = dbManager.ExecuteQuery("SELECT row_id FROM hidden_rows WHERE original_table = 'raw_data'");
-
-            List<int> hiddenRowIds = new List<int>();
-            foreach (DataRow row in hiddenRowsTable.Rows)
-            {
-                if (row["row_id"] != DBNull.Value)
-                {
-                    hiddenRowIds.Add(Convert.ToInt32(row["row_id"]));
-                }
-            }
-
-            return hiddenRowIds;
-        }
-
+        
+       
+       
         public void CreateCheckDataGridView(DataGridView dgv, DataTable dt)
         {
             // 조건에 맞는 데이터만 필터링
@@ -617,6 +434,9 @@ namespace FinanceTool
             }
         }
 
+        /// <summary>
+        /// Excel로 데이터를 내보내는 함수 - MongoDB 버전으로 개선
+        /// </summary>
         public async Task ExportToExcelAsync(List<string> columnList, bool hiddenTableYN = false)
         {
             try
@@ -624,36 +444,208 @@ namespace FinanceTool
                 using (var progress = new ProcessProgressForm())
                 {
                     progress.Show();
+                    await progress.UpdateProgressHandler(5, "데이터 내보내기 준비 중...");
                     await Task.Delay(10);
 
-                    // 1단계: export_result 데이터 테이블 생성 (80%)
-                    await progress.UpdateProgressHandler(5, "데이터 조회 준비 중...");
-                    DataTable export_result = await dataConverter.GetAllRawDataWithClustersAsync(
-                        columnList,
-                        hiddenTableYN,
-                        maxThreads: 4,
-                        initialProgress: 5,
-                        maxProgress: 80,
-                        progressHandler: progress.UpdateProgressHandler  // 프로그레스 핸들러 전달
-                    );
+                    // 1단계: export_result 데이터 테이블 생성 (raw_data 컬렉션에서 데이터 로드)
+                    DataTable export_result = null;
 
-                    // 2단계: cluster_result 데이터 테이블 생성 (10%)
-                    await progress.UpdateProgressHandler(85, "클러스터 정보 가져오는 중...");
+                    await Task.Run(async () =>
+                    {
+                        try
+                        {
+                            // MongoDB에서 raw_data 문서 조회
+                            var rawDataRepo = new RawDataRepository();
+
+                            // 필터 설정 - 숨겨진 문서 처리
+                            var filter = hiddenTableYN ?
+                                Builders<RawDataDocument>.Filter.Empty :
+                                Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false);
+
+                            await progress.UpdateProgressHandler(10, "MongoDB 데이터 조회 중...");
+
+                            // 모든 문서 가져오기 - 페이징 사용 (대용량 데이터 처리)
+                            List<RawDataDocument> allDocuments = new List<RawDataDocument>();
+                            int batchSize = 1000;
+                            int currentBatch = 0;
+                            bool hasMoreData = true;
+
+                            while (hasMoreData)
+                            {
+                                var skip = currentBatch * batchSize;
+                                var sort = Builders<RawDataDocument>.Sort.Ascending(d => d.Id);
+
+                                var batch = await rawDataRepo.FindDocumentsAsync(filter, sort, skip, batchSize);
+
+                                if (batch.Count == 0)
+                                {
+                                    hasMoreData = false;
+                                }
+                                else
+                                {
+                                    allDocuments.AddRange(batch);
+                                    currentBatch++;
+
+                                    // 진행 상황 업데이트 (5% ~ 50% 사이로 배분)
+                                    int progressValue = 10 + (int)(40.0 * allDocuments.Count / (currentBatch * batchSize + 1));
+                                    await progress.UpdateProgressHandler(progressValue, $"데이터 로드 중... ({allDocuments.Count:N0}건)");
+                                }
+                            }
+
+                            Debug.WriteLine($"총 {allDocuments.Count:N0}개 문서 로드 완료");
+                            await progress.UpdateProgressHandler(50, "데이터 변환 중...");
+
+                            // MongoDB 문서를 DataTable로 변환
+                            export_result = ConvertRawDocumentsToEnhancedDataTable(allDocuments, columnList);
+
+                            // 클러스터링 정보 추가
+                            await progress.UpdateProgressHandler(60, "클러스터 정보 추가 중...");
+                            await AddClusterInfoToExportDataAsync(export_result);
+
+                            await progress.UpdateProgressHandler(70, "데이터 내보내기 준비 완료");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"데이터 로드 중 오류: {ex.Message}\n{ex.StackTrace}");
+                            throw; // 예외를 상위로 전파
+                        }
+                    });
+
+                    // 2단계: cluster_result 데이터 테이블 생성
+                    await progress.UpdateProgressHandler(75, "클러스터 정보 변환 중...");
                     DataTable cluster_result = ConvertDataGridViewToCustomDataTable(dataGridView_classify);
 
-                    // 3단계: Excel 저장 (10%)
+                    // 3단계: Excel 저장
                     await progress.UpdateProgressHandler(90, "Excel 파일 저장 중...");
                     DataHandler.SaveDataTableToExcel(cluster_result, export_result);
 
                     await progress.UpdateProgressHandler(100, "Excel 파일 저장 완료");
                     await Task.Delay(500); // 완료 메시지 표시
                 }
+
+                // 저장 완료 메시지
+                MessageBox.Show("Excel 파일로 내보내기가 완료되었습니다.", "내보내기 완료",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Excel 파일 저장 중 오류 발생: {ex.Message}");
                 MessageBox.Show($"Excel 파일 저장 중 오류 발생: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// MongoDB 문서를 확장된 DataTable로 변환하는 메서드 (컬럼 필터링 포함)
+        /// </summary>
+        private DataTable ConvertRawDocumentsToEnhancedDataTable(List<RawDataDocument> documents, List<string> columnList)
+        {
+            DataTable dataTable = new DataTable();
+
+            // 기본 컬럼 추가
+            dataTable.Columns.Add("id", typeof(string));
+            dataTable.Columns.Add("import_date", typeof(DateTime));
+
+            // columnList에 명시된 컬럼만 추가
+            foreach (string columnName in columnList)
+            {
+                if (!dataTable.Columns.Contains(columnName))
+                {
+                    dataTable.Columns.Add(columnName);
+                }
+            }
+
+            // 클러스터명 컬럼 추가 (없을 경우)
+            if (!dataTable.Columns.Contains("클러스터명"))
+            {
+                dataTable.Columns.Add("클러스터명", typeof(string));
+            }
+
+            // 문서 데이터를 DataTable에 추가
+            foreach (var doc in documents)
+            {
+                DataRow row = dataTable.NewRow();
+                row["id"] = doc.Id;
+                row["import_date"] = doc.ImportDate;
+
+                // 동적 데이터 필드 추가 (columnList에 있는 것만)
+                if (doc.Data != null)
+                {
+                    foreach (var kvp in doc.Data)
+                    {
+                        if (columnList.Contains(kvp.Key) && dataTable.Columns.Contains(kvp.Key))
+                        {
+                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+                }
+
+                // 일단 클러스터명은 비워둠 (나중에 채울 예정)
+                row["클러스터명"] = "";
+
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
+        /// <summary>
+        /// 내보내기 데이터에 클러스터 정보 추가
+        /// </summary>
+        private async Task AddClusterInfoToExportDataAsync(DataTable exportData)
+        {
+            if (exportData == null || exportData.Rows.Count == 0)
+                return;
+
+            try
+            {
+                // 클러스터링 데이터 로드
+                var clusteringRepo = new ClusteringRepository();
+                var allClusters = await clusteringRepo.GetAllAsync();
+
+                // 클러스터 ID별 이름 매핑 생성
+                Dictionary<int, string> clusterNameMap = new Dictionary<int, string>();
+                foreach (var cluster in allClusters.Where(c => c.ClusterId == c.ClusterNumber)) // 상위 클러스터만 선택
+                {
+                    clusterNameMap[cluster.ClusterNumber] = cluster.ClusterName;
+                }
+
+                // 문서 ID별 클러스터 매핑 생성
+                Dictionary<string, int> docIdToClusterMap = new Dictionary<string, int>();
+                foreach (var cluster in allClusters)
+                {
+                    if (cluster.DataIndices != null)
+                    {
+                        foreach (var docId in cluster.DataIndices)
+                        {
+                            // 클러스터가 다른 클러스터에 병합된 경우 최상위 클러스터 ID 사용
+                            int topClusterId = cluster.ClusterId > 0 ? cluster.ClusterId : cluster.ClusterNumber;
+                            docIdToClusterMap[docId] = topClusterId;
+                        }
+                    }
+                }
+
+                // exportData의 각 행에 클러스터 정보 추가
+                foreach (DataRow row in exportData.Rows)
+                {
+                    if (row["id"] != DBNull.Value)
+                    {
+                        string docId = row["id"].ToString();
+
+                        if (docIdToClusterMap.TryGetValue(docId, out int clusterId) &&
+                            clusterNameMap.TryGetValue(clusterId, out string clusterName))
+                        {
+                            row["클러스터명"] = clusterName;
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"클러스터 정보 추가 완료: {exportData.Rows.Count}행");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"클러스터 정보 추가 중 오류: {ex.Message}");
+                // 오류 발생해도 계속 진행 (부분적으로라도 내보내기 위함)
             }
         }
 
@@ -668,16 +660,7 @@ namespace FinanceTool
 
             if (result == DialogResult.Yes)
             {
-                /*
-                //export DataTable 생성
-                export_result = CreateFilteredDataTable(dataGridView_keyword);
-
-                cluster_result = ConvertDataGridViewToCustomDataTable(dataGridView_classify);
-
-                DataHandler.SaveDataTableToExcel(cluster_result, export_result);
-                */
-                // 기존 코드를 새 함수 호출로 대체
-                //List<string> columnList = GetVisibleColumns(); // 보이는 컬럼 목록을 가져오는 함수 (필요시 구현)
+                
 
                 await ExportToExcelAsync(process_col_list, DataHandler.hiddenData);
             }
@@ -784,47 +767,135 @@ namespace FinanceTool
 
         private async void restore_col_btn_Click(object sender, EventArgs e)
         {
-            List<string> restore_list = GetCheckedRowsData(dataGridView_delete_col2);
-
-            foreach (string col_name in restore_list)
+            try
             {
-                dataGridView_keyword.Columns[col_name].Visible = true;
+                List<string> restore_list = GetCheckedRowsData(dataGridView_delete_col2);
+                Debug.WriteLine($"선택된 컬럼 수: {restore_list.Count}, 컬럼 목록: {string.Join(", ", restore_list)}");
+
+                // 선택된 컬럼이 없는 경우 (restore_list.Count == 0) - 이 부분이 수정됨
+                // 모든 컬럼을 숨기는 작업으로 처리
+                // 이 조건 검사와 MessageBox 표시 부분 제거
+
+                // 진행 상황 표시 폼 생성
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "컬럼 가시성 업데이트 준비 중...");
+
+                    // UI에 바로 적용 - 선택된 열만 표시
+                    foreach (DataGridViewColumn column in dataGridView_keyword.Columns)
+                    {
+                        // 부서명, 공급업체명, 세목명, 타겟열, 클러스터명은 제외
+                        if (column.Name.Equals(DataHandler.dept_col_name) ||
+                            column.Name.Equals(DataHandler.prod_col_name) ||
+                            column.Name.Equals(DataHandler.sub_acc_col_name))
+                        {
+                            column.Visible = true;
+                            continue;
+                        }
+
+                        if (DataHandler.levelName.Contains(column.Name) ||
+                            "클러스터명".Equals(column.Name))
+                        {
+                            column.Visible = true;
+                            continue;
+                        }
+
+                        // 시스템 컬럼은 항상 숨김
+                        if (column.Name == "id" || column.Name == "raw_data_id" ||
+                            column.Name == "import_date" || column.Name == "processed_date" ||
+                            column.Name == "cluster_id" || column.Name == "cluster_name" ||
+                            column.Name == "is_hidden")
+                        {
+                            column.Visible = false;
+                            continue;
+                        }
+
+                        // 체크 여부에 따라 표시/숨김 설정
+                        column.Visible = restore_list.Contains(column.Name);
+                        Debug.WriteLine($"컬럼 가시성 설정: {column.Name}, Visible: {column.Visible}");
+                    }
+
+                    await progressForm.UpdateProgressHandler(30, "MongoDB 업데이트 중...");
+
+                    // MongoDB 컬렉션에서 컬럼 가시성 업데이트
+                    // 동시에 여러 컬럼을 업데이트하기 위한 Task 목록
+                    List<Task> updateTasks = new List<Task>();
+
+                    // 컬럼 목록 가져오기
+                    var columnMappingRepo = new ColumnMappingRepository();
+                    var allColumns = await columnMappingRepo.GetAllAsync();
+
+                    // 모든 컬럼에 대해 업데이트 작업 생성
+                    foreach (var column in allColumns)
+                    {
+                        // 필수 컬럼 로직은 그대로 유지
+                        if (column.OriginalName.Equals(DataHandler.dept_col_name) ||
+                            column.OriginalName.Equals(DataHandler.prod_col_name) ||
+                            column.OriginalName.Equals(DataHandler.sub_acc_col_name) ||
+                            DataHandler.levelName.Contains(column.OriginalName) ||
+                            "클러스터명".Equals(column.OriginalName))
+                        {
+                            continue;
+                        }
+
+                        // MongoDB에서 컬럼 매핑 정보 업데이트
+                        bool isVisible = restore_list.Contains(column.OriginalName);
+
+                        // 변경이 필요한 경우만 업데이트
+                        if (column.IsVisible != isVisible)
+                        {
+                            updateTasks.Add(UpdateColumnVisibilityInMongoAsync(column.OriginalName, isVisible));
+                        }
+                    }
+
+                    // 모든 업데이트 작업 완료 대기
+                    if (updateTasks.Count > 0)
+                    {
+                        await Task.WhenAll(updateTasks);
+                        Debug.WriteLine($"{updateTasks.Count}개 컬럼 가시성 업데이트 완료");
+                    }
+
+                    await progressForm.UpdateProgressHandler(70, "컬럼 목록 업데이트 중...");
+
+                    // 컬럼 목록 업데이트
+                    await GetColumnListAsync();
+
+                    // dataGridView_delete_col2 다시 업데이트 (비동기 메서드 사용)
+                    await AddSelectedColumnToGridAsync(dataGridView_delete_col2, dataGridView_keyword);
+
+                    await progressForm.UpdateProgressHandler(100, "컬럼 가시성 업데이트 완료");
+                    await Task.Delay(300); // 완료 메시지 표시를 위한 지연
+                    progressForm.Close();
+                }
             }
-
-
-
-            for (int i = 0; i < dataGridView_keyword.Columns.Count; i++)
+            catch (Exception ex)
             {
-                //부서,공급업체명,금액,타겟열,클러스터명은 제외
-                if (dataGridView_keyword.Columns[i].Name.Equals(DataHandler.dept_col_name) || dataGridView_keyword.Columns[i].Name.Equals(DataHandler.prod_col_name) || dataGridView_keyword.Columns[i].Name.Equals(DataHandler.sub_acc_col_name))
-                {
-                    continue;
-                }
-
-                if (DataHandler.levelName.Contains(dataGridView_keyword.Columns[i].Name) || "클러스터명".Equals(dataGridView_keyword.Columns[i].Name))
-                {
-                    continue;
-                }
-
-
-                if (restore_list.Contains(dataGridView_keyword.Columns[i].Name))
-                {
-                    dataGridView_keyword.Columns[i].Visible = true;
-
-                    // SQLite에서 컬럼 가시성 업데이트
-                    dataConverter.UpdateColumnVisibility(dataGridView_keyword.Columns[i].Name, true);
-                }
-                else
-                {
-                    dataGridView_keyword.Columns[i].Visible = false;
-
-                    // SQLite에서 컬럼 가시성 업데이트
-                    dataConverter.UpdateColumnVisibility(dataGridView_keyword.Columns[i].Name, false);
-                }
+                Debug.WriteLine($"컬럼 가시성 업데이트 중 오류: {ex.Message}");
+                MessageBox.Show($"컬럼 가시성 업데이트 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
 
-            await GetColumnListAsync();
+        // MongoDB에서 컬럼 가시성 업데이트하는 비동기 메서드
+        private async Task UpdateColumnVisibilityInMongoAsync(string columnName, bool isVisible)
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var columnCollection = await mongoManager.GetCollectionAsync<BsonDocument>("column_mapping");
 
+                var filter = Builders<BsonDocument>.Filter.Eq("original_name", columnName);
+                var update = Builders<BsonDocument>.Update.Set("is_visible", isVisible);
+
+                var result = await columnCollection.UpdateOneAsync(filter, update);
+                Debug.WriteLine($"컬럼 '{columnName}' 가시성 업데이트: Visible={isVisible}, 결과={result.ModifiedCount}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB {columnName} 컬럼 가시성 업데이트 오류: {ex.Message}");
+                // 오류 발생 시에도 계속 진행 (개별 컬럼 업데이트 실패가 전체에 영향을 주지 않도록)
+            }
         }
 
         private void del_col_list_allcheck_CheckedChanged(object sender, EventArgs e)
@@ -899,8 +970,9 @@ namespace FinanceTool
             await LoadPagedDataAsync();
         }
 
-        // 페이징된 데이터 로드 (MongoDB 사용)
-        private async Task LoadPagedDataAsync()
+        // 페이징된 데이터 로드 메서드 (MongoDB 사용) - raw_data 활용 수정
+        // LoadPagedDataAsync 함수를 수정하여 isAlreadyProgress 매개변수 추가
+        private async Task LoadPagedDataAsync(bool isAlreadyProgress = false)
         {
             if (isProcessingSearch) return;
 
@@ -908,90 +980,265 @@ namespace FinanceTool
             {
                 isProcessingSearch = true;
 
-                using (var loadingForm = new ProcessProgressForm())
+                // isAlreadyProgress가 true면 별도의 프로그레스바를 표시하지 않음
+                if (!isAlreadyProgress)
                 {
-                    loadingForm.Show();
-                    await loadingForm.UpdateProgressHandler(10, "데이터 로드 준비 중...");
-                    await Task.Delay(10);
-
-                    DataTable pageData = null;
-                    DataTable processDataWithClusters = null;
-
-                    await Task.Run(async () =>
+                    using (var loadingForm = new ProcessProgressForm())
                     {
-                        // 1. MongoDB에서 raw_data 로드
-                        var rawDataRepo = new RawDataRepository();
-                        var filter = !DataHandler.hiddenData ?
-                            Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, false) :
-                            Builders<RawDataDocument>.Filter.Empty;
-
-                        var sort = Builders<RawDataDocument>.Sort.Descending(d => d.ImportDate);
-                        int skip = (currentPage - 1) * pageSize;
-
-                        var rawDocs = await rawDataRepo.FindDocumentsAsync(filter, sort, skip, pageSize);
-                        long totalCount = await rawDataRepo.CountDocumentsAsync(filter);
-
-                        // 메타데이터 계산
-                        totalRows = (int)totalCount;
-                        totalPages = (int)Math.Ceiling((double)totalRows / pageSize);
-
-                        // MongoDB 문서를 DataTable로 변환
-                        pageData = ConvertRawDocumentsToDataTable(rawDocs);
-
-                        await loadingForm.UpdateProgressHandler(40, "원본 데이터 로드 완료");
+                        loadingForm.Show();
+                        await loadingForm.UpdateProgressHandler(10, "데이터 로드 준비 중...");
                         await Task.Delay(10);
 
-                        // 2. MongoDB에서 process_data 로드
-                        var processDataRepo = new ProcessDataRepository();
-                        var processFilter = !DataHandler.hiddenData ?
-                            Builders<ProcessDataDocument>.Filter.Eq("is_hidden", false) :
-                            Builders<ProcessDataDocument>.Filter.Empty;
+                        await PerformLoadPagedData(loadingForm.UpdateProgressHandler);
 
-                        var processDocs = await processDataRepo.GetWithPaginationAsync(
-                            currentPage,
-                            pageSize,
-                            p => p.ProcessedDate);
-
-                        // process_data 문서를 DataTable로 변환
-                        var processDataTable = ConvertProcessDocumentsToDataTable(processDocs);
-
-                        // 클러스터링 정보 추가
-                        processDataWithClusters = await AddClusteringInfoToDataTableAsync(processDataTable);
-
-                        await loadingForm.UpdateProgressHandler(70, "처리 데이터 로드 완료");
-                        await Task.Delay(10);
-                    });
-
-                    await loadingForm.UpdateProgressHandler(80, "UI 업데이트 중...");
-                    await Task.Delay(10);
-
-                    // UI 업데이트
-                    this.BeginInvoke(new Action(() =>
-                    {
-                        // DataGridView 업데이트
-                        ConfigureDataGridView(pageData, dataGridView_origin);
-                        ConfigureDataGridView(processDataWithClusters, dataGridView_keyword);
-
-                        UpdatePaginationInfo();
-                        ApplyGridFormatting();
-                    }));
-
-                    await loadingForm.UpdateProgressHandler(100, "데이터 로드 완료");
-                    await Task.Delay(100);
-                    loadingForm.Close();
+                        await loadingForm.UpdateProgressHandler(100, "데이터 로드 완료");
+                        await Task.Delay(100);
+                        loadingForm.Close();
+                    }
+                }
+                else
+                {
+                    // 외부에서 프로그레스바가 이미 표시되고 있는 경우
+                    await PerformLoadPagedData(null);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"페이지 데이터 로드 중 오류: {ex.Message}");
-                MessageBox.Show($"데이터 로드 중 오류 발생: {ex.Message}", "오류",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Debug.WriteLine($"페이지 데이터 로드 중 오류: {ex.Message}\n{ex.StackTrace}");
+                if (!isAlreadyProgress) // 이미 외부 프로그레스바가 있으면 메시지 박스를 표시하지 않음
+                {
+                    MessageBox.Show($"데이터 로드 중 오류 발생: {ex.Message}", "오류",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
             finally
             {
                 isProcessingSearch = false;
             }
         }
+
+        // 실제 데이터 로드 로직을 분리하는 헬퍼 메서드
+        // 실제 데이터 로드 로직을 분리하는 헬퍼 메서드
+        private async Task PerformLoadPagedData(ProcessProgressForm.UpdateProgressDelegate progressHandler = null)
+        {
+            // 컬럼 가시성 정보
+            List<ColumnMappingDocument> visibleColumns = null;
+            DataTable pageData = null;
+
+            await Task.Run(async () =>
+            {
+                try
+                {
+                    // 1. MongoDB에서 visible 컬럼 목록 조회
+                    var columnMappingRepo = new ColumnMappingRepository();
+                    visibleColumns = await columnMappingRepo.GetVisibleColumnsAsync();
+                    Debug.WriteLine($"조회된 가시적 컬럼 수: {visibleColumns.Count}");
+
+                    // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
+                    if (progressHandler != null)
+                    {
+                        await progressHandler(20, "컬럼 정보 로드 완료");
+                    }
+
+                    // 2. MongoDB에서 raw_data 로드
+                    var mongoConverter = new MongoDataConverter();
+                    var (documents, totalCount) = await mongoConverter.GetPagedRawDataAsync(
+                        currentPage, pageSize, DataHandler.hiddenData);
+
+                    // 메타데이터 업데이트
+                    totalRows = (int)totalCount;
+                    totalPages = (int)Math.Ceiling((double)totalRows / pageSize);
+
+                    // MongoDB 문서를 DataTable로 변환
+                    pageData = ConvertRawDocumentsToDataTable(documents);
+                    Debug.WriteLine($"변환된 pageData 컬럼 수: {pageData.Columns.Count}");
+
+                    // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
+                    if (progressHandler != null)
+                    {
+                        await progressHandler(70, "데이터 로드 완료");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"데이터 로드 작업 중 오류: {ex.Message}");
+                    throw; // 예외를 상위로 전파
+                }
+            });
+
+            // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
+            if (progressHandler != null)
+            {
+                await progressHandler(80, "UI 업데이트 중...");
+            }
+
+            // UI 업데이트
+            try
+            {
+                // DataGridView 업데이트
+                if (pageData != null)
+                {
+                    // 원본 그리드와 키워드 그리드 모두 동일한 데이터로 설정
+                    ConfigureDataGridView(pageData, dataGridView_origin);
+                    ConfigureDataGridView(pageData, dataGridView_keyword);
+
+                    Debug.WriteLine($"dataGridView_keyword 설정 완료 (컬럼 수: {dataGridView_keyword.Columns.Count})");
+
+                    // 컬럼 가시성 적용
+                    if (visibleColumns != null && visibleColumns.Count > 0)
+                    {
+                        ApplyColumnVisibilityExplicit(dataGridView_keyword, visibleColumns);
+                        Debug.WriteLine("컬럼 가시성 적용 완료");
+                    }
+                }
+
+                // dataGridView_delete_col2 업데이트 - 컬럼 목록 채우기 (비동기 메서드 사용)
+                await AddSelectedColumnToGridAsync(dataGridView_delete_col2, dataGridView_keyword);
+                Debug.WriteLine($"dataGridView_delete_col2 설정 완료 (행 수: {dataGridView_delete_col2.Rows.Count})");
+
+                UpdatePaginationInfo();
+                ApplyGridFormatting();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"UI 업데이트 중 오류: {ex.Message}\n{ex.StackTrace}");
+            }
+
+            // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
+            if (progressHandler != null)
+            {
+                await progressHandler(90, "데이터 로드 마무리 중...");
+            }
+        }
+
+        // 컬럼 가시성 적용 함수 - 명시적 처리 방식
+        private void ApplyColumnVisibilityExplicit(DataGridView dgv, List<ColumnMappingDocument> visibleColumns)
+        {
+            if (dgv == null || visibleColumns == null || visibleColumns.Count == 0)
+            {
+                Debug.WriteLine("ApplyColumnVisibilityExplicit: 파라미터가 null이거나 빈 컬렉션입니다.");
+                return;
+            }
+
+            // 가시적 컬럼 목록 생성
+            HashSet<string> visibleColumnNames = new HashSet<string>(
+                visibleColumns.Select(c => c.OriginalName)
+            );
+
+            Debug.WriteLine($"ApplyColumnVisibilityExplicit: visibleColumnNames 개수 = {visibleColumnNames.Count}");
+
+            // 항상 표시해야 하는 필수 컬럼 목록
+            HashSet<string> essentialColumns = new HashSet<string>();
+
+            // 클러스터명 추가
+            essentialColumns.Add("클러스터명");
+
+            // 데이터 처리 관련 필수 컬럼 추가
+            if (!string.IsNullOrEmpty(DataHandler.dept_col_name))
+                essentialColumns.Add(DataHandler.dept_col_name);
+
+            if (!string.IsNullOrEmpty(DataHandler.prod_col_name))
+                essentialColumns.Add(DataHandler.prod_col_name);
+
+            if (!string.IsNullOrEmpty(DataHandler.sub_acc_col_name))
+                essentialColumns.Add(DataHandler.sub_acc_col_name);
+
+            // 레벨 컬럼 추가
+            if (DataHandler.levelName != null)
+            {
+                foreach (var levelName in DataHandler.levelName)
+                {
+                    if (!string.IsNullOrEmpty(levelName))
+                        essentialColumns.Add(levelName);
+                }
+            }
+
+            Debug.WriteLine($"필수 컬럼 목록: {string.Join(", ", essentialColumns)}");
+
+            // 항상 숨겨야 하는 시스템 컬럼 목록
+            HashSet<string> systemColumns = new HashSet<string>
+    {
+        "id", "import_date", "is_hidden"
+    };
+
+            // 모든 컬럼 상태 로깅 (디버깅)
+            foreach (DataGridViewColumn column in dgv.Columns)
+            {
+                Debug.WriteLine($"컬럼 처리 전: {column.Name}, Visible: {column.Visible}");
+            }
+
+            // 각 컬럼에 대해 가시성 설정
+            foreach (DataGridViewColumn column in dgv.Columns)
+            {
+                try
+                {
+                    string columnName = column.Name;
+
+                    // 시스템 컬럼은 항상 숨김
+                    if (systemColumns.Contains(columnName))
+                    {
+                        column.Visible = false;
+                        Debug.WriteLine($"시스템 컬럼 숨김: {columnName}");
+                        continue;
+                    }
+
+                    // 필수 컬럼은 항상 표시
+                    if (essentialColumns.Contains(columnName))
+                    {
+                        column.Visible = true;
+                        Debug.WriteLine($"필수 컬럼 표시: {columnName}");
+                        continue;
+                    }
+
+                    // 가시적 컬럼 목록에 있는 컬럼만 표시
+                    bool isVisible = visibleColumnNames.Contains(columnName);
+                    column.Visible = isVisible;
+                    Debug.WriteLine($"일반 컬럼 가시성 설정: {columnName}, Visible: {isVisible}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"컬럼 가시성 설정 중 오류: {column.Name}, {ex.Message}");
+                }
+            }
+
+            // 모든 컬럼 상태 로깅 (디버깅)
+            foreach (DataGridViewColumn column in dgv.Columns)
+            {
+                Debug.WriteLine($"컬럼 처리 후: {column.Name}, Visible: {column.Visible}");
+            }
+        }
+
+        // 필수 컬럼 목록을 가져오는 헬퍼 함수 추가
+        private HashSet<string> GetEssentialColumns()
+        {
+            HashSet<string> essentialColumns = new HashSet<string>();
+
+            // 클러스터명 추가
+            essentialColumns.Add("클러스터명");
+
+            // 데이터 처리 관련 필수 컬럼 추가
+            if (!string.IsNullOrEmpty(DataHandler.dept_col_name))
+                essentialColumns.Add(DataHandler.dept_col_name);
+
+            if (!string.IsNullOrEmpty(DataHandler.prod_col_name))
+                essentialColumns.Add(DataHandler.prod_col_name);
+
+            if (!string.IsNullOrEmpty(DataHandler.sub_acc_col_name))
+                essentialColumns.Add(DataHandler.sub_acc_col_name);
+
+            // 레벨 컬럼 추가
+            if (DataHandler.levelName != null)
+            {
+                foreach (var levelName in DataHandler.levelName)
+                {
+                    if (!string.IsNullOrEmpty(levelName))
+                        essentialColumns.Add(levelName);
+                }
+            }
+
+            return essentialColumns;
+        }
+
 
         // MongoDB RawDataDocument를 DataTable로 변환
         private DataTable ConvertRawDocumentsToDataTable(List<RawDataDocument> documents)
@@ -1003,7 +1250,7 @@ namespace FinanceTool
             dataTable.Columns.Add("import_date", typeof(DateTime));
             dataTable.Columns.Add("is_hidden", typeof(bool));
 
-            // 동적 컬럼 추가
+            // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
             if (documents.Count > 0 && documents[0].Data != null)
             {
                 foreach (var key in documents[0].Data.Keys)
@@ -1015,7 +1262,7 @@ namespace FinanceTool
                 }
             }
 
-            // 문서 데이터 추가
+            // 문서 데이터를 DataTable에 추가
             foreach (var doc in documents)
             {
                 DataRow row = dataTable.NewRow();
@@ -1042,9 +1289,12 @@ namespace FinanceTool
         }
 
         // MongoDB ProcessDataDocument를 DataTable로 변환
+        // DataTable에 컬럼 정확히 처리하도록 변환 함수 개선
         private DataTable ConvertProcessDocumentsToDataTable(List<ProcessDataDocument> documents)
         {
             DataTable dataTable = new DataTable();
+
+            Debug.WriteLine($"ConvertProcessDocumentsToDataTable 시작 (문서 수: {documents.Count})");
 
             // 기본 컬럼 추가
             dataTable.Columns.Add("id", typeof(string));
@@ -1055,8 +1305,9 @@ namespace FinanceTool
             dataTable.Columns.Add("cluster_name", typeof(string));
             dataTable.Columns.Add("클러스터명", typeof(string)); // 클러스터명 컬럼 추가
 
-            // 동적 컬럼 추가
+            // 동적 컬럼 수집 - 모든 문서의 Data 필드를 검사하여 컬럼 통합
             HashSet<string> columnSet = new HashSet<string>();
+
             foreach (var doc in documents)
             {
                 if (doc.Data != null)
@@ -1068,16 +1319,19 @@ namespace FinanceTool
                 }
             }
 
+            Debug.WriteLine($"동적 컬럼 수집 완료: {columnSet.Count}개 컬럼 발견");
+
             // 컬럼 추가
             foreach (var columnName in columnSet)
             {
                 if (!dataTable.Columns.Contains(columnName))
                 {
                     dataTable.Columns.Add(columnName);
+                    Debug.WriteLine($"컬럼 추가: {columnName}");
                 }
             }
 
-            // 문서 데이터 추가
+            // 문서 데이터를 DataTable에 추가
             foreach (var doc in documents)
             {
                 DataRow row = dataTable.NewRow();
@@ -1097,7 +1351,7 @@ namespace FinanceTool
                 }
 
                 row["cluster_name"] = doc.ClusterName ?? "";
-                row["클러스터명"] = doc.ClusterName ?? ""; // 동일한 값 설정
+                row["클러스터명"] = doc.ClusterName ?? "";
 
                 // 동적 데이터 필드 추가
                 if (doc.Data != null)
@@ -1114,8 +1368,10 @@ namespace FinanceTool
                 dataTable.Rows.Add(row);
             }
 
+            Debug.WriteLine($"ConvertProcessDocumentsToDataTable 완료: {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
             return dataTable;
         }
+
 
         // DataTable에 클러스터링 정보 추가
         private async Task<DataTable> AddClusteringInfoToDataTableAsync(DataTable dataTable)
@@ -1225,24 +1481,50 @@ namespace FinanceTool
         }
 
         // DataGridView 설정 및 구성
-        private void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)
+        // DataGridView 설정 함수 개선 (컬럼 가시성 유지)
+        public void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)
         {
-            if (dataTable == null) return;
-
-            // DataSource 설정
-            dataGridView.DataSource = dataTable;
-
-            // 특정 컬럼 숨기기
-            string[] columnsToHide = { "id", "import_date", "is_hidden", "raw_data_id", "processed_date", "cluster_id", "cluster_name" };
-            foreach (string column in columnsToHide)
+            if (dataTable == null)
             {
-                if (dataGridView.Columns.Contains(column))
+                Debug.WriteLine("ConfigureDataGridView: dataTable이 null입니다.");
+                return;
+            }
+
+            Debug.WriteLine($"ConfigureDataGridView: 시작 (컬럼 수: {dataTable.Columns.Count})");
+
+            // 현재 컬럼 가시성 상태 저장
+            Dictionary<string, bool> columnVisibility = new Dictionary<string, bool>();
+            if (dataGridView.Columns.Count > 0)
+            {
+                foreach (DataGridViewColumn column in dataGridView.Columns)
                 {
-                    dataGridView.Columns[column].Visible = false;
+                    columnVisibility[column.Name] = column.Visible;
                 }
             }
 
-            // 행 스타일 적용 (숨겨진 행)
+            // DataGridView의 DataSource를 DataTable로 설정
+            dataGridView.DataSource = dataTable;
+
+            // 필수 시스템 컬럼 숨김 처리
+            string[] hiddenColumns = { "id", "import_date", "is_hidden" };
+            foreach (string colName in hiddenColumns)
+            {
+                if (dataGridView.Columns.Contains(colName))
+                {
+                    dataGridView.Columns[colName].Visible = false;
+                }
+            }
+
+            // 이전에 저장한 컬럼 가시성 상태 복원
+            foreach (var pair in columnVisibility)
+            {
+                if (dataGridView.Columns.Contains(pair.Key))
+                {
+                    dataGridView.Columns[pair.Key].Visible = pair.Value;
+                }
+            }
+
+            // 각 행을 순회하며 is_hidden 필드에 따라 스타일 적용
             foreach (DataGridViewRow row in dataGridView.Rows)
             {
                 bool isHidden = false;
@@ -1261,6 +1543,8 @@ namespace FinanceTool
                     row.DefaultCellStyle.ForeColor = System.Drawing.Color.DarkGray;
                 }
             }
+
+            Debug.WriteLine($"ConfigureDataGridView: 완료 (컬럼 수: {dataGridView.Columns.Count})");
         }
 
         // 페이지 크기 변경
@@ -1274,69 +1558,135 @@ namespace FinanceTool
             }
         }
 
-        // 페이징된 데이터 로드 메서드 (MongoDB 사용)
-        // uc_Classification.cs에 추가할 LoadPagedDataAsync 메서드 (MongoDB 활용)
-      
-        public void AddSelectedColumnToGrid(DataGridView targetDgv, DataGridView sourceDgv)
+        // 컬럼 목록을 그리드에 추가하는 함수 개선
+        // 컬럼 목록을 그리드에 추가하는 함수 개선 - 직접 호출 방식
+        public async Task AddSelectedColumnToGridAsync(DataGridView targetDgv, DataGridView sourceDgv)
         {
+            Debug.WriteLine($"AddSelectedColumnToGrid 시작: targetDgv={targetDgv.Name}, sourceDgv={sourceDgv.Name}");
 
-            // 대상 DataGridView가 비어있는 경우에만 컬럼 초기 설정
-            if (targetDgv.Columns.Count == 0)
+            // 모든 경우에 컬럼 초기화 (기존 내용 클리어)
+            targetDgv.DataSource = null;
+            targetDgv.Rows.Clear();
+            targetDgv.Columns.Clear();
+
+            if (DataHandler.dragSelections.ContainsKey(targetDgv))
             {
-                // 체크박스 컬럼 추가
-                DataGridViewCheckBoxColumn checkColumn = new DataGridViewCheckBoxColumn
+                DataHandler.dragSelections[targetDgv].Clear();
+            }
+
+            // 체크박스 컬럼 추가
+            DataGridViewCheckBoxColumn checkColumn = new DataGridViewCheckBoxColumn
+            {
+                Name = "CheckBox",
+                HeaderText = "",
+                Width = 50,
+                ThreeState = false,
+                FillWeight = 20
+            };
+            targetDgv.Columns.Add(checkColumn);
+
+            // 데이터 컬럼 추가
+            DataGridViewTextBoxColumn textColumn = new DataGridViewTextBoxColumn
+            {
+                Name = "Data",  // 고정된 컬럼명 사용
+                HeaderText = "컬럼명"
+            };
+            targetDgv.Columns.Add(textColumn);
+
+            // GridView 설정
+            targetDgv.AllowUserToAddRows = false;
+            targetDgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            targetDgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+
+            targetDgv.Columns["Data"].ReadOnly = true;  // 데이터 컬럼은 읽기 전용
+            targetDgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
+            targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+
+            // 필수 컬럼 목록 가져오기
+            HashSet<string> essentialColumns = GetEssentialColumns();
+
+            // 시스템 컬럼 정의
+            HashSet<string> systemColumns = new HashSet<string>
+    {
+        "id", "import_date", "is_hidden", "raw_data_id",
+        "processed_date", "cluster_id", "cluster_name"
+    };
+
+            Debug.WriteLine($"필수 컬럼: {string.Join(", ", essentialColumns)}");
+
+            // 소스 DataGridView에서 컬럼 목록 추출
+            // 컬럼 목록과 가시성 상태를 저장할 리스트
+            List<(string Name, bool Visible)> columnList = new List<(string Name, bool Visible)>();
+
+            // 먼저 컬럼 정보 수집
+            foreach (DataGridViewColumn sourceColumn in sourceDgv.Columns)
+            {
+                string columnName = sourceColumn.Name;
+                bool isVisible = sourceColumn.Visible;
+
+                // 시스템 컬럼이나 필수 컬럼은 제외
+                if (systemColumns.Contains(columnName) || essentialColumns.Contains(columnName))
                 {
-                    Name = "CheckBox",
-                    HeaderText = "",
-                    Width = 50,
-                    ThreeState = false,
-                    FillWeight = 20
-                };
-                targetDgv.Columns.Add(checkColumn);
+                    continue;
+                }
 
-                // 데이터 컬럼 추가
-                DataGridViewTextBoxColumn textColumn = new DataGridViewTextBoxColumn
+                // 컬럼 정보 저장
+                columnList.Add((columnName, isVisible));
+            }
+
+            Debug.WriteLine($"추가할 컬럼 수: {columnList.Count}");
+
+            // 컬럼 정보가 없는 경우 - 더 안전한 접근 방식 사용
+            if (columnList.Count == 0)
+            {
+                try
                 {
-                    Name = "Data",  // 고정된 컬럼명 사용
-                    HeaderText = "컬럼명"
-                };
-                targetDgv.Columns.Add(textColumn);
+                    Debug.WriteLine("컬럼 정보가 없어 MongoDB에서 조회합니다.");
 
-                // GridView 설정
-                targetDgv.AllowUserToAddRows = false;
-                targetDgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                targetDgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                    // 비동기로 MongoDB에서 컬럼 정보 조회 (안전하게 처리)
+                    var columnMappingRepo = new ColumnMappingRepository();
+                    var allColumns = await columnMappingRepo.GetVisibleColumnsAsync();
 
-                targetDgv.Columns["Data"].ReadOnly = true;  // 체크박스 컬럼만 편집 가능
-                targetDgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-                targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-
-                foreach (string colName in process_col_list)
-                {
-
-                    //공급업체,부서명,금액,타겟열 제외
-                    if (colName.Equals(DataHandler.dept_col_name) || colName.Equals(DataHandler.prod_col_name))
+                    // 컬럼 정보 추가
+                    foreach (var column in allColumns)
                     {
-                        continue;
+                        // 필수 컬럼이나 시스템 컬럼 제외
+                        if (essentialColumns.Contains(column.OriginalName) ||
+                            systemColumns.Contains(column.OriginalName))
+                        {
+                            continue;
+                        }
+
+                        // 컬럼 정보 추가 - 가시성은 true로 설정 (GetVisibleColumnsAsync에서 이미 필터링됨)
+                        columnList.Add((column.OriginalName, true));
                     }
 
-                    if (DataHandler.levelName.Contains(colName))
-                    {
-                        continue;
-                    }
+                    Debug.WriteLine($"MongoDB에서 불러온 컬럼 수: {columnList.Count}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"MongoDB에서 컬럼 정보 조회 중 오류: {ex.Message}");
 
-                    // 새 행 추가
-                    int rowIndex = targetDgv.Rows.Add();
-                    targetDgv.Rows[rowIndex].Cells["CheckBox"].Value = true;
-                    targetDgv.Rows[rowIndex].Cells["Data"].Value = colName;  // 고정된 컬럼명 사용
-
-
+                    // 오류 발생 시 기본 컬럼 사용 (안전망)
+                    columnList.Add(("연도", true));
+                    columnList.Add(("월", true));
+                    columnList.Add(("회사 코드", true));
                 }
             }
 
+            // 수집된 컬럼 정보로 행 추가
+            foreach (var column in columnList)
+            {
+                int rowIndex = targetDgv.Rows.Add();
+                targetDgv.Rows[rowIndex].Cells["CheckBox"].Value = column.Visible;
+                targetDgv.Rows[rowIndex].Cells["Data"].Value = column.Name;
 
+                Debug.WriteLine($"컬럼 추가: {column.Name}, Visible: {column.Visible}");
+            }
 
+            Debug.WriteLine($"AddSelectedColumnToGrid 완료: {targetDgv.Rows.Count}개 행 추가됨");
         }
+
 
 
         //2025.04.28

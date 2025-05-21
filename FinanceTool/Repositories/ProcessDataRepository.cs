@@ -1,11 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq.Expressions;
-using System.Threading.Tasks;
-using FinanceTool.Models.MongoModels;
+﻿using FinanceTool.Models.MongoModels;
 using FinanceTool.MongoModels;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq.Expressions;
+using System.Threading.Tasks;
 
 namespace FinanceTool.Repositories
 {
@@ -165,15 +166,5 @@ namespace FinanceTool.Repositories
             return await _collection.Find(filter).ToListAsync();
         }
 
-        public async Task<List<ProcessDataDocument>> GetWithPaginationAsync(int page, int pageSize, Expression<Func<ProcessDataDocument, object>> sortField = null)
-        {
-            // 페이징 처리와 정렬 기능 추가
-            var query = _collection.Find(Builders<ProcessDataDocument>.Filter.Empty);
-
-            if (sortField != null)
-                query = query.Sort(Builders<ProcessDataDocument>.Sort.Ascending(sortField));
-
-            return await query.Skip((page - 1) * pageSize).Limit(pageSize).ToListAsync();
-        }
     }
 }
