@@ -536,43 +536,129 @@ namespace FinanceTool
 
                 Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 원본 데이터 로드 완료: {rawDataMap.Count}개");
 
-                // 기존 매핑 로직을 병렬 처리로 개선
-                await Task.Run(() =>
+                /*
+// 기존 매핑 로직을 병렬 처리로 개선
+await Task.Run(() =>
+{
+    Parallel.ForEach(resultTable.AsEnumerable(),
+        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+        row =>
+        {
+            try
+            {
+                if (row["raw_data_id"] != DBNull.Value)
                 {
-                    Parallel.ForEach(resultTable.AsEnumerable(),
-                        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-                        row =>
+                    string rawDataId = row["raw_data_id"].ToString();
+                    if (!string.IsNullOrEmpty(rawDataId) && rawDataMap.TryGetValue(rawDataId, out var rawData))
+                    {
+                        if (rawData.Data != null)
                         {
-                            try
+                            foreach (string column in visibleColumns)
                             {
-                                if (row["raw_data_id"] != DBNull.Value)
+                                if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
                                 {
-                                    string rawDataId = row["raw_data_id"].ToString();
-                                    if (!string.IsNullOrEmpty(rawDataId) && rawDataMap.TryGetValue(rawDataId, out var rawData))
+                                    lock (row) // 행 수준 잠금으로 동시성 제어
                                     {
-                                        if (rawData.Data != null)
+                                        row[column] = rawData.Data[column]?.ToString() ?? string.Empty;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 매핑 중 오류: {ex.Message}");
+            }
+        }
+    );
+});
+*/
+
+                // 수정된 안전한 매핑 로직
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 매핑 시작: {resultTable.Rows.Count}개 행");
+
+                // DataTable을 배열로 변환하여 안전하게 병렬 처리
+                var rowsArray = resultTable.AsEnumerable().ToArray();
+                var totalRows = rowsArray.Length;
+
+                // 배치 단위로 병렬 처리 (더 안전한 방식)
+                //const int mappingBatchSize = 10000;
+                var mappingBatches = new List<DataRow[]>();
+
+                for (int i = 0; i < totalRows; i += batchSize)
+                {
+                    //int batchSize = Math.Min(mappingBatchSize, totalRows - i);
+                    var batch = new DataRow[batchSize];
+                    Array.Copy(rowsArray, i, batch, 0, batchSize);
+                    mappingBatches.Add(batch);
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 매핑 배치 생성: {mappingBatches.Count}개 배치");
+
+                // 병렬 배치 처리
+                using (var semaphore = new SemaphoreSlim(Environment.ProcessorCount))
+                {
+                    var mappingTasks = mappingBatches.Select(async (batch, batchIndex) =>
+                    {
+                        await semaphore.WaitAsync();
+                        try
+                        {
+                            // 각 배치를 순차적으로 처리 (배치 내부는 순차, 배치 간은 병렬)
+                            foreach (var row in batch)
+                            {
+                                try
+                                {
+                                    if (row["raw_data_id"] != DBNull.Value)
+                                    {
+                                        string rawDataId = row["raw_data_id"].ToString();
+                                        if (!string.IsNullOrEmpty(rawDataId) && rawDataMap.TryGetValue(rawDataId, out var rawData))
                                         {
-                                            foreach (string column in visibleColumns)
+                                            if (rawData.Data != null)
                                             {
-                                                if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
+                                                foreach (string column in visibleColumns)
                                                 {
-                                                    lock (row) // 행 수준 잠금으로 동시성 제어
+                                                    if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
                                                     {
-                                                        row[column] = rawData.Data[column]?.ToString() ?? string.Empty;
+                                                        // DataTable 컬럼 인덱스 확인 후 안전하게 할당
+                                                        try
+                                                        {
+                                                            row[column] = rawData.Data[column]?.ToString() ?? string.Empty;
+                                                        }
+                                                        catch (ArgumentException)
+                                                        {
+                                                            // 컬럼이 존재하지 않는 경우 무시
+                                                            continue;
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 행 처리 중 오류: {ex.Message}");
+                                }
                             }
-                            catch (Exception ex)
+
+                            // 진행 상황 로깅
+                            if (batchIndex % 5 == 0)
                             {
-                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 매핑 중 오류: {ex.Message}");
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 매핑 배치 {batchIndex + 1}/{mappingBatches.Count} 완료");
                             }
                         }
-                    );
-                });
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    });
+
+                    await Task.WhenAll(mappingTasks);
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 매핑 완료");
 
                 // 이미 필요한 메타데이터 컬럼만 있을테니 더 이상 제거할 필요 없음
                 Debug.WriteLine("EnrichTransformDataWithMongoData 완료");
