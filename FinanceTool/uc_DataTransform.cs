@@ -758,7 +758,7 @@ await Task.Run(() =>
                 await UpdateProgress(20, "키워드 추출 중...");
 
                 // 3. 시스템 리소스 기반 병렬 처리 설정
-                int maxParallelism = Math.Min(Environment.ProcessorCount, 12);
+                int maxParallelism = Math.Max(Environment.ProcessorCount, 16);
                 int totalRows = transformDataTable.Rows.Count;
 
                 Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 처리 시작: {totalRows}개 행, 최대 병렬도: {maxParallelism}");
@@ -928,7 +928,7 @@ await Task.Run(() =>
                             Debug.WriteLine($"{missingIdsList.Count}개의 금액 정보를 보강합니다.");
 
                             // 배치 크기 설정
-                            const int batchSize = 5000; // 더 작은 배치로 최적화
+                            const int batchSize = 10000; // 더 작은 배치로 최적화
                             var batches = new List<List<string>>();
 
                             for (int i = 0; i < missingIdsList.Count; i += batchSize)
