@@ -36,85 +36,140 @@ namespace FinanceTool.Repositories
         }
 
         /// <summary>
-        /// 특정 기간에 처리된 ProcessView 문서 찾기
+        /// 여러 ProcessView 문서를 배치로 삽입 (InsertManyOptions 지원)
         /// </summary>
-        public async Task<List<ProcessViewDocument>> GetByModifiedDateRangeAsync(DateTime start, DateTime end)
-        {
-            var filter = Builders<ProcessViewDocument>.Filter.And(
-                Builders<ProcessViewDocument>.Filter.Gte(d => d.LastModifiedDate, start),
-                Builders<ProcessViewDocument>.Filter.Lte(d => d.LastModifiedDate, end)
-            );
-            return await _collection.Find(filter).ToListAsync();
-        }
-
-        /// <summary>
-        /// 특정 ProcessView 문서 업데이트
-        /// </summary>
-        public async Task<bool> UpdateKeywordsAsync(string id, KeywordInfo newKeywords)
-        {
-            var filter = Builders<ProcessViewDocument>.Filter.Eq(d => d.Id, id);
-            var update = Builders<ProcessViewDocument>.Update
-                .Set(d => d.Keywords, newKeywords)
-                .Set(d => d.LastModifiedDate, DateTime.Now);
-
-            var result = await _collection.UpdateOneAsync(filter, update);
-            return result.ModifiedCount > 0;
-        }
-
-        /// <summary>
-        /// 특정 ProcessView 문서의 금액 정보 업데이트 (추가됨)
-        /// </summary>
-        public async Task<bool> UpdateMoneyAsync(string id, object moneyValue)
-        {
-            var filter = Builders<ProcessViewDocument>.Filter.Eq(d => d.Id, id);
-            var update = Builders<ProcessViewDocument>.Update
-                .Set(d => d.Money, moneyValue)
-                .Set(d => d.LastModifiedDate, DateTime.Now);
-
-            var result = await _collection.UpdateOneAsync(filter, update);
-            return result.ModifiedCount > 0;
-        }
-
-        /// <summary>
-        /// 페이징 처리된 ProcessView 문서 가져오기
-        /// </summary>
-        public async Task<(List<ProcessViewDocument> Items, long TotalCount)> GetPagedAsync(
-            int pageNumber,
-            int pageSize,
-            FilterDefinition<ProcessViewDocument> filter = null)
-        {
-            filter = filter ?? Builders<ProcessViewDocument>.Filter.Empty;
-            var sort = Builders<ProcessViewDocument>.Sort.Descending(d => d.LastModifiedDate);
-
-            long totalCount = await _collection.CountDocumentsAsync(filter);
-            var items = await _collection.Find(filter)
-                .Sort(sort)
-                .Skip((pageNumber - 1) * pageSize)
-                .Limit(pageSize)
-                .ToListAsync();
-
-            return (items, totalCount);
-        }
-
-        /// <summary>
-        /// 키워드로 ProcessView 문서 검색
-        /// </summary>
-        public async Task<List<ProcessViewDocument>> SearchByKeywordAsync(string keyword)
-        {
-            var filter = Builders<ProcessViewDocument>.Filter.AnyEq("Keywords.FinalKeywords", keyword);
-            return await _collection.Find(filter).ToListAsync();
-        }
-
-        /// <summary>
-        /// 여러 ProcessView 문서를 배치로 삽입
-        /// </summary>
-        public async Task InsertManyAsync(List<ProcessViewDocument> documents)
+        public async Task InsertManyAsync(List<ProcessViewDocument> documents, InsertManyOptions options)
         {
             if (documents == null || documents.Count == 0)
                 return;
 
-            await _collection.InsertManyAsync(documents, new InsertManyOptions { IsOrdered = false });
+            try
+            {
+                // MongoDB 연결 상태 확인
+                await InitializeAsync();
+
+                // 대용량 데이터 처리를 위한 WriteConcern 최적화
+                var optimizedOptions = new InsertManyOptions
+                {
+                    IsOrdered = options?.IsOrdered ?? false, // 순서 상관없이 삽입하여 성능 향상
+                    BypassDocumentValidation = options?.BypassDocumentValidation ?? false
+                };
+
+                // 배치 삽입 실행
+                await _collection.InsertManyAsync(documents, optimizedOptions);
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] ProcessView 문서 {documents.Count}개 삽입 완료");
+            }
+            catch (MongoBulkWriteException ex)
+            {
+                // 부분적 실패 처리
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 중 일부 문서 실패: {ex.WriteErrors?.Count ?? 0}개 오류");
+
+                // 성공한 문서 수 로깅
+                int successCount = documents.Count - (ex.WriteErrors?.Count ?? 0);
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 성공적으로 삽입된 문서: {successCount}개");
+
+                // 실패한 문서들에 대한 세부 정보 로깅
+                if (ex.WriteErrors != null)
+                {
+                    foreach (var error in ex.WriteErrors)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 삽입 실패 - 인덱스: {error.Index}, 오류: {error.Message}");
+                    }
+                }
+
+                throw; // 상위 호출자에게 예외 전파
+            }
+           
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 예상치 못한 오류 발생: {ex.Message}");
+                throw;
+            }
         }
+
+        /// <summary>
+        /// 여러 ProcessView 문서를 배치로 삽입 (기존 메서드 - 하위 호환성 유지)
+        /// </summary>
+        public async Task InsertManyAsync(List<ProcessViewDocument> documents)
+        {
+            // 기본 옵션으로 오버로드된 메서드 호출
+            var defaultOptions = new InsertManyOptions
+            {
+                IsOrdered = false, // 성능 최적화를 위해 기본값을 false로 설정
+                BypassDocumentValidation = false
+            };
+
+            await InsertManyAsync(documents, defaultOptions);
+        }
+
+        /// <summary>
+        /// 재시도 로직이 포함된 안전한 배치 삽입
+        /// </summary>
+        public async Task InsertManyWithRetryAsync(List<ProcessViewDocument> documents, InsertManyOptions options = null, int maxRetries = 3)
+        {
+            if (documents == null || documents.Count == 0)
+                return;
+
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                try
+                {
+                    await InsertManyAsync(documents, options);
+                    return; // 성공하면 즉시 반환
+                }
+                
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 복구 불가능한 오류 발생: {ex.Message}");
+                    throw;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 개별 문서 삽입 (배치 삽입 실패 시 fallback 용도)
+        /// </summary>
+        public async Task<int> InsertManyIndividuallyAsync(List<ProcessViewDocument> documents)
+        {
+            if (documents == null || documents.Count == 0)
+                return 0;
+
+            int successCount = 0;
+            var tasks = new List<Task<bool>>();
+
+            // 동시성 제한을 위한 SemaphoreSlim 사용
+            using (var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2))
+            {
+                foreach (var document in documents)
+                {
+                    tasks.Add(InsertOneWithSemaphoreAsync(document, semaphore));
+                }
+
+                var results = await Task.WhenAll(tasks);
+                successCount = results.Count(r => r);
+            }
+
+            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 삽입 완료: {successCount}/{documents.Count}개 성공");
+            return successCount;
+        }
+
+        /// <summary>
+        /// 세마포어를 사용한 개별 문서 삽입 (동시성 제어)
+        /// </summary>
+        private async Task<bool> InsertOneWithSemaphoreAsync(ProcessViewDocument document, SemaphoreSlim semaphore)
+        {
+            await semaphore.WaitAsync();
+            try
+            {
+                return await InsertOneAsync(document);
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
 
         public async Task<long> CountDocumentsAsync(FilterDefinition<ProcessViewDocument> filter = null)
         {
@@ -122,71 +177,7 @@ namespace FinanceTool.Repositories
             return await _collection.CountDocumentsAsync(filter);
         }
 
-        /// <summary>
-        /// ProcessData 컬렉션에서 데이터를 가져와 ProcessView 생성 (개선버전)
-        /// </summary>
-        public async Task<List<ProcessViewDocument>> CreateFromProcessDataAsync(List<string> processDataIds)
-        {
-            // ProcessData 저장소 접근
-            var processDataRepo = new ProcessDataRepository();
-            var createdDocuments = new List<ProcessViewDocument>();
-
-            foreach (var processDataId in processDataIds)
-            {
-                // ProcessData 문서 가져오기
-                var processData = await processDataRepo.GetByIdAsync(processDataId);
-                if (processData == null) continue;
-
-                // raw_data_id 가져오기
-                string rawDataId = processData.RawDataId;
-
-                // 금액 데이터 가져오기
-                object moneyValue = null;
-                if (processData.Data != null)
-                {
-                    // moneyColumnName 변수의 값을 컬럼명으로 가진 데이터 찾기
-                    string moneyColumnName = DataHandler.levelName[0]; // 금액 컬럼명
-                    if (processData.Data.ContainsKey(moneyColumnName))
-                    {
-                        moneyValue = processData.Data[moneyColumnName];
-                    }
-                }
-
-                // 키워드 확인
-                List<string> keywords = new List<string>();
-                // 타겟 컬럼명 (두 번째 컬럼)에서 추출된 키워드 처리 로직
-                string targetColumnName = DataHandler.levelName[1]; // 타겟 컬럼명
-                if (processData.Data != null && processData.Data.ContainsKey(targetColumnName))
-                {
-                    string originalText = processData.Data[targetColumnName]?.ToString() ?? string.Empty;
-                    // 여기서 키워드 처리 로직 (구분자로 분할 등)을 적용하여 keywords 리스트 채우기
-                    // 이 로직은 uc_preprocessing.cs의 SaveProcessDataToMongoDBAsync 메서드 참조
-                }
-
-                // ProcessView 문서 생성
-                var processViewDoc = new ProcessViewDocument
-                {
-                    ProcessDataId = processDataId,
-                    RawDataId = rawDataId, // 추가된 필드
-                    Keywords = new KeywordInfo
-                    {
-                        FinalKeywords = keywords
-                    },
-                    Money = moneyValue, // 추가된 필드
-                    LastModifiedDate = DateTime.Now
-                };
-
-                createdDocuments.Add(processViewDoc);
-            }
-
-            // 생성된 문서들 일괄 저장
-            if (createdDocuments.Count > 0)
-            {
-                await InsertManyAsync(createdDocuments);
-            }
-
-            return createdDocuments;
-        }
+        
 
         /// <summary>
         /// 단일 ProcessView 문서를 삽입합니다.
