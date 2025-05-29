@@ -193,6 +193,26 @@ namespace FinanceTool.Repositories
             return result.DeletedCount > 0;
         }
 
+        /// <summary>
+        /// 여러 클러스터의 ClusterId를 일괄 업데이트
+        /// </summary>
+        public async Task<bool> UpdateMultipleClusterIdsAsync(List<int> clusterNumbers, int newClusterId)
+        {
+            try
+            {
+                var filter = Builders<ClusteringResultDocument>.Filter.In(c => c.ClusterNumber, clusterNumbers);
+                var update = Builders<ClusteringResultDocument>.Update.Set(c => c.ClusterId, newClusterId);
+
+                var result = await _collection.UpdateManyAsync(filter, update);
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"다중 ClusterId 업데이트 오류: {ex.Message}");
+                return false;
+            }
+        }
+
         // 클러스터 정보 전체 업데이트
         public async Task<bool> UpdateClusterByNumberAsync(
             int clusterNumber,

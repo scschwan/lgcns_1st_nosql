@@ -253,11 +253,30 @@ namespace FinanceTool
                     // dataIndex 처리
                     if (!row.IsNull("dataIndex") && !string.IsNullOrEmpty(row["dataIndex"].ToString()))
                     {
+                        /*
                         clusterDoc.DataIndices = row["dataIndex"].ToString()
                                                .Split(',')
                                                .Select(id => id.Trim())
                                                .Where(id => !string.IsNullOrEmpty(id))
                                                .ToList();
+                        */
+                        //2025.05.29
+                        //대용량 처리 개선
+                        var allIndices = row["dataIndex"].ToString()
+                        .Split(',')
+                        .Select(id => id.Trim())
+                        .Where(id => !string.IsNullOrEmpty(id))
+                        .ToList();
+
+                        // 16MB 제한 고려하여 최대 50만개로 제한
+                        clusterDoc.DataIndices = allIndices.Count > 50000 ?
+                            allIndices.Take(50000).ToList() :
+                            allIndices;
+
+                        if (allIndices.Count > 50000)
+                        {
+                            Debug.WriteLine($"경고: 클러스터 {clusterDoc.ClusterNumber}의 DataIndices가 제한을 초과했습니다. ({allIndices.Count}개)");
+                        }
                     }
 
                     documents.Add(clusterDoc);
@@ -266,7 +285,14 @@ namespace FinanceTool
                 // 데이터 일괄 저장
                 if (documents.Count > 0)
                 {
-                    await clusteringRepo.CreateManyAsync(documents);
+                    //await clusteringRepo.CreateManyAsync(documents);
+                    // 수정된 코드: 배치별로 분할 저장
+                    const int batchSize = 10000; // 문서별 배치 크기
+                    for (int i = 0; i < documents.Count; i += batchSize)
+                    {
+                        var batch = documents.Skip(i).Take(batchSize).ToList();
+                        await clusteringRepo.CreateManyAsync(batch);
+                    }
                     Debug.WriteLine($"{documents.Count}개의 클러스터 데이터를 MongoDB에 저장했습니다.");
                 }
             }
@@ -543,8 +569,26 @@ namespace FinanceTool
 
                 // 4. MongoDB에서 raw_data 문서 조회
                 var rawDataRepo = new RawDataRepository();
-                var filter = Builders<RawDataDocument>.Filter.In(d => d.Id, rawDataIds.ToList());
-                var rawDataDocuments = await rawDataRepo.FindDocumentsAsync(filter);
+                //var filter = Builders<RawDataDocument>.Filter.In(d => d.Id, rawDataIds.ToList());
+                //var rawDataDocuments = await rawDataRepo.FindDocumentsAsync(filter);
+
+                //2025.05.29
+                //대용량 batch 처리
+                // 수정된 코드
+                const int batchSize = 10000;
+                var allRawDataDocuments = new List<RawDataDocument>();
+                var rawDataIdsList = rawDataIds.ToList();
+
+                // 배치별로 분할하여 조회
+                for (int i = 0; i < rawDataIdsList.Count; i += batchSize)
+                {
+                    var batchIds = rawDataIdsList.Skip(i).Take(batchSize).ToList();
+                    var filter = Builders<RawDataDocument>.Filter.In(d => d.Id, batchIds);
+                    var batchDocuments = await rawDataRepo.FindDocumentsAsync(filter);
+                    allRawDataDocuments.AddRange(batchDocuments);
+                }
+
+                var rawDataDocuments = allRawDataDocuments;
 
                 // 5. 조회된 데이터를 결과 테이블에 매핑
                 foreach (var doc in rawDataDocuments)
@@ -1770,6 +1814,7 @@ namespace FinanceTool
                 if (isNewCluster)
                 {
                     // 새 클러스터 생성
+                    /*
                     var newCluster = new ClusteringResultDocument
                     {
                         ClusterNumber = newClusterNumber,
@@ -1781,12 +1826,51 @@ namespace FinanceTool
                         DataIndices = dataIndices,
                         CreatedAt = DateTime.Now
                     };
+                    */
+                    var newCluster = new ClusteringResultDocument
+                    {
+                        ClusterNumber = newClusterNumber,
+                        ClusterId = newClusterNumber, // 병합된 클러스터는 자신의 번호를 ClusterId로 가짐
+                        ClusterName = mergedClusterName,
+                        Keywords = keywordsList,
+                        Count = totalCount,
+                        TotalAmount = totalAmount,
+                        //DataIndices = dataIndices,
+                        DataIndices = dataIndices.Count > 200000 ?
+                                        dataIndices.Take(200000).ToList() : // 임시로 50만개 제한
+                                        dataIndices,
+                        CreatedAt = DateTime.Now
+                    };
 
-                    var newId = await clusteringRepo.CreateAsync(newCluster);
-                    Debug.WriteLine($"새 클러스터 생성 완료: ID={newId}, ClusterNumber={newClusterNumber}");
+                    //var newId = await clusteringRepo.CreateAsync(newCluster);
+                    //Debug.WriteLine($"새 클러스터 생성 완료: ID={newId}, ClusterNumber={newClusterNumber}");
+                    try
+                    {
+                        var newId = await clusteringRepo.CreateAsync(newCluster);
+                        Debug.WriteLine($"새 클러스터 생성 완료: ID={newId}, ClusterNumber={newClusterNumber}");
+
+                        // DataIndices가 제한을 초과한 경우 추가 처리
+                        if (dataIndices.Count > 200000)
+                        {
+                            // TODO: 별도 컬렉션에 나머지 DataIndices 저장
+                            var remainingIndices = dataIndices.Skip(200000).ToList();
+                            Debug.WriteLine($"추가 저장 필요한 DataIndices: {remainingIndices.Count}개");
+                            // 향후 cluster_data_mapping 컬렉션 구현 시 사용
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"클러스터 생성 실패 (16MB 초과 가능성): {ex.Message}");
+
+                        // 16MB 초과로 실패한 경우 DataIndices 더 줄여서 재시도
+                        newCluster.DataIndices = dataIndices.Take(100000).ToList();
+                        var newId = await clusteringRepo.CreateAsync(newCluster);
+                        Debug.WriteLine($"축소된 클러스터 생성 완료: ID={newId}, 저장된 인덱스: {newCluster.DataIndices.Count}개");
+                    }
                 }
                 else
                 {
+                    /*
                     // 기존 클러스터 업데이트
                     bool updateSuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
                         newClusterNumber,
@@ -1796,14 +1880,44 @@ namespace FinanceTool
                         totalAmount,
                         dataIndices
                     );
-
-                    if (!updateSuccess)
+                    */
+                    // DataIndices 크기 제한 적용
+                    try
                     {
-                        Debug.WriteLine($"경고: 클러스터 {newClusterNumber} 업데이트 실패");
+                        // DataIndices 크기 제한 적용
+                        var limitedDataIndices = dataIndices.Count > 200000 ?
+                            dataIndices.Take(200000).ToList() : dataIndices;
+
+                        bool updateSuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
+                            newClusterNumber, mergedClusterName, keywordsList,
+                            totalCount, totalAmount, limitedDataIndices);
+
+                        if (!updateSuccess)
+                        {
+                            Debug.WriteLine($"경고: 클러스터 {newClusterNumber} 업데이트 실패");
+                        }
+
+                        if (dataIndices.Count > 200000)
+                        {
+                            Debug.WriteLine($"경고: {dataIndices.Count - 200000}개의 DataIndices가 저장되지 않았습니다.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"클러스터 업데이트 실패 (16MB 초과 가능성): {ex.Message}");
+
+                        // 더 적은 수로 재시도
+                        var retryDataIndices = dataIndices.Take(100000).ToList();
+                        bool retrySuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
+                            newClusterNumber, mergedClusterName, keywordsList,
+                            totalCount, totalAmount, retryDataIndices);
+
+                        Debug.WriteLine($"축소 재시도 결과: {retrySuccess}, 저장된 인덱스: {retryDataIndices.Count}개");
                     }
                 }
 
                 // 병합된 클러스터들의 ClusterId 업데이트
+                /*
                 foreach (int targetId in targetIds)
                 {
                     if (targetId != newClusterNumber) // 자기 자신은 제외
@@ -1812,6 +1926,93 @@ namespace FinanceTool
                         if (!updateSuccess)
                         {
                             Debug.WriteLine($"경고: 클러스터 {targetId}의 소속 ID 업데이트 실패");
+                        }
+                    }
+                }
+                */
+
+
+                // 수정된 코드: 배치 처리로 성능 개선
+                var targetIdsToUpdate = targetIds.Where(id => id != newClusterNumber).ToList();
+
+                if (targetIdsToUpdate.Count > 0)
+                {
+                    const int batchSize = 10000;
+
+                    if (targetIdsToUpdate.Count <= batchSize)
+                    {
+                        // 10,000건 이하면 한 번에 처리
+                        try
+                        {
+                            bool batchUpdateSuccess = await clusteringRepo.UpdateMultipleClusterIdsAsync(
+                                targetIdsToUpdate, newClusterNumber);
+
+                            if (!batchUpdateSuccess)
+                            {
+                                Debug.WriteLine($"경고: 배치 ClusterId 업데이트 실패, 개별 처리로 전환");
+
+                                // 실패 시 개별 처리로 폴백
+                                foreach (int targetId in targetIdsToUpdate)
+                                {
+                                    await clusteringRepo.UpdateClusterIdAsync(targetId, newClusterNumber);
+                                }
+                            }
+                            else
+                            {
+                                Debug.WriteLine($"배치 ClusterId 업데이트 성공: {targetIdsToUpdate.Count}개");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"배치 업데이트 오류: {ex.Message}, 개별 처리로 전환");
+
+                            // 예외 발생 시 개별 처리
+                            foreach (int targetId in targetIdsToUpdate)
+                            {
+                                try
+                                {
+                                    await clusteringRepo.UpdateClusterIdAsync(targetId, newClusterNumber);
+                                }
+                                catch (Exception individualEx)
+                                {
+                                    Debug.WriteLine($"개별 업데이트 실패 - ClusterID: {targetId}, 오류: {individualEx.Message}");
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // 10,000건 초과하면 배치로 분할 처리
+                        Debug.WriteLine($"대량 ClusterId 업데이트 시작: {targetIdsToUpdate.Count}개, 배치 크기: {batchSize}");
+
+                        for (int i = 0; i < targetIdsToUpdate.Count; i += batchSize)
+                        {
+                            var batch = targetIdsToUpdate.Skip(i).Take(batchSize).ToList();
+
+                            try
+                            {
+                                bool batchSuccess = await clusteringRepo.UpdateMultipleClusterIdsAsync(
+                                    batch, newClusterNumber);
+
+                                Debug.WriteLine($"배치 {i / batchSize + 1} 처리 완료: {batch.Count}개, 성공: {batchSuccess}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"배치 {i / batchSize + 1} 처리 실패: {ex.Message}");
+
+                                // 배치 실패 시 해당 배치만 개별 처리
+                                foreach (int targetId in batch)
+                                {
+                                    try
+                                    {
+                                        await clusteringRepo.UpdateClusterIdAsync(targetId, newClusterNumber);
+                                    }
+                                    catch (Exception individualEx)
+                                    {
+                                        Debug.WriteLine($"개별 업데이트 실패 - ClusterID: {targetId}, 오류: {individualEx.Message}");
+                                    }
+                                }
+                            }
                         }
                     }
                 }
