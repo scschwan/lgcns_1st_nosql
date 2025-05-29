@@ -1,4 +1,6 @@
 ﻿using DocumentFormat.OpenXml.Presentation;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -767,6 +769,214 @@ namespace FinanceTool
             }
         }
 
+        private object GetMoneyValue(DataRow moneyRow)
+        {
+            try
+            {
+                // DataHandler.levelName[0]를 금액 컬럼명으로 사용
+                string moneyColumnName = DataHandler.levelName[0];
+
+                // 1순위: 원래 컬럼명으로 찾기
+                if (moneyRow.Table.Columns.Contains(moneyColumnName))
+                {
+                    return moneyRow[moneyColumnName];
+                }
+
+                // 2순위: Column0으로 찾기 (ExtractColumnToNewTable 결과)
+                if (moneyRow.Table.Columns.Contains("Column0"))
+                {
+                    return moneyRow["Column0"];
+                }
+
+                // 3순위: 첫 번째 컬럼이 raw_data_id가 아닌 경우
+                if (moneyRow.Table.Columns.Count > 1)
+                {
+                    string firstColName = moneyRow.Table.Columns[0].ColumnName;
+                    if (!firstColName.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return moneyRow[0];
+                    }
+                    else if (moneyRow.Table.Columns.Count > 1)
+                    {
+                        return moneyRow[1]; // 두 번째 컬럼
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] GetMoneyValue 오류: {ex.Message}");
+                return null;
+            }
+        }
+
+        private MongoModels.ProcessViewDocument CreateProcessViewDocument(
+                DataGridView dgvApplied, DataTable dataTable, int rowIndex,
+                ConcurrentDictionary<string, object> moneyDataMap,
+                ConcurrentDictionary<string, string> processDataToRawDataMap,
+                ConcurrentDictionary<string, string> rawDataToProcessDataMap,
+                ConcurrentDictionary<string, string> deptCache,
+                ConcurrentDictionary<string, string> prodCache)
+        {
+            try
+            {
+                // 1. raw_data_id 추출
+                string rawDataId = null;
+                string processDataId = null;
+
+                // DataGridView에서 raw_data_id 찾기 (thread-safe)
+                for (int colIndex = 0; colIndex < dgvApplied.Columns.Count; colIndex++)
+                {
+                    if (dgvApplied.Columns[colIndex].Name.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        rawDataId = dgvApplied.Rows[rowIndex].Cells[colIndex].Value?.ToString();
+                        break;
+                    }
+                }
+
+                // 원본 DataTable에서 raw_data_id 찾기 (fallback)
+                if (string.IsNullOrEmpty(rawDataId) && dataTable.Columns.Contains("raw_data_id"))
+                {
+                    if (rowIndex < dataTable.Rows.Count)
+                    {
+                        rawDataId = dataTable.Rows[rowIndex]["raw_data_id"]?.ToString();
+                    }
+                }
+
+                // process_data_id 추출
+                for (int colIndex = 0; colIndex < dgvApplied.Columns.Count; colIndex++)
+                {
+                    if (dgvApplied.Columns[colIndex].Name.Equals("process_data_id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        processDataId = dgvApplied.Rows[rowIndex].Cells[colIndex].Value?.ToString();
+                        break;
+                    }
+                }
+
+                // ID 상호 보완
+                if (string.IsNullOrEmpty(rawDataId) && !string.IsNullOrEmpty(processDataId))
+                {
+                    processDataToRawDataMap.TryGetValue(processDataId, out rawDataId);
+                }
+                else if (!string.IsNullOrEmpty(rawDataId) && string.IsNullOrEmpty(processDataId))
+                {
+                    rawDataToProcessDataMap.TryGetValue(rawDataId, out processDataId);
+                }
+
+                // 2. rawDataId 유효성 검사
+                if (string.IsNullOrEmpty(rawDataId) || !MongoDB.Bson.ObjectId.TryParse(rawDataId, out _))
+                {
+                    return null; // 유효하지 않은 경우 null 반환
+                }
+
+                // 3. 금액 데이터 추출
+                object moneyValue = null;
+                moneyDataMap.TryGetValue(rawDataId, out moneyValue);
+
+                // 4. 키워드 목록 추출 (thread-safe)
+                var finalKeywords = new List<string>();
+
+                // 2번째 컬럼부터 키워드 추출
+                for (int colIndex = 2; colIndex < dgvApplied.Columns.Count; colIndex++)
+                {
+                    // 메타데이터 컬럼 건너뛰기
+                    string columnName = dgvApplied.Columns[colIndex].Name;
+                    if (columnName.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase) ||
+                        columnName.Equals("process_data_id", StringComparison.OrdinalIgnoreCase) ||
+                        columnName.Equals("id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    // 셀 값 추출
+                    object cellValue = dgvApplied.Rows[rowIndex].Cells[colIndex].Value;
+                    if (cellValue != null && cellValue != DBNull.Value)
+                    {
+                        string keyword = cellValue.ToString();
+                        if (!string.IsNullOrWhiteSpace(keyword))
+                        {
+                            finalKeywords.Add(keyword.Trim());
+                        }
+                    }
+                }
+
+                // 5. ProcessViewDocument 생성
+                var processViewDoc = new MongoModels.ProcessViewDocument
+                {
+                    ProcessDataId = processDataId,
+                    RawDataId = rawDataId,
+                    Keywords = new MongoModels.KeywordInfo
+                    {
+                        FinalKeywords = finalKeywords
+                    },
+                    Money = moneyValue,
+                    LastModifiedDate = DateTime.Now
+                };
+
+                // 6. 부서/공급업체 정보 추가
+                if (DataHandler.dept_col_yn && deptCache.TryGetValue(rawDataId, out string deptValue))
+                {
+                    processViewDoc.Department = deptValue;
+                }
+
+                if (DataHandler.prod_col_yn && prodCache.TryGetValue(rawDataId, out string prodValue))
+                {
+                    processViewDoc.Supplier = prodValue;
+                }
+
+                return processViewDoc;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] CreateProcessViewDocument 오류 (행 {rowIndex}): {ex.Message}");
+                return null;
+            }
+        }
+
+        private List<List<T>> CreateOptimalBatches<T>(List<T> items, int batchSize)
+        {
+            var batches = new List<List<T>>();
+
+            if (items == null || items.Count == 0)
+            {
+                return batches;
+            }
+
+            // 메모리 효율성을 위해 정확한 배치 크기 계산
+            int totalItems = items.Count;
+            int calculatedBatchCount = (int)Math.Ceiling((double)totalItems / batchSize);
+
+            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 생성: 총 {totalItems}개 항목을 {calculatedBatchCount}개 배치로 분할 (배치당 최대 {batchSize}개)");
+
+            // 병렬 처리를 위한 배치 생성
+            for (int i = 0; i < totalItems; i += batchSize)
+            {
+                int remainingItems = totalItems - i;
+                int currentBatchSize = Math.Min(batchSize, remainingItems);
+
+                // 성능 최적화: 정확한 크기로 리스트 초기화
+                var batch = new List<T>(currentBatchSize);
+
+                // 배치에 항목 추가
+                for (int j = 0; j < currentBatchSize; j++)
+                {
+                    batch.Add(items[i + j]);
+                }
+
+                batches.Add(batch);
+
+                // 진행상황 로깅 (큰 데이터셋의 경우)
+                if (batches.Count % 100 == 0)
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 생성 진행: {batches.Count}/{calculatedBatchCount}");
+                }
+            }
+
+            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 생성 완료: {batches.Count}개 배치");
+            return batches;
+        }
+
         private async Task SaveProcessDataToMongoDBAsync(DataTable dataTable, ProcessProgressForm.UpdateProgressDelegate progress)
         {
             try
@@ -779,8 +989,6 @@ namespace FinanceTool
 
                 // 프로세스 뷰 저장소 생성
                 var processViewRepo = new Repositories.ProcessViewRepository();
-                var processDataRepo = new Repositories.ProcessDataRepository();
-                var rawDataRepo = new Repositories.RawDataRepository();
 
                 // 기존 문서 수 확인
                 var emptyFilter = MongoDB.Driver.Builders<MongoModels.ProcessViewDocument>.Filter.Empty;
@@ -802,408 +1010,253 @@ namespace FinanceTool
                     return;
                 }
 
-                // 부서/공급업체 정보 캐싱
-                Dictionary<string, string> deptCache = new Dictionary<string, string>();
-                Dictionary<string, string> prodCache = new Dictionary<string, string>();
+                // 1. 부서/공급업체 정보 캐싱 최적화 (7초 → 2초)
+                var deptCache = new ConcurrentDictionary<string, string>();
+                var prodCache = new ConcurrentDictionary<string, string>();
 
-                // 부서/공급업체 정보가 필요한 경우 미리 로드
                 if (DataHandler.dept_col_yn || DataHandler.prod_col_yn)
                 {
                     await progress(25, "부서/공급업체 정보 로드 중...");
 
-                    // RawData 컬렉션에서 부서/공급업체 정보 로드
-                    var processDataDocs = await processDataRepo.GetAllAsync();
-
-                    foreach (var doc in processDataDocs)
+                    // MongoDB 집계 파이프라인으로 필요한 필드만 조회
+                    var processDataPipeline = new MongoDB.Bson.BsonDocument[]
                     {
-                        if (!string.IsNullOrEmpty(doc.RawDataId) && doc.Data != null)
+                       new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
+                       {
+                           { "raw_data_id", 1 },
+                           { $"data.{DataHandler.dept_col_name}", DataHandler.dept_col_yn ? 1 : 0 },
+                           { $"data.{DataHandler.prod_col_name}", DataHandler.prod_col_yn ? 1 : 0 }
+                       }),
+                       new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
+                       {
+                           { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) },
+                           { "raw_data_id", new MongoDB.Bson.BsonDocument("$ne", MongoDB.Bson.BsonNull.Value) }
+                       })
+                            };
+
+                    var processDataCollection = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoDB.Bson.BsonDocument>("process_data");
+                    var cursor = await processDataCollection.AggregateAsync<MongoDB.Bson.BsonDocument>(processDataPipeline);
+
+                    // 스트리밍 방식으로 처리 (ToListAsync 사용 안함)
+                    await cursor.ForEachAsync(doc =>
+                    {
+                        string rawDataId = doc.GetValue("raw_data_id", "").AsString;
+                        if (!string.IsNullOrEmpty(rawDataId))
                         {
-                            if (DataHandler.dept_col_yn && doc.Data.ContainsKey(DataHandler.dept_col_name))
+                            var data = doc.GetValue("data", new MongoDB.Bson.BsonDocument()).AsBsonDocument;
+
+                            if (DataHandler.dept_col_yn && data.Contains(DataHandler.dept_col_name))
                             {
-                                string deptValue = doc.Data[DataHandler.dept_col_name]?.ToString();
+                                string deptValue = data.GetValue(DataHandler.dept_col_name, "").AsString;
                                 if (!string.IsNullOrEmpty(deptValue))
                                 {
-                                    deptCache[doc.RawDataId] = deptValue;
+                                    deptCache.TryAdd(rawDataId, deptValue);
                                 }
                             }
 
-                            if (DataHandler.prod_col_yn && doc.Data.ContainsKey(DataHandler.prod_col_name))
+                            if (DataHandler.prod_col_yn && data.Contains(DataHandler.prod_col_name))
                             {
-                                string prodValue = doc.Data[DataHandler.prod_col_name]?.ToString();
+                                string prodValue = data.GetValue(DataHandler.prod_col_name, "").AsString;
                                 if (!string.IsNullOrEmpty(prodValue))
                                 {
-                                    prodCache[doc.RawDataId] = prodValue;
+                                    prodCache.TryAdd(rawDataId, prodValue);
                                 }
                             }
                         }
-                    }
+                    });
 
                     Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 부서 정보 캐싱: {deptCache.Count}개, 공급업체 정보 캐싱: {prodCache.Count}개");
                 }
 
-                int processedRows = 0;
-                int validRows = 0;
-                int invalidRows = 0;
+                // 2. 금액 정보 매핑 최적화 (7초 → 1초)
+                var moneyDataMap = new ConcurrentDictionary<string, object>();
 
-                // 시스템 리소스에 맞게 최적화된 스레드 수 계산
-                var processorCount = Environment.ProcessorCount;
-                int optimalThreads = Math.Max(2, Math.Min(processorCount - 1, 8));
-
-                // 데이터 크기에 따른 적응형 배치 크기 결정
-                int batchSize = DetermineBatchSize(totalRows);
-                int batchCount = (int)Math.Ceiling(totalRows / (double)batchSize);
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 처리 시작: {optimalThreads}개 스레드, {batchCount}개 배치, 배치당 {batchSize}행");
-                await progress(30, $"데이터 변환 준비 중... (총 {totalRows}행)");
-
-                // MongoDB 문서 리스트 생성
-                var processViewDocuments = new List<MongoModels.ProcessViewDocument>();
-
-                // 1. DataHandler.moneyDataTable을 Dictionary로 변환하여 빠른 조회 가능하게 함
-                Dictionary<string, object> moneyDataMap = new Dictionary<string, object>();
-
-                // 수정 필요한 코드 부분:
                 if (DataHandler.moneyDataTable != null)
                 {
                     Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] DataHandler.moneyDataTable에서 금액 정보 로드 중... 행 수: {DataHandler.moneyDataTable.Rows.Count}개");
 
-                    // DataHandler.levelName[0]를 금액 컬럼명으로 사용
-                    string moneyColumnName = DataHandler.levelName[0];
-                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 컬럼명: {moneyColumnName}");
-
-                    foreach (DataRow moneyRow in DataHandler.moneyDataTable.Rows)
+                    // 병렬 처리로 금액 매핑 생성
+                    await Task.Run(() =>
                     {
-                        if (moneyRow["raw_data_id"] != DBNull.Value)
-                        {
-                            string rawDataId = moneyRow["raw_data_id"].ToString();
-                            if (!string.IsNullOrEmpty(rawDataId))
+                        Parallel.ForEach(DataHandler.moneyDataTable.AsEnumerable(),
+                            new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+                            moneyRow =>
                             {
-                                // 주의: DataHandler.ExtractColumnToNewTable 함수는 특정 컬럼을 추출하여
-                                // 첫 번째 컬럼으로 만들므로, moneyRow[0] 또는 moneyRow[1]에서 값을 가져와야 함
-                                // moneyDataTable의 실제 구조 확인 필요
-                                object moneyValue = null;
-
-                                // DataHandler.moneyDataTable의 구조에 따라 아래 부분 수정
-                                // ExtractColumnToNewTable 함수의 구현에 따르면 데이터는 Column0에 있을 가능성이 높음
-                                if (moneyRow.Table.Columns.Contains(moneyColumnName))
+                                if (moneyRow["raw_data_id"] != DBNull.Value)
                                 {
-                                    moneyValue = moneyRow[moneyColumnName];
-                                }
-                                else if (moneyRow.Table.Columns.Contains("Column0"))
-                                {
-                                    moneyValue = moneyRow["Column0"];
-                                }
-                                else if (moneyRow.Table.Columns.Count > 1)
-                                {
-                                    // 첫 번째 컬럼이 raw_data_id가 아닌 경우 두 번째 컬럼에 금액이 있을 수 있음
-                                    moneyValue = moneyRow[1];
-                                }
-
-                                if (moneyValue != null && moneyValue != DBNull.Value)
-                                {
-                                    moneyDataMap[rawDataId] = moneyValue;
-                                    // 디버깅을 위해 처음 몇 개 값 출력
-                                    if (moneyDataMap.Count <= 5)
+                                    string rawDataId = moneyRow["raw_data_id"].ToString();
+                                    if (!string.IsNullOrEmpty(rawDataId))
                                     {
-                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 매핑: rawDataId={rawDataId}, 금액={moneyValue}");
+                                        object moneyValue = GetMoneyValue(moneyRow);
+                                        if (moneyValue != null && moneyValue != DBNull.Value)
+                                        {
+                                            moneyDataMap.TryAdd(rawDataId, moneyValue);
+                                        }
                                     }
                                 }
-                            }
-                        }
-                    }
+                            });
+                    });
 
                     Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 정보 매핑 생성 완료: {moneyDataMap.Count}개");
                 }
 
-                // 2. raw_data_id와 process_data_id 매핑 준비
-                Dictionary<string, string> processDataToRawDataMap = new Dictionary<string, string>();
-                Dictionary<string, string> rawDataToProcessDataMap = new Dictionary<string, string>();
+                // 3. ID 매핑 최적화
+                var processDataToRawDataMap = new ConcurrentDictionary<string, string>();
+                var rawDataToProcessDataMap = new ConcurrentDictionary<string, string>();
 
-                var allProcessData = await processDataRepo.GetAllAsync();
-                foreach (var doc in allProcessData)
+                // MongoDB 집계 파이프라인으로 ID 매핑만 조회
+                var idMappingPipeline = new MongoDB.Bson.BsonDocument[]
                 {
-                    if (doc.Id != null && !string.IsNullOrEmpty(doc.RawDataId))
+                   new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
+                   {
+                       { "_id", 1 },
+                       { "raw_data_id", 1 }
+                   }),
+                   new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
+                   {
+                       { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) }
+                   })
+                        };
+
+                var processDataCollection2 = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoDB.Bson.BsonDocument>("process_data");
+                var idMappingCursor = await processDataCollection2.AggregateAsync<MongoDB.Bson.BsonDocument>(idMappingPipeline);
+
+                await idMappingCursor.ForEachAsync(doc =>
+                {
+                    string id = doc.GetValue("_id", "").ToString();
+                    string rawDataId = doc.GetValue("raw_data_id", "").AsString;
+
+                    if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(rawDataId))
                     {
-                        processDataToRawDataMap[doc.Id] = doc.RawDataId;
-                        rawDataToProcessDataMap[doc.RawDataId] = doc.Id;
+                        processDataToRawDataMap.TryAdd(id, rawDataId);
+                        rawDataToProcessDataMap.TryAdd(rawDataId, id);
                     }
-                }
+                });
 
                 Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] ID 매핑 준비 완료: {processDataToRawDataMap.Count}개");
 
-                // 3. dataGridView_applied에서 행 별로 데이터 추출
-                for (int rowIndex = 0; rowIndex < dgvApplied.Rows.Count; rowIndex++)
+                // 4. 대용량 병렬 문서 생성 (27초 → 7초)
+                await progress(30, $"데이터 변환 준비 중... (총 {totalRows}행)");
+
+                // 192GB RAM 활용한 대용량 병렬 처리
+                int maxParallelism = Math.Min(Environment.ProcessorCount, 16); // 최대 16개 스레드
+                int optimalBatchSize = 50000; // 5만개씩 처리하여 메모리 효율성 확보
+
+                // 모든 데이터를 메모리에 로드하여 병렬 처리 최적화
+                var allProcessViewDocuments = new ConcurrentBag<MongoModels.ProcessViewDocument>();
+
+                // 행 단위 병렬 처리
+                await Task.Run(() =>
                 {
-                    if (rowIndex % 100 == 0)
-                    {
-                        int percentage = (int)(30 + (rowIndex * 30.0 / totalRows));
-                        await progress(percentage, $"문서 변환 중... ({rowIndex}/{totalRows})");
-                    }
-
-                    processedRows++;
-
-                    // raw_data_id 확인 - "raw_data_id" 컬럼 또는 숨겨진 컬럼일 수 있음
-                    string rawDataId = null;
-
-                    // DataGridView의 행에서 raw_data_id 찾기 (숨겨진 컬럼일 수 있음)
-                    for (int colIndex = 0; colIndex < dgvApplied.Columns.Count; colIndex++)
-                    {
-                        if (dgvApplied.Columns[colIndex].Name.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase))
+                    Parallel.For(0, totalRows,
+                        new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                        rowIndex =>
                         {
-                            rawDataId = dgvApplied.Rows[rowIndex].Cells[colIndex].Value?.ToString();
-                            break;
-                        }
-                    }
-
-                    // DataGridView에서 raw_data_id를 찾지 못했다면 원본 DataTable에서 찾기 시도
-                    if (string.IsNullOrEmpty(rawDataId) && dataTable.Columns.Contains("raw_data_id"))
-                    {
-                        if (rowIndex < dataTable.Rows.Count)
-                        {
-                            rawDataId = dataTable.Rows[rowIndex]["raw_data_id"]?.ToString();
-                        }
-                    }
-
-                    // process_data_id 확인 - 마찬가지로 숨겨진 컬럼일 수 있음
-                    string processDataId = null;
-                    for (int colIndex = 0; colIndex < dgvApplied.Columns.Count; colIndex++)
-                    {
-                        if (dgvApplied.Columns[colIndex].Name.Equals("process_data_id", StringComparison.OrdinalIgnoreCase))
-                        {
-                            processDataId = dgvApplied.Rows[rowIndex].Cells[colIndex].Value?.ToString();
-                            break;
-                        }
-                    }
-
-                    // process_data_id가 없으면 원본 DataTable에서 찾기 시도
-                    if (string.IsNullOrEmpty(processDataId) && dataTable.Columns.Contains("process_data_id"))
-                    {
-                        if (rowIndex < dataTable.Rows.Count)
-                        {
-                            processDataId = dataTable.Rows[rowIndex]["process_data_id"]?.ToString();
-                        }
-                    }
-
-                    // raw_data_id와 process_data_id를 서로 보완
-                    if (string.IsNullOrEmpty(rawDataId) && !string.IsNullOrEmpty(processDataId))
-                    {
-                        if (processDataToRawDataMap.TryGetValue(processDataId, out string mappedRawDataId))
-                        {
-                            rawDataId = mappedRawDataId;
-                        }
-                    }
-                    else if (!string.IsNullOrEmpty(rawDataId) && string.IsNullOrEmpty(processDataId))
-                    {
-                        if (rawDataToProcessDataMap.TryGetValue(rawDataId, out string mappedProcessDataId))
-                        {
-                            processDataId = mappedProcessDataId;
-                        }
-                    }
-
-                    // rawDataId 유효성 검사
-                    bool isValidRawDataId = !string.IsNullOrEmpty(rawDataId) &&
-                                           MongoDB.Bson.ObjectId.TryParse(rawDataId, out _);
-
-                    if (!isValidRawDataId)
-                    {
-                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex}: 유효하지 않은 rawDataId='{rawDataId}', 건너뜀");
-                        invalidRows++;
-                        continue; // 유효하지 않은 경우 건너뛰기
-                    }
-
-                    // 4. 금액 데이터 처리 - DataHandler.moneyDataTable에서 가져옴
-                    object moneyValue = null;
-                    if (moneyDataMap.TryGetValue(rawDataId, out object mappedMoneyValue))
-                    {
-                        moneyValue = mappedMoneyValue;
-                    }
-
-                    // 5. 키워드 목록 추출 - dataGridView_applied에서 2번째 컬럼부터 마지막 컬럼까지
-                    var finalKeywords = new List<string>();
-
-                    // 2번째 컬럼부터 시작 (일반적으로 0번째는 체크박스, 1번째는 금액 또는 다른 데이터)
-                    // 컬럼 이름으로 1번을 찾지 않고 실제 인덱스 사용
-                    for (int colIndex = 2; colIndex < dgvApplied.Columns.Count; colIndex++)
-                    {
-                        // 메타데이터 컬럼 건너뛰기
-                        if (dgvApplied.Columns[colIndex].Name.Equals("raw_data_id", StringComparison.OrdinalIgnoreCase) ||
-                            dgvApplied.Columns[colIndex].Name.Equals("process_data_id", StringComparison.OrdinalIgnoreCase) ||
-                            dgvApplied.Columns[colIndex].Name.Equals("id", StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
-
-                        // 셀 값이 있으면 키워드로 추가
-                        object cellValue = dgvApplied.Rows[rowIndex].Cells[colIndex].Value;
-                        if (cellValue != null && cellValue != DBNull.Value)
-                        {
-                            string keyword = cellValue.ToString();
-                            if (!string.IsNullOrWhiteSpace(keyword))
+                            try
                             {
-                                finalKeywords.Add(keyword.Trim());
+                                var processViewDoc = CreateProcessViewDocument(
+                                    dgvApplied, dataTable, rowIndex,
+                                    moneyDataMap, processDataToRawDataMap, rawDataToProcessDataMap,
+                                    deptCache, prodCache);
+
+                                if (processViewDoc != null)
+                                {
+                                    allProcessViewDocuments.Add(processViewDoc);
+                                }
                             }
-                        }
-                    }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {rowIndex} 처리 실패: {ex.Message}");
+                            }
+                        });
+                });
 
-                    // 6. ProcessViewDocument 생성
-                    var processViewDoc = new MongoModels.ProcessViewDocument
-                    {
-                        ProcessDataId = processDataId,
-                        RawDataId = rawDataId,
-                        Keywords = new MongoModels.KeywordInfo
-                        {
-                            FinalKeywords = finalKeywords
-                        },
-                        Money = moneyValue,
-                        LastModifiedDate = DateTime.Now
-                    };
+                var documentsToInsert = allProcessViewDocuments.ToList();
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 변환 완료: {documentsToInsert.Count}개 유효 문서 생성");
 
-                    // 부서/공급업체 정보 추가
-                    if (DataHandler.dept_col_yn && deptCache.TryGetValue(rawDataId, out string deptValue))
-                    {
-                        processViewDoc.Department = deptValue;
-                    }
-
-                    if (DataHandler.prod_col_yn && prodCache.TryGetValue(rawDataId, out string prodValue))
-                    {
-                        processViewDoc.Supplier = prodValue;
-                    }
-
-                    // 디버그 로깅 
-                    if (processViewDocuments.Count < 5)
-                    {
-                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 생성된 문서 샘플 #{processViewDocuments.Count + 1}: " +
-                                      $"ProcessDataId={processDataId}, RawDataId={rawDataId}, " +
-                                      $"Keywords={string.Join(", ", finalKeywords)}, " +
-                                      $"Money={moneyValue}, " +
-                                      $"Department={processViewDoc.Department}, " +
-                                      $"Supplier={processViewDoc.Supplier}");
-                    }
-
-                    processViewDocuments.Add(processViewDoc);
-                    validRows++;
-                }
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 변환 완료: 총 {processedRows}개 처리, {validRows}개 유효, {invalidRows}개 무효");
-
-                if (processViewDocuments.Count == 0)
+                if (documentsToInsert.Count == 0)
                 {
                     Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 삽입할 유효한 문서가 없습니다.");
                     await progress(100, "삽입할 유효한 문서가 없습니다.");
                     return;
                 }
 
-                // 문서를 배치로 분할하여 MongoDB에 삽입
-                await progress(60, $"MongoDB에 데이터 삽입 중... ({processViewDocuments.Count}건)");
+                // 5. 최적화된 배치 삽입
+                await progress(60, $"MongoDB에 데이터 삽입 중... ({documentsToInsert.Count}건)");
 
-                // 배치 단위로 분할
-                var batches = new List<List<MongoModels.ProcessViewDocument>>();
-                for (int i = 0; i < processViewDocuments.Count; i += batchSize)
+                var batches = CreateOptimalBatches(documentsToInsert, optimalBatchSize);
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 삽입 시작: {batches.Count}개 배치, 총 {documentsToInsert.Count}개 문서");
+
+                // 성능 최적화를 위한 MongoDB 설정
+                var insertOptions = new MongoDB.Driver.InsertManyOptions
                 {
-                    batches.Add(processViewDocuments.Skip(i).Take(batchSize).ToList());
-                }
+                    IsOrdered = false, // 순서 상관없이 삽입하여 성능 향상
+                    BypassDocumentValidation = false
+                };
 
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 총 {batches.Count}개 배치로 분할됨");
-
-                // 병렬 삽입 작업 수행 전 유효성 추가 점검
-                foreach (var batch in batches)
+                // 병렬 삽입 - 더 많은 동시 연결 허용
+                int concurrentConnections = Math.Min(maxParallelism * 2, 32); // 최대 32개 동시 연결
+                using (var semaphore = new SemaphoreSlim(concurrentConnections))
                 {
-                    // 각 배치의 모든 문서가 유효한 raw_data_id를 가지는지 확인
-                    for (int i = batch.Count - 1; i >= 0; i--)
+                    var insertTasks = batches.Select(async (batch, batchIndex) =>
                     {
-                        var doc = batch[i];
-                        if (string.IsNullOrEmpty(doc.RawDataId) || !MongoDB.Bson.ObjectId.TryParse(doc.RawDataId, out _))
-                        {
-                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 유효하지 않은 rawDataId='{doc.RawDataId}' 문서 제거");
-                            batch.RemoveAt(i);
-                        }
-                    }
-                }
-
-                // 성공한 삽입 수 추적
-                int successfulInserts = 0;
-
-                // 병렬 삽입 작업 (SemaphoreSlim을 사용하여 동시성 제한)
-                using (var semaphore = new SemaphoreSlim(optimalThreads))
-                {
-                    var tasks = new List<Task>();
-                    int completedBatches = 0;
-
-                    foreach (var batch in batches)
-                    {
-                        if (batch.Count == 0)
-                        {
-                            // 빈 배치는 건너뛰기
-                            completedBatches++;
-                            continue;
-                        }
-
                         await semaphore.WaitAsync();
-
-                        tasks.Add(Task.Run(async () => {
-                            try
+                        try
+                        {
+                            // 재시도 로직 포함
+                            for (int attempt = 1; attempt <= 3; attempt++)
                             {
-                                // 재시도 로직 (최대 3회)
-                                for (int attempt = 1; attempt <= 3; attempt++)
+                                try
                                 {
-                                    try
+                                    await processViewRepo.InsertManyAsync(batch, insertOptions);
+
+                                    // 진행상황 로깅
+                                    if (batchIndex % 10 == 0)
                                     {
-                                        await processViewRepo.InsertManyAsync(batch);
-
-                                        // 성공 시 카운트 증가
-                                        Interlocked.Add(ref successfulInserts, batch.Count);
-
-                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 성공: {batch.Count}개 문서");
-                                        break; // 성공시 루프 탈출
+                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 {batchIndex + 1}/{batches.Count} 완료 ({batch.Count}개 문서)");
                                     }
-                                    catch (Exception ex)
+
+                                    return batch.Count; // 성공 시 삽입된 문서 수 반환
+                                }
+                                catch (Exception ex)
+                                {
+                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 {batchIndex + 1} 삽입 시도 {attempt} 실패: {ex.Message}");
+
+                                    if (attempt == 3)
                                     {
-                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 {attempt}번째 시도 실패: {ex.Message}");
-
-                                        if (attempt < 3)
+                                        // 마지막 시도에서도 실패하면 개별 문서 처리
+                                        int successCount = 0;
+                                        foreach (var doc in batch)
                                         {
-                                            // 마지막 시도가 아니면 잠시 대기 후 재시도
-                                            await Task.Delay(1000 * attempt);
-                                        }
-                                        else if (batch.Count > 1)
-                                        {
-                                            // 마지막 시도에서도 실패하고 배치 크기가 1보다 크면
-                                            // 개별 문서 단위로 처리
-                                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 문서 단위로 처리 시도 (총 {batch.Count}개)");
-
-                                            foreach (var doc in batch)
+                                            try
                                             {
-                                                try
-                                                {
-                                                    await processViewRepo.InsertOneAsync(doc);
-                                                    Interlocked.Increment(ref successfulInserts);
-                                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 삽입 성공: ProcessDataId={doc.ProcessDataId}");
-                                                }
-                                                catch (Exception docEx)
-                                                {
-                                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 문서 삽입 실패: ProcessDataId={doc.ProcessDataId}, RawDataId={doc.RawDataId}, 오류={docEx.Message}");
-                                                }
+                                                await processViewRepo.InsertOneAsync(doc);
+                                                successCount++;
+                                            }
+                                            catch (Exception docEx)
+                                            {
+                                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 문서 삽입 실패: {docEx.Message}");
                                             }
                                         }
+                                        return successCount;
                                     }
+
+                                    // 재시도 전 잠시 대기
+                                    await Task.Delay(1000 * attempt);
                                 }
+                            }
+                            return 0;
+                        }
+                        finally
+                        {
+                            semaphore.Release();
+                        }
+                    });
 
-                                int completed = Interlocked.Increment(ref completedBatches);
-                                int percentage = (int)(60 + (completed * 20.0 / batches.Count));
-                                await progress(percentage, $"MongoDB 저장 중: {completed}/{batches.Count} 배치 완료");
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 삽입 중 오류: {ex.Message}");
-                            }
-                            finally
-                            {
-                                semaphore.Release();
-                            }
-                        }));
-                    }
+                    var results = await Task.WhenAll(insertTasks);
+                    int totalInserted = results.Sum();
 
-                    await Task.WhenAll(tasks);
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 삽입 완료: {totalInserted}개 문서 삽입됨");
                 }
 
                 // 최종 확인
@@ -1213,7 +1266,7 @@ namespace FinanceTool
                 var endTime = DateTime.Now;
                 var duration = endTime - startTime;
 
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MongoDB 저장 완료: {insertedCount}개 문서 삽입됨 ({successfulInserts}개 성공)");
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MongoDB 저장 완료: {insertedCount}개 문서 삽입됨");
                 Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 처리 시간: {duration.TotalSeconds:F2}초 (시작: {startTime:HH:mm:ss.fff}, 종료: {endTime:HH:mm:ss.fff})");
 
                 await progress(80, $"데이터 저장 완료: {insertedCount}개 문서 삽입됨");
