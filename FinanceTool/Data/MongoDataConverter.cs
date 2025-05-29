@@ -250,7 +250,7 @@ namespace FinanceTool
                 // 시스템 환경에 맞게 동시성 수준 조정
                 int cpuCount = Environment.ProcessorCount;
                 int maxConcurrency = Math.Min(cpuCount * 2, 16); // 동시 작업 수 제한
-                int batchSize = 1000; // 더 작은 배치 크기로 안정성 향상
+                int batchSize = 10000; // 더 작은 배치 크기로 안정성 향상
 
                 // 문서를 배치로 분할
                 var batches = documents
@@ -481,7 +481,7 @@ namespace FinanceTool
                 // 시스템 환경에 맞게 동시성 수준 조정
                 int cpuCount = Environment.ProcessorCount;
                 int maxConcurrency = Math.Min(cpuCount * 2, 16); // 동시 작업 수 제한
-                int batchSize = 1000; // 적절한 배치 크기 설정
+                int batchSize = 10000; // 적절한 배치 크기 설정
 
                 Debug.WriteLine($"[process_data] InsertProcessDataBatchesAsync start");
 

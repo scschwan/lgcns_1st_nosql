@@ -431,7 +431,7 @@ namespace FinanceTool
                 Debug.WriteLine($"보강할 raw_data_id: {rawDataIds.Count}개");
 
                 // 7. 배치 처리로 원본 데이터 가져오기
-                const int batchSize = 100;
+                const int batchSize = 10000;
                 List<string> idList = rawDataIds.ToList();
 
                 // 안전한 배치 처리
@@ -738,7 +738,8 @@ namespace FinanceTool
                             Debug.WriteLine($"{missingIds.Count}개의 금액 정보를 보강합니다.");
 
                             // 배치 크기 설정 - MongoDB 쿼리 제한에 맞게 조정
-                            const int batchSize = 1000;
+                            //const int batchSize = 1000;
+                            const int batchSize = 10000;
                             var idsList = missingIds.ToList();
 
                             // 배치 처리를 위해 리스트를 분할
@@ -1049,7 +1050,7 @@ namespace FinanceTool
                 Debug.WriteLine($"보강할 raw_data_id: {rawDataIds.Count}개");
 
                 // 7. 배치 처리로 원본 데이터 가져오기
-                const int batchSize = 100;
+                const int batchSize = 10000;
                 List<string> idList = rawDataIds.ToList();
 
                 // 안전한 배치 처리

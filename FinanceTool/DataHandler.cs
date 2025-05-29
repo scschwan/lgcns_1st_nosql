@@ -830,7 +830,7 @@ namespace FinanceTool
                 // 배치 처리로 MongoDB에서 금액 정보 로드
                 if (missingMoneyIds.Count > 0)
                 {
-                    const int MongoDBbatchSize = 1000;
+                    const int MongoDBbatchSize = 10000;
 
                     // MongoDB 연결 확인
                     await Data.MongoDBManager.Instance.EnsureInitializedAsync();
@@ -920,7 +920,7 @@ namespace FinanceTool
                     if (neededIds.Count > 0)
                     {
                         // 배치 처리 도입: 대량 데이터 처리 최적화
-                        const int mongoBatchSize = 1000; // MongoDB 권장 최대 배치 크기
+                        const int mongoBatchSize = 10000; // MongoDB 권장 최대 배치 크기
 
                         foreach (var idBatch in BatchIdsForQuery(neededIds, mongoBatchSize))
                         {
@@ -1144,9 +1144,9 @@ namespace FinanceTool
         private static int CalculateOptimalBatchSize(int totalItems)
         {
             // 최적의 배치 크기 계산 (항목 수 기준)
-            if (totalItems < 10000) return 100;
-            if (totalItems < 100000) return 1000;
-            return 2000;
+            if (totalItems < 10000) return 1000;
+            if (totalItems < 100000) return 10000;
+            return 20000;
         }
 
         private static List<(int Start, int End)> SplitIntoOptimalBatches(int totalItems, int batchSize)

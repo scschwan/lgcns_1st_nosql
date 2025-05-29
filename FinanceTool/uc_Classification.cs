@@ -22,7 +22,6 @@ namespace FinanceTool
         DataTable cluster_result = new DataTable();
         List<string> process_col_list = new List<string>();
 
-        private DataConverter dataConverter;
         private int currentPage = 1;
         private int pageSize = 1000;
         private int totalPages = 1;
@@ -198,34 +197,6 @@ namespace FinanceTool
 
 
 
-        private void InitializePagingControls(bool attachEvents)
-        {
-            // 콤보박스 초기화
-            cmb_pageSize.Items.Clear();
-            cmb_pageSize.Items.AddRange(new object[] { 500, 1000, 2000, 5000 });
-            cmb_pageSize.SelectedIndex = 1; // 기본값 1000
-            cmb_pageSize.DropDownStyle = ComboBoxStyle.DropDownList;
-
-            // NumericUpDown 설정
-            num_pageNumber.Minimum = 1;
-            num_pageNumber.Maximum = 1;
-            num_pageNumber.Value = 1;
-
-
-            // 컨트롤 활성화 
-            //EnablePagingControls(false);
-
-            // 이벤트 등록은 옵션에 따라 결정
-            if (attachEvents)
-            {
-                AttachPagingEvents();
-            }
-
-            // 초기 페이징 상태
-            UpdatePaginationInfo();
-
-            DataHandler.RegisterDataGridView(dataGridView_delete_col2);
-        }
 
         private void UpdatePaginationInfo()
         {
@@ -466,7 +437,7 @@ namespace FinanceTool
 
                             // 모든 문서 가져오기 - 페이징 사용 (대용량 데이터 처리)
                             List<RawDataDocument> allDocuments = new List<RawDataDocument>();
-                            int batchSize = 1000;
+                            int batchSize = 10000;
                             int currentBatch = 0;
                             bool hasMoreData = true;
 
@@ -1701,212 +1672,9 @@ namespace FinanceTool
             // "클러스터명" 컬럼 클릭 시 이벤트 무시
             if (e.ColumnIndex >= 0 && dataGridView_classify.Columns[e.ColumnIndex].Name == "클러스터명")
                 return;
-            
-            /*
-            // 선택된 행에서 ClusterID 또는 ID 값 가져오기
-            DataGridViewRow selectedRow = dataGridView_classify.Rows[e.RowIndex];
-
-            // ClusterID 컬럼이 있으면 사용, 없으면 ID 컬럼 사용
-            int selectedClusterId;
-            string selectedClusterName;
-            if (selectedRow.Cells["ClusterID"] != null && selectedRow.Cells["ClusterID"].Value != null)
-            {
-                selectedClusterId = Convert.ToInt32(selectedRow.Cells["ClusterID"].Value);
-                selectedClusterName = selectedRow.Cells["클러스터명"].Value.ToString();
-            }
-            else if (selectedRow.Cells["ID"] != null && selectedRow.Cells["ID"].Value != null)
-            {
-                selectedClusterId = Convert.ToInt32(selectedRow.Cells["ID"].Value);
-                selectedClusterName = selectedRow.Cells["클러스터명"].Value.ToString();
-            }
-            else
-            {
-                // ID, ClusterID 모두 없는 경우 예외 처리
-                MessageBox.Show("클러스터 ID를 찾을 수 없습니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // 팝업 폼 생성 및 표시
-            ShowClusterDetailPopup(selectedClusterId , selectedClusterName);
-            */
+         
         }
 
-        private void ShowClusterDetailPopup(int selectedClusterId ,string selectedClusterName)
-        {
-            // 팝업용 Form 생성
-            Form popupForm = new Form
-            {
-                Text = $"클러스터 상세 내역 (클러스터명: {selectedClusterName})",
-                StartPosition = FormStartPosition.CenterParent,
-                Size = new Size(1800, 1000),
-                MinimizeBox = false,
-                MaximizeBox = true,
-                FormBorderStyle = FormBorderStyle.Sizable
-            };
-
-            // DataGridView 생성
-            DataGridView detailGridView = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                AllowUserToAddRows = false,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                ReadOnly = true,
-                Font = new System.Drawing.Font("맑은 고딕", 9F)
-            };
-
-            // DataGridView 초기화
-            detailGridView.Rows.Clear();
-            detailGridView.Columns.Clear();
-
-          
-
-            // 원본 DataTable의 컬럼들 추가
-            foreach (DataColumn col in DataHandler.finalClusteringData.Columns)
-            {
-                detailGridView.Columns.Add(col.ColumnName, col.ColumnName);
-            }
-
-            // 데이터 필터링 및 추가
-            foreach (DataRow row in DataHandler.finalClusteringData.Rows)
-            {
-                if (!row.IsNull("ClusterID") && Convert.ToInt32(row["ClusterID"]) == selectedClusterId)
-                {
-                    int rowIndex = detailGridView.Rows.Add();
-                    
-                    for (int i = 0; i < DataHandler.finalClusteringData.Columns.Count; i++)
-                    {
-                        // 합산금액 컬럼은 포맷 적용
-                        if ("합산금액".Equals(DataHandler.finalClusteringData.Columns[i].ColumnName))
-                        {
-                            //detailGridView.Rows[rowIndex].Cells[i].Value = FormatToKoreanUnit(Convert.ToDecimal(row[i]));
-                            detailGridView.Rows[rowIndex].Cells[i].Value = Convert.ToDecimal(row[i]);
-                        }
-                        else
-                        {
-                            detailGridView.Rows[rowIndex].Cells[i].Value = row[i];
-                        }
-                    }
-                }
-            }
-
-            // 필요한 컬럼 숨기기
-            if (detailGridView.Columns["ID"] != null)
-                detailGridView.Columns["ID"].Visible = false;
-
-            if (detailGridView.Columns["ClusterID"] != null)
-                detailGridView.Columns["ClusterID"].Visible = false;
-
-            if (detailGridView.Columns["dataIndex"] != null)
-                detailGridView.Columns["dataIndex"].Visible = false;
-
-            if (detailGridView.Columns["import_date"] != null)
-                detailGridView.Columns["import_date"].Visible = false;
-
-            // Count 컬럼 포맷 설정
-            if (detailGridView.Columns["Count"] != null)
-            {
-                detailGridView.Columns["Count"].DefaultCellStyle.Format = "N0";
-                detailGridView.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
-            }
-
-            // 기타 DataGridView 속성 설정
-            detailGridView.AllowUserToAddRows = false;
-            detailGridView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-            detailGridView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            detailGridView.ReadOnly = false;
-
-            // 나머지 컬럼들은 읽기 전용으로 설정
-            for (int i = 1; i < detailGridView.Columns.Count; i++)
-            {
-                detailGridView.Columns[i].ReadOnly = true;
-            }
-
-            // 클러스터명 컬럼 설정
-            if (detailGridView.Columns["클러스터명"] != null)
-            {
-                detailGridView.Columns["클러스터명"].ReadOnly = true;
-                detailGridView.Columns["클러스터명"].Width = 400;
-                detailGridView.Columns["클러스터명"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-            }
-
-            // 타겟 컬럼 너비 고정
-            if (DataHandler.levelName.Count > 0)
-            {
-                string lastLevelName = DataHandler.levelName[DataHandler.levelName.Count - 1];
-                if (detailGridView.Columns[lastLevelName] != null)
-                {
-                    detailGridView.Columns[lastLevelName].Width = 400;
-                    detailGridView.Columns[lastLevelName].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-                }
-            }
-
-            // 나머지 컬럼은 자동 크기 조정
-            for (int i = 1; i < detailGridView.Columns.Count; i++)
-            {
-                string colName = detailGridView.Columns[i].Name;
-                if (colName != "클러스터명" &&
-                    colName != DataHandler.prod_col_name &&
-                    (DataHandler.levelName.Count == 0 || colName != DataHandler.levelName[DataHandler.levelName.Count - 1]))
-                {
-                    detailGridView.Columns[i].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-                }
-            }
-
-            // SortCompare 이벤트 핸들러 추가
-            detailGridView.SortCompare -= DataHandler.money_SortCompare;
-            detailGridView.SortCompare += DataHandler.money_SortCompare;
-
-            // 컬럼 순서 재배치
-            List<string> desiredOrder = new List<string>
-                {
-                    "Count",
-                    DataHandler.sub_acc_col_name,
-                    DataHandler.levelName[DataHandler.levelName.Count - 1],
-                    DataHandler.prod_col_name,
-                    DataHandler.dept_col_name,
-                    "합산금액"
-                };
-
-            // 기존 컬럼 위치 저장
-            Dictionary<string, int> originalIndices = new Dictionary<string, int>();
-            for (int i = 0; i < detailGridView.Columns.Count; i++)
-            {
-                originalIndices[detailGridView.Columns[i].Name] = i;
-            }
-
-            // 새로운 컬럼 순서 설정
-            for (int i = 0; i < desiredOrder.Count; i++)
-            {
-                string colName = desiredOrder[i];
-                if (detailGridView.Columns.Contains(colName))
-                {
-                    detailGridView.Columns[colName].DisplayIndex = i;
-                }
-            }
-
-            // 나머지 컬럼들은 안전하게 순서 설정
-            var remainingColumns = detailGridView.Columns.Cast<DataGridViewColumn>()
-                .Where(col => !desiredOrder.Contains(col.Name))
-                .ToList();
-
-            int nextIndex = desiredOrder.Count;
-            foreach (var col in remainingColumns)
-            {
-                try
-                {
-                    col.DisplayIndex = nextIndex++;
-                }
-                catch (ArgumentOutOfRangeException)
-                {
-                    // 오류 발생 시 최대 허용 인덱스로 설정
-                    col.DisplayIndex = detailGridView.Columns.Count - 1;
-                }
-            }
-
-            // 팝업 폼에 DataGridView 추가 및 표시
-            popupForm.Controls.Add(detailGridView);
-            popupForm.ShowDialog();
-        }
+       
     }
 }

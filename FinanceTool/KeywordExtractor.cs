@@ -70,7 +70,7 @@ namespace FinanceTool
 
 
 
-        public async Task<DataTable> ExtractKeywordsFromDataTable(DataTable table,  int columnIndex, int limit, int batchSize = 100, IProgress<int> progress = null)
+        public async Task<DataTable> ExtractKeywordsFromDataTable(DataTable table,  int columnIndex, int limit, int batchSize = 10000, IProgress<int> progress = null)
         {
             var allProcessedData = new List<ProcessedTextData>();
             var batches = GetBatches_by_textData(table, columnIndex, batchSize).ToList();
