@@ -1011,6 +1011,7 @@ namespace FinanceTool
                 }
 
                 // 1. 부서/공급업체 정보 캐싱 최적화 (7초 → 2초)
+                // 1. 부서/공급업체 정보 캐싱 최적화 - 수정된 버전
                 var deptCache = new ConcurrentDictionary<string, string>();
                 var prodCache = new ConcurrentDictionary<string, string>();
 
@@ -1018,50 +1019,69 @@ namespace FinanceTool
                 {
                     await progress(25, "부서/공급업체 정보 로드 중...");
 
-                    // MongoDB 집계 파이프라인으로 필요한 필드만 조회
-                    var processDataPipeline = new MongoDB.Bson.BsonDocument[]
+                    // MongoDB 집계 파이프라인 수정 - 더 안전한 방식
+                    var processDataPipeline = new List<MongoDB.Bson.BsonDocument>();
+
+                    // 1단계: 필터 조건
+                    processDataPipeline.Add(new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
+    {
+        { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) },
+        { "raw_data_id", new MongoDB.Bson.BsonDocument("$ne", MongoDB.Bson.BsonNull.Value) }
+    }));
+
+                    // 2단계: 프로젝션 - 동적으로 필드 추가
+                    var projectionDoc = new MongoDB.Bson.BsonDocument
+    {
+        { "raw_data_id", 1 }
+    };
+
+                    if (DataHandler.dept_col_yn)
                     {
-                       new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
-                       {
-                           { "raw_data_id", 1 },
-                           { $"data.{DataHandler.dept_col_name}", DataHandler.dept_col_yn ? 1 : 0 },
-                           { $"data.{DataHandler.prod_col_name}", DataHandler.prod_col_yn ? 1 : 0 }
-                       }),
-                       new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
-                       {
-                           { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) },
-                           { "raw_data_id", new MongoDB.Bson.BsonDocument("$ne", MongoDB.Bson.BsonNull.Value) }
-                       })
-                            };
+                        projectionDoc.Add($"data.{DataHandler.dept_col_name}", 1);
+                    }
+
+                    if (DataHandler.prod_col_yn)
+                    {
+                        projectionDoc.Add($"data.{DataHandler.prod_col_name}", 1);
+                    }
+
+                    processDataPipeline.Add(new MongoDB.Bson.BsonDocument("$project", projectionDoc));
 
                     var processDataCollection = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoDB.Bson.BsonDocument>("process_data");
                     var cursor = await processDataCollection.AggregateAsync<MongoDB.Bson.BsonDocument>(processDataPipeline);
 
-                    // 스트리밍 방식으로 처리 (ToListAsync 사용 안함)
+                    // 스트리밍 방식으로 처리 (안전한 필드 접근)
                     await cursor.ForEachAsync(doc =>
                     {
-                        string rawDataId = doc.GetValue("raw_data_id", "").AsString;
-                        if (!string.IsNullOrEmpty(rawDataId))
+                        try
                         {
-                            var data = doc.GetValue("data", new MongoDB.Bson.BsonDocument()).AsBsonDocument;
-
-                            if (DataHandler.dept_col_yn && data.Contains(DataHandler.dept_col_name))
+                            string rawDataId = doc.GetValue("raw_data_id", "").AsString;
+                            if (!string.IsNullOrEmpty(rawDataId))
                             {
-                                string deptValue = data.GetValue(DataHandler.dept_col_name, "").AsString;
-                                if (!string.IsNullOrEmpty(deptValue))
+                                var data = doc.GetValue("data", new MongoDB.Bson.BsonDocument()).AsBsonDocument;
+
+                                if (DataHandler.dept_col_yn && data.Contains(DataHandler.dept_col_name))
                                 {
-                                    deptCache.TryAdd(rawDataId, deptValue);
+                                    string deptValue = data.GetValue(DataHandler.dept_col_name, "").AsString;
+                                    if (!string.IsNullOrEmpty(deptValue))
+                                    {
+                                        deptCache.TryAdd(rawDataId, deptValue);
+                                    }
+                                }
+
+                                if (DataHandler.prod_col_yn && data.Contains(DataHandler.prod_col_name))
+                                {
+                                    string prodValue = data.GetValue(DataHandler.prod_col_name, "").AsString;
+                                    if (!string.IsNullOrEmpty(prodValue))
+                                    {
+                                        prodCache.TryAdd(rawDataId, prodValue);
+                                    }
                                 }
                             }
-
-                            if (DataHandler.prod_col_yn && data.Contains(DataHandler.prod_col_name))
-                            {
-                                string prodValue = data.GetValue(DataHandler.prod_col_name, "").AsString;
-                                if (!string.IsNullOrEmpty(prodValue))
-                                {
-                                    prodCache.TryAdd(rawDataId, prodValue);
-                                }
-                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 부서/공급업체 캐싱 처리 중 오류: {ex.Message}");
                         }
                     });
 
@@ -1104,32 +1124,40 @@ namespace FinanceTool
                 var processDataToRawDataMap = new ConcurrentDictionary<string, string>();
                 var rawDataToProcessDataMap = new ConcurrentDictionary<string, string>();
 
-                // MongoDB 집계 파이프라인으로 ID 매핑만 조회
+                // MongoDB 집계 파이프라인 수정 - 중복 필드명 제거
                 var idMappingPipeline = new MongoDB.Bson.BsonDocument[]
                 {
-                   new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
-                   {
-                       { "_id", 1 },
-                       { "raw_data_id", 1 }
-                   }),
-                   new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
-                   {
-                       { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) }
-                   })
-                        };
+                        new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
+                        {
+                            { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) },
+                            { "raw_data_id", new MongoDB.Bson.BsonDocument("$ne", MongoDB.Bson.BsonNull.Value) }
+                        }),
+                        new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
+                        {
+                            { "_id", 1 },
+                            { "raw_data_id", 1 }
+                        })
+                };
 
                 var processDataCollection2 = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoDB.Bson.BsonDocument>("process_data");
                 var idMappingCursor = await processDataCollection2.AggregateAsync<MongoDB.Bson.BsonDocument>(idMappingPipeline);
 
                 await idMappingCursor.ForEachAsync(doc =>
                 {
-                    string id = doc.GetValue("_id", "").ToString();
-                    string rawDataId = doc.GetValue("raw_data_id", "").AsString;
-
-                    if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(rawDataId))
+                    try
                     {
-                        processDataToRawDataMap.TryAdd(id, rawDataId);
-                        rawDataToProcessDataMap.TryAdd(rawDataId, id);
+                        string id = doc.GetValue("_id", "").ToString();
+                        string rawDataId = doc.GetValue("raw_data_id", "").AsString;
+
+                        if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(rawDataId))
+                        {
+                            processDataToRawDataMap.TryAdd(id, rawDataId);
+                            rawDataToProcessDataMap.TryAdd(rawDataId, id);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] ID 매핑 처리 중 오류: {ex.Message}");
                     }
                 });
 
