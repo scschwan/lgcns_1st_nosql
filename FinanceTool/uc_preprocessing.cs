@@ -1019,17 +1019,18 @@ namespace FinanceTool
                 {
                     await progress(25, "부서/공급업체 정보 로드 중...");
 
-                    // MongoDB 집계 파이프라인 수정 - 더 안전한 방식
-                    var processDataPipeline = new List<MongoDB.Bson.BsonDocument>();
-
-                    // 1단계: 필터 조건
-                    processDataPipeline.Add(new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
+                    // 수정된 매치 조건
+                    var matchCondition = new MongoDB.Bson.BsonDocument
     {
-        { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) },
-        { "raw_data_id", new MongoDB.Bson.BsonDocument("$ne", MongoDB.Bson.BsonNull.Value) }
-    }));
+        { "raw_data_id", new MongoDB.Bson.BsonDocument
+            {
+                { "$exists", true },
+                { "$ne", MongoDB.Bson.BsonNull.Value }
+            }
+        }
+    };
 
-                    // 2단계: 프로젝션 - 동적으로 필드 추가
+                    // 프로젝션 문서 동적 생성
                     var projectionDoc = new MongoDB.Bson.BsonDocument
     {
         { "raw_data_id", 1 }
@@ -1045,7 +1046,11 @@ namespace FinanceTool
                         projectionDoc.Add($"data.{DataHandler.prod_col_name}", 1);
                     }
 
-                    processDataPipeline.Add(new MongoDB.Bson.BsonDocument("$project", projectionDoc));
+                    var processDataPipeline = new MongoDB.Bson.BsonDocument[]
+                    {
+        new MongoDB.Bson.BsonDocument("$match", matchCondition),
+        new MongoDB.Bson.BsonDocument("$project", projectionDoc)
+                    };
 
                     var processDataCollection = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoDB.Bson.BsonDocument>("process_data");
                     var cursor = await processDataCollection.AggregateAsync<MongoDB.Bson.BsonDocument>(processDataPipeline);
@@ -1055,26 +1060,49 @@ namespace FinanceTool
                     {
                         try
                         {
-                            string rawDataId = doc.GetValue("raw_data_id", "").AsString;
+                            // ObjectId를 안전하게 문자열로 변환
+                            string rawDataId = null;
+                            var rawDataIdBson = doc.GetValue("raw_data_id", MongoDB.Bson.BsonNull.Value);
+
+                            if (rawDataIdBson != null && rawDataIdBson != MongoDB.Bson.BsonNull.Value)
+                            {
+                                if (rawDataIdBson.IsObjectId)
+                                {
+                                    rawDataId = rawDataIdBson.AsObjectId.ToString();
+                                }
+                                else if (rawDataIdBson.IsString)
+                                {
+                                    rawDataId = rawDataIdBson.AsString;
+                                }
+                            }
+
                             if (!string.IsNullOrEmpty(rawDataId))
                             {
                                 var data = doc.GetValue("data", new MongoDB.Bson.BsonDocument()).AsBsonDocument;
 
                                 if (DataHandler.dept_col_yn && data.Contains(DataHandler.dept_col_name))
                                 {
-                                    string deptValue = data.GetValue(DataHandler.dept_col_name, "").AsString;
-                                    if (!string.IsNullOrEmpty(deptValue))
+                                    var deptBsonValue = data.GetValue(DataHandler.dept_col_name, MongoDB.Bson.BsonNull.Value);
+                                    if (deptBsonValue != null && deptBsonValue != MongoDB.Bson.BsonNull.Value)
                                     {
-                                        deptCache.TryAdd(rawDataId, deptValue);
+                                        string deptValue = deptBsonValue.ToString(); // 안전한 문자열 변환
+                                        if (!string.IsNullOrEmpty(deptValue))
+                                        {
+                                            deptCache.TryAdd(rawDataId, deptValue);
+                                        }
                                     }
                                 }
 
                                 if (DataHandler.prod_col_yn && data.Contains(DataHandler.prod_col_name))
                                 {
-                                    string prodValue = data.GetValue(DataHandler.prod_col_name, "").AsString;
-                                    if (!string.IsNullOrEmpty(prodValue))
+                                    var prodBsonValue = data.GetValue(DataHandler.prod_col_name, MongoDB.Bson.BsonNull.Value);
+                                    if (prodBsonValue != null && prodBsonValue != MongoDB.Bson.BsonNull.Value)
                                     {
-                                        prodCache.TryAdd(rawDataId, prodValue);
+                                        string prodValue = prodBsonValue.ToString(); // 안전한 문자열 변환
+                                        if (!string.IsNullOrEmpty(prodValue))
+                                        {
+                                            prodCache.TryAdd(rawDataId, prodValue);
+                                        }
                                     }
                                 }
                             }
@@ -1126,17 +1154,21 @@ namespace FinanceTool
 
                 // MongoDB 집계 파이프라인 수정 - 중복 필드명 제거
                 var idMappingPipeline = new MongoDB.Bson.BsonDocument[]
-                {
-                        new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
-                        {
-                            { "raw_data_id", new MongoDB.Bson.BsonDocument("$exists", true) },
-                            { "raw_data_id", new MongoDB.Bson.BsonDocument("$ne", MongoDB.Bson.BsonNull.Value) }
-                        }),
-                        new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
-                        {
-                            { "_id", 1 },
-                            { "raw_data_id", 1 }
-                        })
+{
+                    new MongoDB.Bson.BsonDocument("$match", new MongoDB.Bson.BsonDocument
+                    {
+                        { "raw_data_id", new MongoDB.Bson.BsonDocument
+                            {
+                                { "$exists", true },
+                                { "$ne", MongoDB.Bson.BsonNull.Value }
+                            }
+                        }
+                    }),
+                    new MongoDB.Bson.BsonDocument("$project", new MongoDB.Bson.BsonDocument
+                    {
+                        { "_id", 1 },
+                        { "raw_data_id", 1 }
+                    })
                 };
 
                 var processDataCollection2 = await Data.MongoDBManager.Instance.GetCollectionAsync<MongoDB.Bson.BsonDocument>("process_data");
@@ -1146,8 +1178,28 @@ namespace FinanceTool
                 {
                     try
                     {
-                        string id = doc.GetValue("_id", "").ToString();
-                        string rawDataId = doc.GetValue("raw_data_id", "").AsString;
+                        // _id (ObjectId)를 안전하게 문자열로 변환
+                        string id = null;
+                        var idBson = doc.GetValue("_id", MongoDB.Bson.BsonNull.Value);
+                        if (idBson != null && idBson.IsObjectId)
+                        {
+                            id = idBson.AsObjectId.ToString();
+                        }
+
+                        // raw_data_id (ObjectId)를 안전하게 문자열로 변환
+                        string rawDataId = null;
+                        var rawDataIdBson = doc.GetValue("raw_data_id", MongoDB.Bson.BsonNull.Value);
+                        if (rawDataIdBson != null)
+                        {
+                            if (rawDataIdBson.IsObjectId)
+                            {
+                                rawDataId = rawDataIdBson.AsObjectId.ToString();
+                            }
+                            else if (rawDataIdBson.IsString)
+                            {
+                                rawDataId = rawDataIdBson.AsString;
+                            }
+                        }
 
                         if (!string.IsNullOrEmpty(id) && !string.IsNullOrEmpty(rawDataId))
                         {
@@ -1167,7 +1219,8 @@ namespace FinanceTool
                 await progress(30, $"데이터 변환 준비 중... (총 {totalRows}행)");
 
                 // 192GB RAM 활용한 대용량 병렬 처리
-                int maxParallelism = Math.Min(Environment.ProcessorCount, 16); // 최대 16개 스레드
+                //int maxParallelism = Math.Min(Environment.ProcessorCount, 16); // 최대 16개 스레드
+                int maxParallelism = Math.Max(Environment.ProcessorCount, 16); // 최대 16개 스레드
                 int optimalBatchSize = 50000; // 5만개씩 처리하여 메모리 효율성 확보
 
                 // 모든 데이터를 메모리에 로드하여 병렬 처리 최적화
