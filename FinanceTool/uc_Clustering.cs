@@ -1739,8 +1739,12 @@ namespace FinanceTool
                     mergedClusterName, mergedData, targetIds, extremeParallelism);
 
                 // 6단계: DataTable 업데이트 (극한 속도)
+                /*
                 await UltraSpeedDataTableUpdateAsync(dataTable, targetIds, targetList,
                     newClusterNumber, mergedClusterName, mergedData, extremeParallelism);
+                */
+                await SafeSequentialDataTableUpdateAsync(dataTable, targetIds, targetList,
+                newClusterNumber, mergedClusterName, mergedData, extremeParallelism);
 
                 Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 완료: {newClusterNumber}");
 
@@ -2008,6 +2012,302 @@ namespace FinanceTool
             public decimal TotalAmount { get; set; }
         }
 
+
+        private async Task SafeSequentialDataTableUpdateAsync(DataTable dataTable, List<int> targetIds,
+    List<UltraSpeedRowData> targetList, int newClusterNumber, string clusterName,
+    UltraSpeedMergedData mergedData, int extremeParallelism)
+        {
+            try
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 안전한 순차 DataTable 업데이트 시작: {targetIds.Count}개 대상");
+
+                // 1단계: 메모리 기반 중간 처리 (병렬 처리로 속도 최적화)
+                var updatePlan = await CreateUpdatePlanAsync(dataTable, targetIds, newClusterNumber, extremeParallelism);
+
+                // 2단계: 새 클러스터 행 준비 (안전한 방식)
+                var newClusterRow = await PrepareNewClusterRowAsync(dataTable, newClusterNumber, clusterName, mergedData);
+
+                // 3단계: 안전한 순차 업데이트 (DataTable 동시성 문제 해결)
+                await ExecuteSafeSequentialUpdateAsync(dataTable, updatePlan, newClusterRow);
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 안전한 순차 DataTable 업데이트 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 안전한 DataTable 업데이트 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 업데이트 계획 생성 (병렬 처리로 속도 최적화)
+        /// </summary>
+        private async Task<SafeUpdatePlan> CreateUpdatePlanAsync(DataTable dataTable, List<int> targetIds,
+            int newClusterNumber, int extremeParallelism)
+        {
+            return await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 업데이트 계획 생성 시작");
+
+                var updatePlan = new SafeUpdatePlan();
+                var rowsToUpdate = new ConcurrentBag<SafeRowUpdate>();
+
+                // 병렬로 업데이트 대상 행 식별 (읽기 전용 작업이므로 안전)
+                Parallel.ForEach(targetIds,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    targetId =>
+                    {
+                        try
+                        {
+                            // 안전한 행 검색 (인덱스 기반이 아닌 조건 검색)
+                            var matchingRows = dataTable.AsEnumerable()
+                                .Where(r => !r.IsNull("ID") && Convert.ToInt32(r["ID"]) == targetId)
+                                .ToList();
+
+                            foreach (var row in matchingRows)
+                            {
+                                // 현재 행의 위치를 안전하게 저장
+                                int rowIndex = dataTable.Rows.IndexOf(row);
+                                if (rowIndex >= 0) // 유효한 인덱스인 경우에만
+                                {
+                                    rowsToUpdate.Add(new SafeRowUpdate
+                                    {
+                                        RowIndex = rowIndex,
+                                        TargetId = targetId,
+                                        NewClusterNumber = newClusterNumber,
+                                        CurrentClusterID = row.IsNull("ClusterID") ? (int?)null : Convert.ToInt32(row["ClusterID"])
+                                    });
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 식별 오류 (ID: {targetId}): {ex.Message}");
+                        }
+                    });
+
+                updatePlan.RowUpdates = rowsToUpdate.ToList();
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 업데이트 계획 완료: {updatePlan.RowUpdates.Count}개 행");
+
+                return updatePlan;
+            });
+        }
+
+        /// <summary>
+        /// 새 클러스터 행 준비
+        /// </summary>
+        private async Task<DataRow> PrepareNewClusterRowAsync(DataTable dataTable, int newClusterNumber,
+            string clusterName, UltraSpeedMergedData mergedData)
+        {
+            return await Task.Run(() =>
+            {
+                try
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 새 클러스터 행 준비 시작");
+
+                    // 새 행을 별도로 생성 (메인 테이블과 분리)
+                    var tempTable = dataTable.Clone();
+                    var newRow = tempTable.NewRow();
+
+                    // 안전한 값 설정
+                    newRow["ID"] = newClusterNumber;
+                    newRow["ClusterID"] = newClusterNumber;
+                    newRow["클러스터명"] = clusterName ?? "";
+                    newRow["키워드목록"] = string.Join(",", mergedData.Keywords ?? new List<string>());
+                    newRow["Count"] = mergedData.TotalCount;
+                    newRow["합산금액"] = mergedData.TotalAmount;
+                    newRow["dataIndex"] = string.Join(",", mergedData.DataIndices ?? new List<string>());
+
+                    // 기타 필요한 컬럼들 초기화
+                    foreach (DataColumn column in dataTable.Columns)
+                    {
+                        if (!newRow.Table.Columns.Contains(column.ColumnName))
+                            continue;
+
+                        if (newRow.IsNull(column.ColumnName))
+                        {
+                            if (column.DataType == typeof(string))
+                                newRow[column.ColumnName] = "";
+                            else if (column.DataType == typeof(int))
+                                newRow[column.ColumnName] = 0;
+                            else if (column.DataType == typeof(decimal))
+                                newRow[column.ColumnName] = 0m;
+                            else if (column.DataType == typeof(DateTime))
+                                newRow[column.ColumnName] = DateTime.Now;
+                        }
+                    }
+
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 새 클러스터 행 준비 완료");
+                    return newRow;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 새 클러스터 행 준비 오류: {ex.Message}");
+                    throw;
+                }
+            });
+        }
+
+        /// <summary>
+        /// 안전한 순차 업데이트 실행 (동시성 문제 해결)
+        /// </summary>
+        private async Task ExecuteSafeSequentialUpdateAsync(DataTable dataTable, SafeUpdatePlan updatePlan, DataRow newClusterRow)
+        {
+            await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 안전한 순차 업데이트 시작");
+
+                // 단일 스레드에서 순차 처리 (DataTable 동시성 문제 해결)
+                lock (dataTable)
+                {
+                    try
+                    {
+                        // 1. 기존 행들 업데이트 (안전한 순서로)
+                        var validUpdates = new List<SafeRowUpdate>();
+
+                        // 먼저 모든 업데이트가 유효한지 검증
+                        foreach (var update in updatePlan.RowUpdates.OrderBy(u => u.RowIndex))
+                        {
+                            try
+                            {
+                                // 행 인덱스 유효성 재검증
+                                if (update.RowIndex >= 0 && update.RowIndex < dataTable.Rows.Count)
+                                {
+                                    var row = dataTable.Rows[update.RowIndex];
+
+                                    // ID가 일치하는지 확인 (데이터 무결성 검증)
+                                    if (!row.IsNull("ID") && Convert.ToInt32(row["ID"]) == update.TargetId)
+                                    {
+                                        validUpdates.Add(update);
+                                    }
+                                    else
+                                    {
+                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] ID 불일치 감지: 예상={update.TargetId}, 실제={row["ID"]}");
+                                    }
+                                }
+                                else
+                                {
+                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 유효하지 않은 행 인덱스: {update.RowIndex}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 업데이트 검증 오류: {ex.Message}");
+                            }
+                        }
+
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 유효한 업데이트: {validUpdates.Count}/{updatePlan.RowUpdates.Count}");
+
+                        // 2. 검증된 업데이트만 순차 실행
+                        int successCount = 0;
+                        foreach (var update in validUpdates)
+                        {
+                            try
+                            {
+                                // 다시 한번 범위 검증 (최종 안전장치)
+                                if (update.RowIndex >= 0 && update.RowIndex < dataTable.Rows.Count)
+                                {
+                                    var row = dataTable.Rows[update.RowIndex];
+
+                                    // ClusterID 업데이트 (안전한 방식)
+                                    if (dataTable.Columns.Contains("ClusterID"))
+                                    {
+                                        row["ClusterID"] = update.NewClusterNumber;
+                                        successCount++;
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 업데이트 오류 (인덱스: {update.RowIndex}): {ex.Message}");
+                            }
+                        }
+
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 기존 행 업데이트 완료: {successCount}개 성공");
+
+                        // 3. 새 클러스터 행 추가 (안전한 방식)
+                        try
+                        {
+                            // 새 행의 값들을 배열로 준비
+                            object[] newRowValues = new object[dataTable.Columns.Count];
+
+                            for (int i = 0; i < dataTable.Columns.Count; i++)
+                            {
+                                string columnName = dataTable.Columns[i].ColumnName;
+                                if (newClusterRow.Table.Columns.Contains(columnName))
+                                {
+                                    newRowValues[i] = newClusterRow[columnName];
+                                }
+                                else
+                                {
+                                    // 기본값 설정
+                                    Type columnType = dataTable.Columns[i].DataType;
+                                    if (columnType == typeof(string))
+                                        newRowValues[i] = "";
+                                    else if (columnType == typeof(int))
+                                        newRowValues[i] = 0;
+                                    else if (columnType == typeof(decimal))
+                                        newRowValues[i] = 0m;
+                                    else if (columnType == typeof(DateTime))
+                                        newRowValues[i] = DateTime.Now;
+                                    else
+                                        newRowValues[i] = DBNull.Value;
+                                }
+                            }
+
+                            // 새 행 추가
+                            dataTable.Rows.Add(newRowValues);
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 새 클러스터 행 추가 완료");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 새 행 추가 오류: {ex.Message}");
+                            throw;
+                        }
+
+                        // 4. 변경사항 적용
+                        dataTable.AcceptChanges();
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] DataTable 변경사항 적용 완료");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 순차 업데이트 전체 오류: {ex.Message}");
+
+                        // 롤백 시도
+                        try
+                        {
+                            dataTable.RejectChanges();
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] DataTable 롤백 완료");
+                        }
+                        catch (Exception rollbackEx)
+                        {
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 롤백 실패: {rollbackEx.Message}");
+                        }
+
+                        throw;
+                    }
+                }
+            });
+        }
+
+        /// <summary>
+        /// 안전한 업데이트 계획 클래스
+        /// </summary>
+        private class SafeUpdatePlan
+        {
+            public List<SafeRowUpdate> RowUpdates { get; set; } = new List<SafeRowUpdate>();
+        }
+
+        /// <summary>
+        /// 안전한 행 업데이트 정보
+        /// </summary>
+        private class SafeRowUpdate
+        {
+            public int RowIndex { get; set; }
+            public int TargetId { get; set; }
+            public int NewClusterNumber { get; set; }
+            public int? CurrentClusterID { get; set; }
+        }
 
 
         public async Task deleteClusterId(DataTable dataTable, List<int> targetIds)
