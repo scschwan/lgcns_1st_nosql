@@ -38,12 +38,12 @@ namespace FinanceTool
         // === 페이징 관련 멤버 변수 추가 ===
         private DataTable _fullDataTable2nd = null;
         private int _currentPage2nd = 1;
-        private int _pageSize2nd = 100;
+        private int _pageSize2nd = 1000;
         private int _totalPages2nd = 1;
 
         private DataTable _fullDataTableTransform = null;
         private int _currentPageTransform = 1;
-        private int _pageSizeTransform = 100;
+        private int _pageSizeTransform = 1000;
         private int _totalPagesTransform = 1;
 
 
@@ -452,8 +452,8 @@ namespace FinanceTool
 
                     // ProcessView에서 바로 금액 정보를 가져오므로 추가 로드 필요 없음
                     // 대신 moneyDataTable을 초기화
-                    await progressForm.UpdateProgressHandler(50, "금액 데이터 설정 중...");
-                    await SetupMoneyDataTable();
+                    //await progressForm.UpdateProgressHandler(50, "금액 데이터 설정 중...");
+                    //await SetupMoneyDataTable();
 
                     // 원본 데이터로 뷰 데이터 보강 (극한 성능 적용)
                     await progressForm.UpdateProgressHandler(60, "극한 속도 원본 데이터 보강 중...");
@@ -579,6 +579,7 @@ namespace FinanceTool
                 moneyTable.Columns.Add("amount", typeof(decimal));
 
                 // transformDataTable에서 직접 금액 정보 추출
+                /*
                 foreach (DataRow row in transformDataTable.Rows)
                 {
                     if (row["raw_data_id"] != DBNull.Value && row["Column0"] != DBNull.Value)
@@ -587,7 +588,27 @@ namespace FinanceTool
 
                         // 금액 파싱
                         decimal amount = 0;
-                        if (decimal.TryParse(row["Column0"].ToString(), out amount))
+                        //if (decimal.TryParse(row["Column0"].ToString(), out amount))
+                        if (decimal.TryParse(row[DataHandler.levelName[0]].ToString(), out amount))
+                        {
+                            DataRow moneyRow = moneyTable.NewRow();
+                            moneyRow["raw_data_id"] = rawDataId;
+                            moneyRow["amount"] = amount;
+                            moneyTable.Rows.Add(moneyRow);
+                        }
+                    }
+                }
+                */
+                foreach (DataRow row in DataHandler.moneyDataTable.Rows)
+                {
+                    if (row["raw_data_id"] != DBNull.Value && row["Column0"] != DBNull.Value)
+                    {
+                        string rawDataId = row["raw_data_id"].ToString();
+
+                        // 금액 파싱
+                        decimal amount = 0;
+                        //if (decimal.TryParse(row["Column0"].ToString(), out amount))
+                        if (decimal.TryParse(row[DataHandler.levelName[0]].ToString(), out amount))
                         {
                             DataRow moneyRow = moneyTable.NewRow();
                             moneyRow["raw_data_id"] = rawDataId;
@@ -1638,15 +1659,17 @@ namespace FinanceTool
 
                 // 3. 극한 속도 키워드 처리 (기존 Parallel.ForEach 대체)
                 var (keywordFrequency, keywordToRawDataIds) = await ProcessKeywordsUltraSpeed(transformDataTable, keywordColumns);
-
+                
                 await UpdateProgress(40, $"키워드별 금액 합산 중... ({keywordFrequency.Count}개 키워드)");
 
                 // 4. 금액 정보를 극한 속도로 처리
                 var rawDataToMoney = new ConcurrentDictionary<string, decimal>();
 
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 금액 정보 로드 시작: {DataHandler.moneyDataTable.Rows.Count}개 행");
+
                 if (DataHandler.moneyDataTable != null && DataHandler.moneyDataTable.Rows.Count > 0)
                 {
-                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 금액 정보 로드 시작: {DataHandler.moneyDataTable.Rows.Count}개 행");
+                    
 
                     // 금액 데이터를 극한 병렬 처리로 로드
                     await Task.Run(() =>
@@ -1707,8 +1730,10 @@ namespace FinanceTool
                         );
                     });
 
-                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 정보 로드 완료: {rawDataToMoney.Count}개");
+                    
                 }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 정보 로드 완료: {rawDataToMoney.Count}개");
 
                 await UpdateProgress(60, "키워드별 금액 합산 중...");
 
