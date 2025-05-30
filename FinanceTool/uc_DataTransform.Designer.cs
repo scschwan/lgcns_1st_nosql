@@ -55,6 +55,20 @@
             match_keyword_table = new DataGridView();
             button5 = new Button();
             groupBox3 = new GroupBox();
+            btn_nextPage = new Button();
+            btn_prevPage = new Button();
+            cmb_pageSize = new ComboBox();
+            lbl_pageSizeText = new Label();
+            lbl_pagination = new Label();
+            num_pageNumber = new NumericUpDown();
+            lbl_pagination2 = new Label();
+            btn_nextPage2 = new Button();
+            btn_prevPage2 = new Button();
+            cmb_pageSize2 = new ComboBox();
+            label6 = new Label();
+            lbl_pagination3 = new Label();
+            num_pageNumber2 = new NumericUpDown();
+            lbl_pagination4 = new Label();
             ((System.ComponentModel.ISupportInitialize)dataGridView_2nd).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dataGridView_transform).BeginInit();
             groupBox1.SuspendLayout();
@@ -62,6 +76,8 @@
             groupbox2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)match_keyword_table).BeginInit();
             groupBox3.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)num_pageNumber).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)num_pageNumber2).BeginInit();
             SuspendLayout();
             // 
             // dataGridView_2nd
@@ -69,7 +85,7 @@
             dataGridView_2nd.AllowUserToAddRows = false;
             dataGridView_2nd.AllowUserToDeleteRows = false;
             dataGridView_2nd.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridView_2nd.Location = new Point(24, 104);
+            dataGridView_2nd.Location = new Point(24, 90);
             dataGridView_2nd.Name = "dataGridView_2nd";
             dataGridView_2nd.ReadOnly = true;
             dataGridView_2nd.Size = new Size(1171, 378);
@@ -78,20 +94,20 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Font = new Font("맑은 고딕", 26.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            label1.Location = new Point(451, 41);
+            label1.Font = new Font("맑은 고딕", 21.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            label1.Location = new Point(24, 39);
             label1.Name = "label1";
-            label1.Size = new Size(324, 47);
+            label1.Size = new Size(269, 40);
             label1.TabIndex = 1;
             label1.Text = "원본 키워드 데이터";
             // 
             // label2
             // 
             label2.AutoSize = true;
-            label2.Font = new Font("맑은 고딕", 26.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            label2.Location = new Point(451, 513);
+            label2.Font = new Font("맑은 고딕", 21.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            label2.Location = new Point(24, 533);
             label2.Name = "label2";
-            label2.Size = new Size(324, 47);
+            label2.Size = new Size(269, 40);
             label2.TabIndex = 3;
             label2.Text = "변환 키워드 데이터";
             // 
@@ -380,10 +396,162 @@
             groupBox3.TabStop = false;
             groupBox3.Text = "Cluster 설정";
             // 
+            // btn_nextPage
+            // 
+            btn_nextPage.AutoSize = true;
+            btn_nextPage.Font = new Font("맑은 고딕", 14.25F);
+            btn_nextPage.Location = new Point(900, 475);
+            btn_nextPage.Name = "btn_nextPage";
+            btn_nextPage.Size = new Size(86, 35);
+            btn_nextPage.TabIndex = 60;
+            btn_nextPage.Text = "다음 ▶";
+            btn_nextPage.UseVisualStyleBackColor = true;
+            // 
+            // btn_prevPage
+            // 
+            btn_prevPage.AutoSize = true;
+            btn_prevPage.Font = new Font("맑은 고딕", 14.25F);
+            btn_prevPage.Location = new Point(470, 474);
+            btn_prevPage.Name = "btn_prevPage";
+            btn_prevPage.Size = new Size(86, 35);
+            btn_prevPage.TabIndex = 59;
+            btn_prevPage.Text = "◀ 이전";
+            btn_prevPage.UseVisualStyleBackColor = true;
+            // 
+            // cmb_pageSize
+            // 
+            cmb_pageSize.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            cmb_pageSize.FormattingEnabled = true;
+            cmb_pageSize.Location = new Point(155, 477);
+            cmb_pageSize.Name = "cmb_pageSize";
+            cmb_pageSize.Size = new Size(121, 33);
+            cmb_pageSize.TabIndex = 58;
+            // 
+            // lbl_pageSizeText
+            // 
+            lbl_pageSizeText.AutoSize = true;
+            lbl_pageSizeText.Font = new Font("맑은 고딕", 14F);
+            lbl_pageSizeText.Location = new Point(24, 480);
+            lbl_pageSizeText.Name = "lbl_pageSizeText";
+            lbl_pageSizeText.Size = new Size(125, 25);
+            lbl_pageSizeText.TabIndex = 57;
+            lbl_pageSizeText.Text = "페이지 크기 :";
+            // 
+            // lbl_pagination
+            // 
+            lbl_pagination.AutoSize = true;
+            lbl_pagination.Font = new Font("맑은 고딕", 14F);
+            lbl_pagination.Location = new Point(562, 479);
+            lbl_pagination.Name = "lbl_pagination";
+            lbl_pagination.Size = new Size(80, 25);
+            lbl_pagination.TabIndex = 54;
+            lbl_pagination.Text = "페이지 :";
+            // 
+            // num_pageNumber
+            // 
+            num_pageNumber.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            num_pageNumber.Location = new Point(655, 477);
+            num_pageNumber.Name = "num_pageNumber";
+            num_pageNumber.Size = new Size(52, 33);
+            num_pageNumber.TabIndex = 56;
+            // 
+            // lbl_pagination2
+            // 
+            lbl_pagination2.AutoSize = true;
+            lbl_pagination2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            lbl_pagination2.Location = new Point(713, 480);
+            lbl_pagination2.Name = "lbl_pagination2";
+            lbl_pagination2.Size = new Size(118, 25);
+            lbl_pagination2.TabIndex = 55;
+            lbl_pagination2.Text = "/ 0 (총 0 행)";
+            // 
+            // btn_nextPage2
+            // 
+            btn_nextPage2.AutoSize = true;
+            btn_nextPage2.Font = new Font("맑은 고딕", 14.25F);
+            btn_nextPage2.Location = new Point(900, 965);
+            btn_nextPage2.Name = "btn_nextPage2";
+            btn_nextPage2.Size = new Size(86, 35);
+            btn_nextPage2.TabIndex = 67;
+            btn_nextPage2.Text = "다음 ▶";
+            btn_nextPage2.UseVisualStyleBackColor = true;
+            // 
+            // btn_prevPage2
+            // 
+            btn_prevPage2.AutoSize = true;
+            btn_prevPage2.Font = new Font("맑은 고딕", 14.25F);
+            btn_prevPage2.Location = new Point(470, 964);
+            btn_prevPage2.Name = "btn_prevPage2";
+            btn_prevPage2.Size = new Size(86, 35);
+            btn_prevPage2.TabIndex = 66;
+            btn_prevPage2.Text = "◀ 이전";
+            btn_prevPage2.UseVisualStyleBackColor = true;
+            // 
+            // cmb_pageSize2
+            // 
+            cmb_pageSize2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            cmb_pageSize2.FormattingEnabled = true;
+            cmb_pageSize2.Location = new Point(155, 967);
+            cmb_pageSize2.Name = "cmb_pageSize2";
+            cmb_pageSize2.Size = new Size(121, 33);
+            cmb_pageSize2.TabIndex = 65;
+            // 
+            // label6
+            // 
+            label6.AutoSize = true;
+            label6.Font = new Font("맑은 고딕", 14F);
+            label6.Location = new Point(24, 970);
+            label6.Name = "label6";
+            label6.Size = new Size(125, 25);
+            label6.TabIndex = 64;
+            label6.Text = "페이지 크기 :";
+            // 
+            // lbl_pagination3
+            // 
+            lbl_pagination3.AutoSize = true;
+            lbl_pagination3.Font = new Font("맑은 고딕", 14F);
+            lbl_pagination3.Location = new Point(562, 969);
+            lbl_pagination3.Name = "lbl_pagination3";
+            lbl_pagination3.Size = new Size(80, 25);
+            lbl_pagination3.TabIndex = 61;
+            lbl_pagination3.Text = "페이지 :";
+            // 
+            // num_pageNumber2
+            // 
+            num_pageNumber2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            num_pageNumber2.Location = new Point(655, 967);
+            num_pageNumber2.Name = "num_pageNumber2";
+            num_pageNumber2.Size = new Size(52, 33);
+            num_pageNumber2.TabIndex = 63;
+            // 
+            // lbl_pagination4
+            // 
+            lbl_pagination4.AutoSize = true;
+            lbl_pagination4.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            lbl_pagination4.Location = new Point(713, 970);
+            lbl_pagination4.Name = "lbl_pagination4";
+            lbl_pagination4.Size = new Size(118, 25);
+            lbl_pagination4.TabIndex = 62;
+            lbl_pagination4.Text = "/ 0 (총 0 행)";
+            // 
             // uc_DataTransform
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
+            Controls.Add(btn_nextPage2);
+            Controls.Add(btn_prevPage2);
+            Controls.Add(cmb_pageSize2);
+            Controls.Add(label6);
+            Controls.Add(lbl_pagination3);
+            Controls.Add(num_pageNumber2);
+            Controls.Add(lbl_pagination4);
+            Controls.Add(btn_nextPage);
+            Controls.Add(btn_prevPage);
+            Controls.Add(cmb_pageSize);
+            Controls.Add(lbl_pageSizeText);
+            Controls.Add(lbl_pagination);
+            Controls.Add(num_pageNumber);
+            Controls.Add(lbl_pagination2);
             Controls.Add(groupBox3);
             Controls.Add(groupbox2);
             Controls.Add(groupBox1);
@@ -403,6 +571,8 @@
             ((System.ComponentModel.ISupportInitialize)match_keyword_table).EndInit();
             groupBox3.ResumeLayout(false);
             groupBox3.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)num_pageNumber).EndInit();
+            ((System.ComponentModel.ISupportInitialize)num_pageNumber2).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -434,5 +604,19 @@
         private ComboBox decimal_combo;
         private GroupBox groupBox3;
         private DataGridView sum_keyword_table;
+        private Button btn_nextPage;
+        private Button btn_prevPage;
+        private ComboBox cmb_pageSize;
+        private Label lbl_pageSizeText;
+        private Label lbl_pagination;
+        private NumericUpDown num_pageNumber;
+        private Label lbl_pagination2;
+        private Button btn_nextPage2;
+        private Button btn_prevPage2;
+        private ComboBox cmb_pageSize2;
+        private Label label6;
+        private Label lbl_pagination3;
+        private NumericUpDown num_pageNumber2;
+        private Label lbl_pagination4;
     }
 }

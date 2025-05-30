@@ -33,9 +33,338 @@ namespace FinanceTool
         private int keywordColumnsCount = 0;
 
         private bool isFinishSession = false;
+
+
+        // === 페이징 관련 멤버 변수 추가 ===
+        private DataTable _fullDataTable2nd = null;
+        private int _currentPage2nd = 1;
+        private int _pageSize2nd = 100;
+        private int _totalPages2nd = 1;
+
+        private DataTable _fullDataTableTransform = null;
+        private int _currentPageTransform = 1;
+        private int _pageSizeTransform = 100;
+        private int _totalPagesTransform = 1;
+
+
+
         public uc_DataTransform()
         {
             InitializeComponent();
+        }
+
+        private void InitializePaginationEvents()
+        {
+            try
+            {
+                // dataGridView_2nd용 설정
+                cmb_pageSize.Items.Clear();
+                //cmb_pageSize.Items.AddRange(new object[] { 50, 100, 200, 500, 1000 });
+                cmb_pageSize.Items.AddRange(new object[] { 1000,2000,5000,10000 });
+                cmb_pageSize.SelectedItem = _pageSize2nd;
+                cmb_pageSize.DropDownStyle = ComboBoxStyle.DropDownList;
+                cmb_pageSize.SelectedIndexChanged += cmb_pageSize_SelectedIndexChanged2nd;
+
+                num_pageNumber.Minimum = 1;
+                num_pageNumber.ValueChanged += num_pageNumber_ValueChanged2nd;
+                btn_prevPage.Click += btn_prevPage_Click2nd;
+                btn_nextPage.Click += btn_nextPage_Click2nd;
+
+                // dataGridView_transform용 설정
+                cmb_pageSize2.Items.Clear();
+                //cmb_pageSize2.Items.AddRange(new object[] { 50, 100, 200, 500, 1000 });
+                cmb_pageSize2.Items.AddRange(new object[] { 1000, 2000, 5000, 10000 });
+                cmb_pageSize2.SelectedItem = _pageSizeTransform;
+                cmb_pageSize2.DropDownStyle = ComboBoxStyle.DropDownList;
+                cmb_pageSize2.SelectedIndexChanged += cmb_pageSize_SelectedIndexChangedTransform;
+
+                num_pageNumber2.Minimum = 1;
+                num_pageNumber2.ValueChanged += num_pageNumber_ValueChangedTransform;
+                btn_prevPage2.Click += btn_prevPage_ClickTransform;
+                btn_nextPage2.Click += btn_nextPage_ClickTransform;
+
+                // 초기 비활성화
+                EnablePaginationControls2nd(false);
+                EnablePaginationControlsTransform(false);
+
+                Debug.WriteLine("페이징 이벤트 핸들러 초기화 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"페이징 초기화 오류: {ex.Message}");
+            }
+        }
+
+        // === 페이징 컨트롤 활성화/비활성화 ===
+        private void EnablePaginationControls2nd(bool enabled)
+        {
+            btn_prevPage.Enabled = enabled;
+            btn_nextPage.Enabled = enabled;
+            num_pageNumber.Enabled = enabled;
+            cmb_pageSize.Enabled = enabled;
+        }
+
+        private void EnablePaginationControlsTransform(bool enabled)
+        {
+            btn_prevPage2.Enabled = enabled;
+            btn_nextPage2.Enabled = enabled;
+            num_pageNumber2.Enabled = enabled;
+            cmb_pageSize2.Enabled = enabled;
+        }
+
+        // === dataGridView_2nd 페이징 이벤트 핸들러들 ===
+        private async void num_pageNumber_ValueChanged2nd(object sender, EventArgs e)
+        {
+            if (num_pageNumber.Value < 1 || num_pageNumber.Value > _totalPages2nd)
+                return;
+
+            if (_currentPage2nd == (int)num_pageNumber.Value)
+                return;
+
+            _currentPage2nd = (int)num_pageNumber.Value;
+            DisplayPage2nd();
+            UpdatePaginationControls2nd();
+        }
+
+        private async void btn_prevPage_Click2nd(object sender, EventArgs e)
+        {
+            if (_currentPage2nd > 1)
+            {
+                num_pageNumber.Value--;
+            }
+        }
+
+        private async void btn_nextPage_Click2nd(object sender, EventArgs e)
+        {
+            if (_currentPage2nd < _totalPages2nd)
+            {
+                num_pageNumber.Value++;
+            }
+        }
+
+        private async void cmb_pageSize_SelectedIndexChanged2nd(object sender, EventArgs e)
+        {
+            if (cmb_pageSize.SelectedItem != null)
+            {
+                _pageSize2nd = (int)cmb_pageSize.SelectedItem;
+                _currentPage2nd = 1;
+                if (_fullDataTable2nd != null)
+                    SetFullDataTable2nd(_fullDataTable2nd);
+            }
+        }
+
+        // === dataGridView_transform 페이징 이벤트 핸들러들 ===
+        private async void num_pageNumber_ValueChangedTransform(object sender, EventArgs e)
+        {
+            if (num_pageNumber2.Value < 1 || num_pageNumber2.Value > _totalPagesTransform)
+                return;
+
+            if (_currentPageTransform == (int)num_pageNumber2.Value)
+                return;
+
+            _currentPageTransform = (int)num_pageNumber2.Value;
+            DisplayPageTransform();
+            UpdatePaginationControlsTransform();
+        }
+
+        private async void btn_prevPage_ClickTransform(object sender, EventArgs e)
+        {
+            if (_currentPageTransform > 1)
+            {
+                num_pageNumber2.Value--;
+            }
+        }
+
+        private async void btn_nextPage_ClickTransform(object sender, EventArgs e)
+        {
+            if (_currentPageTransform < _totalPagesTransform)
+            {
+                num_pageNumber2.Value++;
+            }
+        }
+
+        private async void cmb_pageSize_SelectedIndexChangedTransform(object sender, EventArgs e)
+        {
+            if (cmb_pageSize2.SelectedItem != null)
+            {
+                _pageSizeTransform = (int)cmb_pageSize2.SelectedItem;
+                _currentPageTransform = 1;
+                if (_fullDataTableTransform != null)
+                    SetFullDataTableTransform(_fullDataTableTransform);
+            }
+        }
+
+        // === 페이지 표시 메서드들 ===
+        private void DisplayPage2nd()
+        {
+            try
+            {
+                if (_fullDataTable2nd == null || _fullDataTable2nd.Rows.Count == 0)
+                {
+                    dataGridView_2nd.DataSource = null;
+                    return;
+                }
+
+                int startIndex = (_currentPage2nd - 1) * _pageSize2nd;
+                int endIndex = Math.Min(startIndex + _pageSize2nd, _fullDataTable2nd.Rows.Count);
+
+                DataTable pageData = _fullDataTable2nd.Clone();
+
+                for (int i = startIndex; i < endIndex; i++)
+                {
+                    if (i < _fullDataTable2nd.Rows.Count)
+                    {
+                        pageData.ImportRow(_fullDataTable2nd.Rows[i]);
+                    }
+                }
+
+                dataGridView_2nd.DataSource = pageData;
+
+                if (dataGridView_2nd.Columns["raw_data_id"] != null)
+                    dataGridView_2nd.Columns["raw_data_id"].Visible = false;
+
+                Debug.WriteLine($"dataGridView_2nd 페이지 {_currentPage2nd} 표시: {pageData.Rows.Count}개 행");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"dataGridView_2nd 페이지 표시 오류: {ex.Message}");
+            }
+        }
+
+        private void DisplayPageTransform()
+        {
+            try
+            {
+                if (_fullDataTableTransform == null || _fullDataTableTransform.Rows.Count == 0)
+                {
+                    dataGridView_transform.DataSource = null;
+                    return;
+                }
+
+                int startIndex = (_currentPageTransform - 1) * _pageSizeTransform;
+                int endIndex = Math.Min(startIndex + _pageSizeTransform, _fullDataTableTransform.Rows.Count);
+
+                DataTable pageData = _fullDataTableTransform.Clone();
+
+                for (int i = startIndex; i < endIndex; i++)
+                {
+                    if (i < _fullDataTableTransform.Rows.Count)
+                    {
+                        pageData.ImportRow(_fullDataTableTransform.Rows[i]);
+                    }
+                }
+
+                dataGridView_transform.DataSource = pageData;
+
+                if (dataGridView_transform.Columns["raw_data_id"] != null)
+                    dataGridView_transform.Columns["raw_data_id"].Visible = false;
+
+                Debug.WriteLine($"dataGridView_transform 페이지 {_currentPageTransform} 표시: {pageData.Rows.Count}개 행");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"dataGridView_transform 페이지 표시 오류: {ex.Message}");
+            }
+        }
+
+        // === 페이징 컨트롤 업데이트 ===
+        private void UpdatePaginationControls2nd()
+        {
+            try
+            {
+                int totalRecords = _fullDataTable2nd?.Rows.Count ?? 0;
+
+                //lbl_pagination.Text = $"페이지: {_currentPage2nd}";
+                lbl_pagination2.Text = $"/ {_totalPages2nd} (총 {totalRecords:N0}개)";
+
+                num_pageNumber.Maximum = Math.Max(1, _totalPages2nd);
+                if (num_pageNumber.Value != _currentPage2nd)
+                    num_pageNumber.Value = _currentPage2nd;
+
+                btn_prevPage.Enabled = _currentPage2nd > 1;
+                btn_nextPage.Enabled = _currentPage2nd < _totalPages2nd;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"dataGridView_2nd 페이징 컨트롤 업데이트 오류: {ex.Message}");
+            }
+        }
+
+        private void UpdatePaginationControlsTransform()
+        {
+            try
+            {
+                int totalRecords = _fullDataTableTransform?.Rows.Count ?? 0;
+
+                //lbl_pagination3.Text = $"페이지: {_currentPageTransform}";
+                lbl_pagination4.Text = $"/ {_totalPagesTransform} (총 {totalRecords:N0}개)";
+
+                num_pageNumber2.Maximum = Math.Max(1, _totalPagesTransform);
+                if (num_pageNumber2.Value != _currentPageTransform)
+                    num_pageNumber2.Value = _currentPageTransform;
+
+                btn_prevPage2.Enabled = _currentPageTransform > 1;
+                btn_nextPage2.Enabled = _currentPageTransform < _totalPagesTransform;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"dataGridView_transform 페이징 컨트롤 업데이트 오류: {ex.Message}");
+            }
+        }
+
+        // === 데이터 설정 메서드들 ===
+        private void SetFullDataTable2nd(DataTable fullData)
+        {
+            try
+            {
+                _fullDataTable2nd = fullData;
+                _currentPage2nd = 1;
+
+                if (fullData != null && fullData.Rows.Count > 0)
+                {
+                    _totalPages2nd = (int)Math.Ceiling((double)fullData.Rows.Count / _pageSize2nd);
+                    EnablePaginationControls2nd(true);
+                }
+                else
+                {
+                    _totalPages2nd = 1;
+                    EnablePaginationControls2nd(false);
+                }
+
+                DisplayPage2nd();
+                UpdatePaginationControls2nd();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"dataGridView_2nd 전체 데이터 설정 오류: {ex.Message}");
+            }
+        }
+
+        private void SetFullDataTableTransform(DataTable fullData)
+        {
+            try
+            {
+                _fullDataTableTransform = fullData;
+                _currentPageTransform = 1;
+
+                if (fullData != null && fullData.Rows.Count > 0)
+                {
+                    _totalPagesTransform = (int)Math.Ceiling((double)fullData.Rows.Count / _pageSizeTransform);
+                    EnablePaginationControlsTransform(true);
+                }
+                else
+                {
+                    _totalPagesTransform = 1;
+                    EnablePaginationControlsTransform(false);
+                }
+
+                DisplayPageTransform();
+                UpdatePaginationControlsTransform();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"dataGridView_transform 전체 데이터 설정 오류: {ex.Message}");
+            }
         }
 
 
@@ -182,6 +511,8 @@ namespace FinanceTool
                         {
                             Application.OpenForms[0].Invoke((MethodInvoker)delegate
                             {
+
+                                /*
                                 // 보강된 viewTransformDataTable로 dataGridView_2nd 업데이트
                                 Debug.WriteLine($"viewTransformDataTable 표시 준비: {viewTransformDataTable.Rows.Count}개 행");
 
@@ -203,6 +534,20 @@ namespace FinanceTool
 
                                 // 데이터그리드뷰 새로고침 강제
                                 dataGridView_2nd.Refresh();
+                                */
+
+                                // 페이징 이벤트 핸들러 초기화 (아직 안했다면)
+                                if (cmb_pageSize.Items.Count == 0)
+                                {
+                                    InitializePaginationEvents();
+                                }
+
+                                // 보강된 viewTransformDataTable를 페이징으로 표시
+                                Debug.WriteLine($"viewTransformDataTable 페이징 준비: {viewTransformDataTable.Rows.Count}개 행");
+                                SetFullDataTable2nd(viewTransformDataTable);
+
+                                Debug.WriteLine($"viewTransformDataTable 페이징 표시 완료");
+
                             });
                         }
                     });
@@ -2041,6 +2386,7 @@ namespace FinanceTool
                     }
                 }
             }
+            /*
             // 키워드를 사용하여 transformDataTable 필터링
             DataTable filteredTable = FilterTransformDataByKeyword(viewTransformDataTable, transformDataTable, target_keyword);
 
@@ -2055,9 +2401,12 @@ namespace FinanceTool
             {
                 dataGridView_2nd.Columns["raw_data_id"].Visible = false;
             }
+            */
 
-            
-            
+            // 마지막 부분만 수정:
+            DataTable filteredTable = FilterTransformDataByKeyword(viewTransformDataTable, transformDataTable, target_keyword);
+            SetFullDataTable2nd(filteredTable); // 페이징 적용
+
         }
 
         private void check_all_keyword_list_CheckedChanged(object sender, EventArgs e)
@@ -2306,28 +2655,12 @@ namespace FinanceTool
         {
             if (sum_keyword_table.SelectedCells.Count > 0)
             {
-                // 선택된 셀의 행 인덱스 가져오기
                 int rowIndex = sum_keyword_table.SelectedCells[0].RowIndex;
-
-                // 선택된 행의 첫 번째 열(Value/Keyword) 값 가져오기
                 string keyword = sum_keyword_table.Rows[rowIndex].Cells[0].Value.ToString();
 
-                // 키워드를 사용하여 transformDataTable 필터링
                 DataTable filteredTable = FilterTransformDataByKeyword(viewTransformDataTable, transformDataTable, keyword);
+                SetFullDataTable2nd(filteredTable); // 페이징 적용
 
-                // 필터링된 결과를 다른 DataGridView에 표시
-                dataGridView_2nd.DataSource = null;
-                dataGridView_2nd.Rows.Clear();
-                dataGridView_2nd.Columns.Clear();
-                dataGridView_2nd.DataSource = filteredTable;
-                //dataGridView_2nd.Columns["import_date"].Visible = false;
-
-                if (dataGridView_2nd.Columns["raw_data_id"] != null)
-                {
-                    dataGridView_2nd.Columns["raw_data_id"].Visible = false;
-                }
-
-                // 또는 상태 표시줄에 결과 개수 표시
                 Debug.WriteLine($"키워드 '{keyword}'를 포함하는 행: {filteredTable.Rows.Count}개");
             }
         }
@@ -2336,24 +2669,12 @@ namespace FinanceTool
         {
             if (match_keyword_table.SelectedCells.Count > 0)
             {
-                // 선택된 셀의 행 인덱스 가져오기
                 int rowIndex = match_keyword_table.SelectedCells[0].RowIndex;
-
-                // 선택된 행의 첫 번째 열(Value/Keyword) 값 가져오기
                 string keyword = match_keyword_table.Rows[rowIndex].Cells[1].Value.ToString();
 
-                // 키워드를 사용하여 transformDataTable 필터링
                 DataTable filteredTable = FilterTransformDataByKeyword(viewTransformDataTable, transformDataTable, keyword);
+                SetFullDataTableTransform(filteredTable); // 페이징 적용
 
-                // 필터링된 결과를 다른 DataGridView에 표시
-                dataGridView_transform.DataSource = filteredTable;
-                //dataGridView_transform.Columns["import_date"].Visible = false;
-                if (dataGridView_transform.Columns["raw_data_id"] != null)
-                {
-                    dataGridView_transform.Columns["raw_data_id"].Visible = false;
-                }
-
-                // 또는 상태 표시줄에 결과 개수 표시
                 Debug.WriteLine($"키워드 '{keyword}'를 포함하는 행: {filteredTable.Rows.Count}개");
             }
         }
@@ -2442,8 +2763,12 @@ namespace FinanceTool
                 }
             }
 
-
+            
             CreateFilteredDataGridView(match_keyword_table, modifiedDataTable, MathcingPairs);
+            
+            // 마지막 부분만 수정:
+            //DataTable filteredTable = FilterTransformDataByKeyword(viewTransformDataTable, transformDataTable, target_keyword);
+            //SetFullDataTable2nd(filteredTable); // 페이징 적용
 
             check_all_keyword_list.Checked = false;
 
