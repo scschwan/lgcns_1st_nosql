@@ -59,6 +59,51 @@ namespace FinanceTool.Repositories
             }
         }
 
+        /// <summary>
+        /// 병합되지 않은 클러스터만 가져와서 DataTable로 변환 (UI 표시용)
+        /// ClusterId <= 0 또는 ClusterId == ClusterNumber인 클러스터만 포함
+        /// </summary>
+        public async Task<DataTable> GetUnmergedClustersAsDataTableAsync()
+        {
+            // 병합되지 않은 클러스터만 필터링
+            var filter = Builders<ClusteringResultDocument>.Filter.Or(
+                Builders<ClusteringResultDocument>.Filter.Lte(c => c.ClusterId, 0),
+                Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterId == c.ClusterNumber)
+            );
+
+            var clusters = await _collection.Find(filter)
+                .Sort(Builders<ClusteringResultDocument>.Sort.Ascending(c => c.ClusterNumber))
+                .ToListAsync();
+
+            // 기존 ToDataTableAsync()와 동일한 DataTable 생성 로직
+            var dataTable = new DataTable();
+            dataTable.Columns.Add("ID", typeof(int));
+            dataTable.Columns.Add("ClusterID", typeof(int));
+            dataTable.Columns.Add("클러스터명", typeof(string));
+            dataTable.Columns.Add("키워드목록", typeof(string));
+            dataTable.Columns.Add("Count", typeof(int));
+            dataTable.Columns.Add("합산금액", typeof(decimal));
+            dataTable.Columns.Add("dataIndex", typeof(string));
+            dataTable.Columns.Add("_MongoId", typeof(string));
+
+            foreach (var cluster in clusters)
+            {
+                var row = dataTable.NewRow();
+                row["ID"] = cluster.ClusterNumber;
+                row["ClusterID"] = cluster.ClusterId;
+                row["클러스터명"] = cluster.ClusterName;
+                row["키워드목록"] = string.Join(",", cluster.Keywords);
+                row["Count"] = cluster.Count;
+                row["합산금액"] = cluster.TotalAmount;
+                row["dataIndex"] = string.Join(",", cluster.DataIndices);
+                row["_MongoId"] = cluster.Id;
+
+                dataTable.Rows.Add(row);
+            }
+
+            return dataTable;
+        }
+
         // 클러스터 전체 정보 업데이트
         public async Task<bool> UpdateClusterFullInfoAsync(
             int clusterNumber,
