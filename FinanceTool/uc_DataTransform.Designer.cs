@@ -166,11 +166,11 @@
             prod_col_check.Checked = true;
             prod_col_check.CheckState = CheckState.Checked;
             prod_col_check.Font = new Font("맑은 고딕", 14.25F);
-            prod_col_check.Location = new Point(227, 50);
+            prod_col_check.Location = new Point(241, 50);
             prod_col_check.Name = "prod_col_check";
-            prod_col_check.Size = new Size(126, 29);
+            prod_col_check.Size = new Size(107, 29);
             prod_col_check.TabIndex = 29;
-            prod_col_check.Text = "공급업체명";
+            prod_col_check.Text = "공급업체";
             prod_col_check.UseVisualStyleBackColor = true;
             prod_col_check.CheckedChanged += prod_col_check_CheckedChanged;
             // 
@@ -180,11 +180,11 @@
             dept_col_check.Checked = true;
             dept_col_check.CheckState = CheckState.Checked;
             dept_col_check.Font = new Font("맑은 고딕", 14.25F);
-            dept_col_check.Location = new Point(152, 50);
+            dept_col_check.Location = new Point(109, 50);
             dept_col_check.Name = "dept_col_check";
-            dept_col_check.Size = new Size(69, 29);
+            dept_col_check.Size = new Size(126, 29);
             dept_col_check.TabIndex = 28;
-            dept_col_check.Text = "부서";
+            dept_col_check.Text = "코스트센터";
             dept_col_check.UseVisualStyleBackColor = true;
             dept_col_check.CheckedChanged += dept_col_check_CheckedChanged;
             // 
@@ -194,9 +194,9 @@
             label3.Font = new Font("맑은 고딕", 14.25F);
             label3.Location = new Point(6, 50);
             label3.Name = "label3";
-            label3.Size = new Size(140, 25);
+            label3.Size = new Size(95, 25);
             label3.TabIndex = 26;
-            label3.Text = "필수 포함 항목";
+            label3.Text = "필수 포함";
             // 
             // button2
             // 

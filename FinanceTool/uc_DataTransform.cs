@@ -38,7 +38,7 @@ namespace FinanceTool
             InitializeComponent();
         }
 
-       
+
         // initUI 메서드 수정
         public async Task initUI()
         {
@@ -75,8 +75,6 @@ namespace FinanceTool
                     DataTable viewData = new DataTable();
 
                     // 필요한 메타데이터 컬럼 추가
-                    //viewData.Columns.Add("id", typeof(string));
-                    //viewData.Columns.Add("process_data_id", typeof(string));
                     viewData.Columns.Add("raw_data_id", typeof(string)); // raw_data_id 직접 사용
 
                     // 각 키워드를 별도 컬럼으로 추가
@@ -102,8 +100,6 @@ namespace FinanceTool
                         foreach (var doc in processViewDocs)
                         {
                             DataRow row = viewData.NewRow();
-                            //row["id"] = doc.Id;
-                            //row["process_data_id"] = doc.ProcessDataId;
                             row["raw_data_id"] = doc.RawDataId; // 직접 raw_data_id 사용
 
                             // 키워드들을 Column0부터 바로 매핑
@@ -125,16 +121,14 @@ namespace FinanceTool
 
                     Debug.WriteLine("data Transform initUI -> transformDataTable 설정 완료");
 
-                    
-
                     // ProcessView에서 바로 금액 정보를 가져오므로 추가 로드 필요 없음
                     // 대신 moneyDataTable을 초기화
                     await progressForm.UpdateProgressHandler(50, "금액 데이터 설정 중...");
                     await SetupMoneyDataTable();
 
-                    // 원본 데이터로 뷰 데이터 보강
-                    await progressForm.UpdateProgressHandler(60, "원본 데이터 보강 중...");
-                    viewTransformDataTable = await EnrichTransformDataWithMongoData(transformDataTable);
+                    // 원본 데이터로 뷰 데이터 보강 (극한 성능 적용)
+                    await progressForm.UpdateProgressHandler(60, "극한 속도 원본 데이터 보강 중...");
+                    viewTransformDataTable = await UltraHighPerformanceEnrichTransformDataAsync(transformDataTable);
 
                     Debug.WriteLine("data Transform initUI -> DataGridView 바인딩 설정 완료");
 
@@ -145,7 +139,6 @@ namespace FinanceTool
                         {
                             Application.OpenForms[0].Invoke((MethodInvoker)delegate
                             {
-                                
                                 // 정렬 처리 설정
                                 sum_keyword_table.SortCompare += DataHandler.money_SortCompare;
                                 match_keyword_table.SortCompare += DataHandler.money_SortCompare;
@@ -155,8 +148,6 @@ namespace FinanceTool
 
                     // 나머지 초기화 로직
                     await progressForm.UpdateProgressHandler(70, "키워드 병합 리스트 생성 중...");
-
-
 
                     // create_merge_keyword_list 함수 호출 - 새로운 ProcessMergeKeywordListWithProgress 호출
                     await create_merge_keyword_list();
@@ -203,14 +194,6 @@ namespace FinanceTool
                                 // 필요한 컬럼 숨김 처리 다시 수행
                                 if (dataGridView_2nd.Columns["raw_data_id"] != null)
                                     dataGridView_2nd.Columns["raw_data_id"].Visible = false;
-
-                                /*
-                                if (dataGridView_2nd.Columns["id"] != null)
-                                    dataGridView_2nd.Columns["id"].Visible = false;
-
-                                if (dataGridView_2nd.Columns["process_data_id"] != null)
-                                    dataGridView_2nd.Columns["process_data_id"].Visible = false;
-                                */
 
                                 // 필요한 경우 열 너비 조정
                                 dataGridView_2nd.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
@@ -432,123 +415,246 @@ namespace FinanceTool
         /// 극한 속도로 데이터 보강 수행
         /// </summary>
         private async Task UltraSpeedDataEnrichmentAsync(
-            DataTable sourceTable,
-            DataTable targetTable,
-            ConcurrentDictionary<string, UltraSpeedMongoData> mongoLookup,
-            int extremeParallelism)
+    DataTable sourceTable,
+    DataTable targetTable,
+    ConcurrentDictionary<string, UltraSpeedMongoData> mongoLookup,
+    int extremeParallelism)
         {
-            // 행별 처리를 위한 극한 병렬 배치 생성
-            const int rowBatchSize = 10000; // 행 처리용 배치 크기
-            var rowBatches = new List<List<DataRow>>();
-
-            for (int i = 0; i < sourceTable.Rows.Count; i += rowBatchSize)
+            try
             {
-                var batch = sourceTable.Rows.Cast<DataRow>()
-                                       .Skip(i)
-                                       .Take(rowBatchSize)
-                                       .ToList();
-                rowBatches.Add(batch);
-            }
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 안전한 데이터 보강 시작: {sourceTable.Rows.Count}행");
 
-            // 결과 행들을 저장할 스레드 안전 컬렉션
-            var processedRows = new ConcurrentBag<DataRow>();
+                // 행별 처리를 위한 최적화된 배치 생성
+                const int rowBatchSize = 5000; // 더 작은 배치로 안전성 확보
+                var rowBatches = new List<List<DataRow>>();
 
-            // 극한 병렬로 각 배치 처리
-            await Task.Run(() =>
-            {
-                Parallel.ForEach(rowBatches,
-                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
-                    batch =>
-                    {
-                        foreach (var sourceRow in batch)
+                for (int i = 0; i < sourceTable.Rows.Count; i += rowBatchSize)
+                {
+                    var batch = sourceTable.Rows.Cast<DataRow>()
+                                           .Skip(i)
+                                           .Take(rowBatchSize)
+                                           .ToList();
+                    rowBatches.Add(batch);
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 생성 완료: {rowBatches.Count}개 배치");
+
+                // 결과 행들을 저장할 스레드 안전 컬렉션
+                var processedRows = new ConcurrentBag<(DataRow row, int originalIndex)>();
+
+                // 적절한 병렬 처리 (너무 많은 스레드는 오히려 성능 저하)
+                int safeParallelism = Math.Min(extremeParallelism, Environment.ProcessorCount * 2);
+
+                // 극한 병렬로 각 배치 처리
+                await Task.Run(() =>
+                {
+                    Parallel.ForEach(rowBatches,
+                        new ParallelOptions { MaxDegreeOfParallelism = safeParallelism },
+                        (batch, state, batchIndex) =>
                         {
                             try
                             {
-                                var enrichedRow = ProcessSingleRowWithUltraSpeed(sourceRow, targetTable, mongoLookup);
-                                if (enrichedRow != null)
+                                for (int i = 0; i < batch.Count; i++)
                                 {
-                                    processedRows.Add(enrichedRow);
+                                    var sourceRow = batch[i];
+                                    int originalIndex = (int)batchIndex * rowBatchSize + i;
+
+                                    try
+                                    {
+                                        var enrichedRow = ProcessSingleRowWithUltraSpeed(sourceRow, targetTable, mongoLookup);
+                                        if (enrichedRow != null)
+                                        {
+                                            processedRows.Add((enrichedRow, originalIndex));
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 행 처리 오류 (인덱스 {originalIndex}): {ex.Message}");
+
+                                        // 오류 발생한 행은 대체 행으로 처리
+                                        try
+                                        {
+                                            var fallbackRow = CreateFallbackRow(sourceRow, targetTable);
+                                            if (fallbackRow != null)
+                                            {
+                                                processedRows.Add((fallbackRow, originalIndex));
+                                            }
+                                        }
+                                        catch (Exception fallbackEx)
+                                        {
+                                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 대체 행 생성도 실패 (인덱스 {originalIndex}): {fallbackEx.Message}");
+                                        }
+                                    }
+                                }
+
+                                // 배치 완료 로깅
+                                if (batchIndex % 10 == 0)
+                                {
+                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 {batchIndex + 1}/{rowBatches.Count} 완료");
                                 }
                             }
-                            catch (Exception ex)
+                            catch (Exception batchEx)
                             {
-                                Debug.WriteLine($"행 처리 오류: {ex.Message}");
-                                // 오류 발생한 행은 원본 데이터로 추가
-                                var fallbackRow = CreateFallbackRow(sourceRow, targetTable);
-                                if (fallbackRow != null)
-                                {
-                                    processedRows.Add(fallbackRow);
-                                }
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 {batchIndex} 전체 오류: {batchEx.Message}");
                             }
-                        }
-                    });
-            });
+                        });
+                });
 
-            // 처리된 행들을 최종 테이블에 추가 (순서 보장을 위해 단일 스레드)
-            var sortedRows = processedRows.OrderBy(row =>
-            {
-                // raw_data_id 기준으로 정렬 (원본 순서 최대한 유지)
-                if (row["raw_data_id"] != DBNull.Value)
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 처리 완료: {processedRows.Count}개 행 처리됨");
+
+                // 처리된 행들을 원본 순서대로 정렬하여 최종 테이블에 추가
+                var sortedRows = processedRows
+                    .OrderBy(item => item.originalIndex)
+                    .Select(item => item.row)
+                    .ToList();
+
+                // 단일 스레드에서 안전하게 최종 테이블에 추가
+                foreach (var row in sortedRows)
                 {
-                    return row["raw_data_id"].ToString();
+                    try
+                    {
+                        targetTable.Rows.Add(row.ItemArray);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 최종 테이블 추가 오류: {ex.Message}");
+                    }
                 }
-                return string.Empty;
-            }).ToList();
 
-            foreach (var row in sortedRows)
-            {
-                targetTable.Rows.Add(row.ItemArray);
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 보강 완료: {targetTable.Rows.Count}행 생성");
             }
-
-            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 보강 완료: {targetTable.Rows.Count}행 생성");
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] UltraSpeedDataEnrichmentAsync 전체 오류: {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>
         /// 단일 행을 극한 속도로 처리
         /// </summary>
         private DataRow ProcessSingleRowWithUltraSpeed(
-            DataRow sourceRow,
-            DataTable targetTable,
-            ConcurrentDictionary<string, UltraSpeedMongoData> mongoLookup)
+    DataRow sourceRow,
+    DataTable targetTable,
+    ConcurrentDictionary<string, UltraSpeedMongoData> mongoLookup)
         {
-            var newRow = targetTable.NewRow();
-
-            // 기본 데이터 복사 (극한 속도)
-            for (int i = 0; i < Math.Min(sourceRow.ItemArray.Length, newRow.ItemArray.Length); i++)
+            try
             {
-                newRow[i] = sourceRow[i];
-            }
+                var newRow = targetTable.NewRow();
 
-            // MongoDB 데이터로 보강
-            if (sourceRow["raw_data_id"] != DBNull.Value && sourceRow["raw_data_id"] != null)
-            {
-                string rawDataId = sourceRow["raw_data_id"].ToString();
-
-                if (!string.IsNullOrEmpty(rawDataId) && mongoLookup.TryGetValue(rawDataId, out var mongoData))
+                // 1단계: 컬럼명 기반 안전한 데이터 복사 (인덱스 대신 컬럼명 사용)
+                foreach (DataColumn sourceColumn in sourceRow.Table.Columns)
                 {
-                    // MongoDB 데이터 컬럼 추가/업데이트
-                    foreach (var kvp in mongoData.Data)
+                    string columnName = sourceColumn.ColumnName;
+
+                    // 대상 테이블에 해당 컬럼이 있는지 확인
+                    if (targetTable.Columns.Contains(columnName))
                     {
-                        if (targetTable.Columns.Contains(kvp.Key))
+                        try
                         {
-                            newRow[kvp.Key] = kvp.Value ?? DBNull.Value;
+                            // 안전한 값 복사
+                            object sourceValue = sourceRow[columnName];
+
+                            // DBNull 및 null 처리
+                            if (sourceValue == null || sourceValue == DBNull.Value)
+                            {
+                                newRow[columnName] = DBNull.Value;
+                            }
+                            else
+                            {
+                                // 타입 호환성 검사
+                                Type targetType = targetTable.Columns[columnName].DataType;
+                                if (targetType == typeof(string))
+                                {
+                                    newRow[columnName] = sourceValue.ToString();
+                                }
+                                else if (sourceValue.GetType() == targetType)
+                                {
+                                    newRow[columnName] = sourceValue;
+                                }
+                                else
+                                {
+                                    // 타입 변환 시도
+                                    newRow[columnName] = Convert.ChangeType(sourceValue, targetType) ?? DBNull.Value;
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"컬럼 '{columnName}' 복사 중 오류: {ex.Message}");
+                            newRow[columnName] = DBNull.Value;
                         }
                     }
+                }
 
-                    // 메타데이터 추가
-                    if (targetTable.Columns.Contains("is_hidden"))
-                    {
-                        newRow["is_hidden"] = mongoData.IsHidden;
-                    }
+                // 2단계: MongoDB 데이터로 보강 (안전한 방식)
+                if (sourceRow.Table.Columns.Contains("raw_data_id") &&
+                    sourceRow["raw_data_id"] != DBNull.Value &&
+                    sourceRow["raw_data_id"] != null)
+                {
+                    string rawDataId = sourceRow["raw_data_id"].ToString();
 
-                    if (targetTable.Columns.Contains("import_date"))
+                    if (!string.IsNullOrEmpty(rawDataId) && mongoLookup.TryGetValue(rawDataId, out var mongoData))
                     {
-                        newRow["import_date"] = mongoData.ImportDate;
+                        // MongoDB 데이터 컬럼 추가/업데이트 (안전한 방식)
+                        if (mongoData.Data != null)
+                        {
+                            foreach (var kvp in mongoData.Data)
+                            {
+                                string mongoColumnName = kvp.Key;
+
+                                if (targetTable.Columns.Contains(mongoColumnName))
+                                {
+                                    try
+                                    {
+                                        object mongoValue = kvp.Value;
+
+                                        if (mongoValue == null)
+                                        {
+                                            newRow[mongoColumnName] = DBNull.Value;
+                                        }
+                                        else
+                                        {
+                                            // 문자열로 안전하게 변환
+                                            newRow[mongoColumnName] = mongoValue.ToString();
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"MongoDB 컬럼 '{mongoColumnName}' 설정 중 오류: {ex.Message}");
+                                        newRow[mongoColumnName] = DBNull.Value;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 메타데이터 추가 (안전한 방식)
+                        try
+                        {
+                            if (targetTable.Columns.Contains("is_hidden"))
+                            {
+                                newRow["is_hidden"] = mongoData.IsHidden;
+                            }
+
+                            if (targetTable.Columns.Contains("import_date"))
+                            {
+                                newRow["import_date"] = mongoData.ImportDate;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"메타데이터 설정 중 오류: {ex.Message}");
+                        }
                     }
                 }
-            }
 
-            return newRow;
+                return newRow;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"행 처리 중 전체 오류: {ex.Message}");
+                return CreateFallbackRow(sourceRow, targetTable);
+            }
         }
 
         /// <summary>
@@ -560,11 +666,34 @@ namespace FinanceTool
             {
                 var fallbackRow = targetTable.NewRow();
 
-                // 안전하게 데이터 복사
-                int copyLength = Math.Min(sourceRow.ItemArray.Length, fallbackRow.ItemArray.Length);
-                for (int i = 0; i < copyLength; i++)
+                // 컬럼명 기반 안전한 복사 (인덱스 기반 방식 대신)
+                foreach (DataColumn sourceColumn in sourceRow.Table.Columns)
                 {
-                    fallbackRow[i] = sourceRow[i];
+                    string columnName = sourceColumn.ColumnName;
+
+                    if (targetTable.Columns.Contains(columnName))
+                    {
+                        try
+                        {
+                            object sourceValue = sourceRow[columnName];
+
+                            // 안전한 값 설정
+                            if (sourceValue == null || sourceValue == DBNull.Value)
+                            {
+                                fallbackRow[columnName] = DBNull.Value;
+                            }
+                            else
+                            {
+                                // 문자열로 안전하게 변환
+                                fallbackRow[columnName] = sourceValue.ToString();
+                            }
+                        }
+                        catch (Exception)
+                        {
+                            // 개별 컬럼 오류 시 DBNull로 설정
+                            fallbackRow[columnName] = DBNull.Value;
+                        }
+                    }
                 }
 
                 return fallbackRow;
@@ -572,7 +701,24 @@ namespace FinanceTool
             catch (Exception ex)
             {
                 Debug.WriteLine($"대체 행 생성 실패: {ex.Message}");
-                return null;
+
+                // 최후의 수단: 빈 행 생성
+                try
+                {
+                    var emptyRow = targetTable.NewRow();
+
+                    // 모든 컬럼을 DBNull로 초기화
+                    foreach (DataColumn column in targetTable.Columns)
+                    {
+                        emptyRow[column.ColumnName] = DBNull.Value;
+                    }
+
+                    return emptyRow;
+                }
+                catch
+                {
+                    return null;
+                }
             }
         }
 

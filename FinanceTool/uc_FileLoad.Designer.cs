@@ -58,6 +58,8 @@
             dataGridView_delete_col = new DataGridView();
             restore_col_btn = new Button();
             groupBox1 = new GroupBox();
+            label10 = new Label();
+            prod_col_combo = new ComboBox();
             label8 = new Label();
             label9 = new Label();
             lbl_pagination2 = new Label();
@@ -67,8 +69,6 @@
             cmb_pageSize = new ComboBox();
             btn_prevPage = new Button();
             btn_nextPage = new Button();
-            label10 = new Label();
-            prod_col_combo = new ComboBox();
             ((System.ComponentModel.ISupportInitialize)dataGridView_target).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dataGridView_process).BeginInit();
             groupBox2.SuspendLayout();
@@ -130,9 +130,9 @@
             // 
             cmb_target.Font = new Font("맑은 고딕", 14F);
             cmb_target.FormattingEnabled = true;
-            cmb_target.Location = new Point(157, 252);
+            cmb_target.Location = new Point(183, 252);
             cmb_target.Name = "cmb_target";
-            cmb_target.Size = new Size(307, 33);
+            cmb_target.Size = new Size(281, 33);
             cmb_target.TabIndex = 14;
             // 
             // label1
@@ -149,9 +149,9 @@
             // 
             cmb_money.Font = new Font("맑은 고딕", 14F);
             cmb_money.FormattingEnabled = true;
-            cmb_money.Location = new Point(157, 202);
+            cmb_money.Location = new Point(183, 202);
             cmb_money.Name = "cmb_money";
-            cmb_money.Size = new Size(307, 33);
+            cmb_money.Size = new Size(281, 33);
             cmb_money.TabIndex = 18;
             // 
             // label3
@@ -288,9 +288,9 @@
             // 
             sub_acc_col_combo.Font = new Font("맑은 고딕", 14F);
             sub_acc_col_combo.FormattingEnabled = true;
-            sub_acc_col_combo.Location = new Point(157, 54);
+            sub_acc_col_combo.Location = new Point(183, 54);
             sub_acc_col_combo.Name = "sub_acc_col_combo";
-            sub_acc_col_combo.Size = new Size(307, 33);
+            sub_acc_col_combo.Size = new Size(281, 33);
             sub_acc_col_combo.TabIndex = 23;
             // 
             // label5
@@ -307,9 +307,9 @@
             // 
             dept_col_combo.Font = new Font("맑은 고딕", 14F);
             dept_col_combo.FormattingEnabled = true;
-            dept_col_combo.Location = new Point(157, 104);
+            dept_col_combo.Location = new Point(183, 104);
             dept_col_combo.Name = "dept_col_combo";
-            dept_col_combo.Size = new Size(308, 33);
+            dept_col_combo.Size = new Size(282, 33);
             dept_col_combo.TabIndex = 21;
             // 
             // label6
@@ -318,9 +318,9 @@
             label6.Font = new Font("맑은 고딕", 14F);
             label6.Location = new Point(26, 107);
             label6.Name = "label6";
-            label6.Size = new Size(87, 25);
+            label6.Size = new Size(151, 25);
             label6.TabIndex = 22;
-            label6.Text = "부서 열 :";
+            label6.Text = "코스트센터 열  :";
             // 
             // btn_complete
             // 
@@ -423,6 +423,25 @@
             groupBox1.TabStop = false;
             groupBox1.Text = "필수 항목 설정";
             // 
+            // label10
+            // 
+            label10.AutoSize = true;
+            label10.Font = new Font("맑은 고딕", 14F);
+            label10.Location = new Point(26, 158);
+            label10.Name = "label10";
+            label10.Size = new Size(125, 25);
+            label10.TabIndex = 40;
+            label10.Text = "공급업체 열 :";
+            // 
+            // prod_col_combo
+            // 
+            prod_col_combo.Font = new Font("맑은 고딕", 14F);
+            prod_col_combo.FormattingEnabled = true;
+            prod_col_combo.Location = new Point(183, 155);
+            prod_col_combo.Name = "prod_col_combo";
+            prod_col_combo.Size = new Size(282, 33);
+            prod_col_combo.TabIndex = 39;
+            // 
             // label8
             // 
             label8.AutoSize = true;
@@ -513,25 +532,6 @@
             btn_nextPage.Text = "다음 ▶";
             btn_nextPage.UseVisualStyleBackColor = true;
             btn_nextPage.Click += btn_nextPage_Click;
-            // 
-            // label10
-            // 
-            label10.AutoSize = true;
-            label10.Font = new Font("맑은 고딕", 14F);
-            label10.Location = new Point(26, 158);
-            label10.Name = "label10";
-            label10.Size = new Size(125, 25);
-            label10.TabIndex = 40;
-            label10.Text = "공급업체 열 :";
-            // 
-            // prod_col_combo
-            // 
-            prod_col_combo.Font = new Font("맑은 고딕", 14F);
-            prod_col_combo.FormattingEnabled = true;
-            prod_col_combo.Location = new Point(157, 155);
-            prod_col_combo.Name = "prod_col_combo";
-            prod_col_combo.Size = new Size(308, 33);
-            prod_col_combo.TabIndex = 39;
             // 
             // uc_FileLoad
             // 
