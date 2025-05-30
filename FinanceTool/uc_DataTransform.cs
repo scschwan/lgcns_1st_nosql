@@ -1,5 +1,7 @@
 ﻿using DocumentFormat.OpenXml.Drawing;
 using DocumentFormat.OpenXml.Wordprocessing;
+using FinanceTool.MongoModels;
+using FinanceTool.Repositories;
 using Microsoft.VisualBasic.Devices;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -319,359 +321,290 @@ namespace FinanceTool
                 DataHandler.moneyDataTable = emptyTable;
             }
         }
+        /// <summary>
+        /// 극한 성능으로 MongoDB 데이터를 활용하여 transform 데이터를 보강
+        /// 192GB RAM과 16코어 CPU를 최대한 활용
+        /// </summary>
+        private async Task<DataTable> UltraHighPerformanceEnrichTransformDataAsync(DataTable transformDataTable)
+        {
+            try
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 성능 데이터 보강 시작: {transformDataTable.Rows.Count}행");
 
-        // EnrichTransformDataWithMongoData 메서드 수정 (원본 구조 최대한 유지)
+                // 극한 병렬 설정 - CPU 코어 수의 8배 스레드 사용 (clustering 패턴 적용)
+                int extremeParallelism = Environment.ProcessorCount * 8; // 16코어 * 8 = 128 스레드
+                const int ultraBatchSize = 50000; // 대용량 배치 (192GB RAM 활용)
+
+                // 결과 테이블 생성 (원본 구조 복사)
+                DataTable enrichedTable = transformDataTable.Clone();
+
+                // 1단계: 모든 raw_data_id 수집 및 유효성 검증 (극한 병렬)
+                var allRawDataIds = new ConcurrentBag<string>();
+
+                await Task.Run(() =>
+                {
+                    Parallel.ForEach(transformDataTable.AsEnumerable(),
+                        new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                        row =>
+                        {
+                            if (row["raw_data_id"] != DBNull.Value && row["raw_data_id"] != null)
+                            {
+                                string rawDataId = row["raw_data_id"].ToString();
+                                if (!string.IsNullOrEmpty(rawDataId))
+                                {
+                                    allRawDataIds.Add(rawDataId);
+                                }
+                            }
+                        });
+                });
+
+                var uniqueRawDataIds = allRawDataIds.Distinct().ToList();
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 수집된 고유 raw_data_id: {uniqueRawDataIds.Count}개");
+
+                if (uniqueRawDataIds.Count == 0)
+                {
+                    Debug.WriteLine("raw_data_id가 없어 원본 테이블 반환");
+                    return transformDataTable;
+                }
+
+                // 2단계: MongoDB에서 초고속 배치 조회 (대용량 메모리 활용)
+                var mongoDataLookup = new ConcurrentDictionary<string, UltraSpeedMongoData>();
+                var rawDataRepo = new RawDataRepository();
+
+                // 초대용량 배치로 MongoDB 쿼리 (메모리 과다 사용 허용)
+                var batchTasks = new List<Task>();
+
+                for (int i = 0; i < uniqueRawDataIds.Count; i += ultraBatchSize)
+                {
+                    var batchIds = uniqueRawDataIds.Skip(i).Take(ultraBatchSize).ToList();
+
+                    batchTasks.Add(Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var filter = Builders<RawDataDocument>.Filter.In(d => d.Id, batchIds);
+                            var rawDataDocs = await rawDataRepo.FindDocumentsAsync(filter);
+
+                            // 극한 병렬로 데이터 처리
+                            Parallel.ForEach(rawDataDocs,
+                                new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                                doc =>
+                                {
+                                    var ultraData = new UltraSpeedMongoData
+                                    {
+                                        Id = doc.Id,
+                                        Data = doc.Data ?? new Dictionary<string, object>(),
+                                        IsHidden = doc.IsHidden,
+                                        ImportDate = doc.ImportDate
+                                    };
+
+                                    mongoDataLookup.TryAdd(doc.Id, ultraData);
+                                });
+
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 처리 완료: {rawDataDocs.Count}개 문서");
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 처리 오류: {ex.Message}");
+                        }
+                    }));
+                }
+
+                // 모든 배치 작업 완료 대기
+                await Task.WhenAll(batchTasks);
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] MongoDB 데이터 로드 완료: {mongoDataLookup.Count}개");
+
+                // 3단계: 극한 속도 데이터 매핑 및 보강
+                await UltraSpeedDataEnrichmentAsync(transformDataTable, enrichedTable, mongoDataLookup, extremeParallelism);
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 성능 데이터 보강 완료: {enrichedTable.Rows.Count}행");
+                return enrichedTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 성능 데이터 보강 오류: {ex.Message}");
+                // 오류 시 원본 테이블 반환 (안전성 확보)
+                return transformDataTable;
+            }
+        }
+
+        /// <summary>
+        /// 극한 속도로 데이터 보강 수행
+        /// </summary>
+        private async Task UltraSpeedDataEnrichmentAsync(
+            DataTable sourceTable,
+            DataTable targetTable,
+            ConcurrentDictionary<string, UltraSpeedMongoData> mongoLookup,
+            int extremeParallelism)
+        {
+            // 행별 처리를 위한 극한 병렬 배치 생성
+            const int rowBatchSize = 10000; // 행 처리용 배치 크기
+            var rowBatches = new List<List<DataRow>>();
+
+            for (int i = 0; i < sourceTable.Rows.Count; i += rowBatchSize)
+            {
+                var batch = sourceTable.Rows.Cast<DataRow>()
+                                       .Skip(i)
+                                       .Take(rowBatchSize)
+                                       .ToList();
+                rowBatches.Add(batch);
+            }
+
+            // 결과 행들을 저장할 스레드 안전 컬렉션
+            var processedRows = new ConcurrentBag<DataRow>();
+
+            // 극한 병렬로 각 배치 처리
+            await Task.Run(() =>
+            {
+                Parallel.ForEach(rowBatches,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    batch =>
+                    {
+                        foreach (var sourceRow in batch)
+                        {
+                            try
+                            {
+                                var enrichedRow = ProcessSingleRowWithUltraSpeed(sourceRow, targetTable, mongoLookup);
+                                if (enrichedRow != null)
+                                {
+                                    processedRows.Add(enrichedRow);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"행 처리 오류: {ex.Message}");
+                                // 오류 발생한 행은 원본 데이터로 추가
+                                var fallbackRow = CreateFallbackRow(sourceRow, targetTable);
+                                if (fallbackRow != null)
+                                {
+                                    processedRows.Add(fallbackRow);
+                                }
+                            }
+                        }
+                    });
+            });
+
+            // 처리된 행들을 최종 테이블에 추가 (순서 보장을 위해 단일 스레드)
+            var sortedRows = processedRows.OrderBy(row =>
+            {
+                // raw_data_id 기준으로 정렬 (원본 순서 최대한 유지)
+                if (row["raw_data_id"] != DBNull.Value)
+                {
+                    return row["raw_data_id"].ToString();
+                }
+                return string.Empty;
+            }).ToList();
+
+            foreach (var row in sortedRows)
+            {
+                targetTable.Rows.Add(row.ItemArray);
+            }
+
+            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 보강 완료: {targetTable.Rows.Count}행 생성");
+        }
+
+        /// <summary>
+        /// 단일 행을 극한 속도로 처리
+        /// </summary>
+        private DataRow ProcessSingleRowWithUltraSpeed(
+            DataRow sourceRow,
+            DataTable targetTable,
+            ConcurrentDictionary<string, UltraSpeedMongoData> mongoLookup)
+        {
+            var newRow = targetTable.NewRow();
+
+            // 기본 데이터 복사 (극한 속도)
+            for (int i = 0; i < Math.Min(sourceRow.ItemArray.Length, newRow.ItemArray.Length); i++)
+            {
+                newRow[i] = sourceRow[i];
+            }
+
+            // MongoDB 데이터로 보강
+            if (sourceRow["raw_data_id"] != DBNull.Value && sourceRow["raw_data_id"] != null)
+            {
+                string rawDataId = sourceRow["raw_data_id"].ToString();
+
+                if (!string.IsNullOrEmpty(rawDataId) && mongoLookup.TryGetValue(rawDataId, out var mongoData))
+                {
+                    // MongoDB 데이터 컬럼 추가/업데이트
+                    foreach (var kvp in mongoData.Data)
+                    {
+                        if (targetTable.Columns.Contains(kvp.Key))
+                        {
+                            newRow[kvp.Key] = kvp.Value ?? DBNull.Value;
+                        }
+                    }
+
+                    // 메타데이터 추가
+                    if (targetTable.Columns.Contains("is_hidden"))
+                    {
+                        newRow["is_hidden"] = mongoData.IsHidden;
+                    }
+
+                    if (targetTable.Columns.Contains("import_date"))
+                    {
+                        newRow["import_date"] = mongoData.ImportDate;
+                    }
+                }
+            }
+
+            return newRow;
+        }
+
+        /// <summary>
+        /// 오류 발생 시 대체 행 생성
+        /// </summary>
+        private DataRow CreateFallbackRow(DataRow sourceRow, DataTable targetTable)
+        {
+            try
+            {
+                var fallbackRow = targetTable.NewRow();
+
+                // 안전하게 데이터 복사
+                int copyLength = Math.Min(sourceRow.ItemArray.Length, fallbackRow.ItemArray.Length);
+                for (int i = 0; i < copyLength; i++)
+                {
+                    fallbackRow[i] = sourceRow[i];
+                }
+
+                return fallbackRow;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"대체 행 생성 실패: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 극한 속도용 MongoDB 데이터 클래스
+        /// </summary>
+        private class UltraSpeedMongoData
+        {
+            public string Id { get; set; }
+            public Dictionary<string, object> Data { get; set; }
+            public bool IsHidden { get; set; }
+            public DateTime ImportDate { get; set; }
+        }
+        /// <summary>
+        /// 기존 EnrichTransformDataWithMongoData 메서드를 대체하는 호출부
+        /// </summary>
         public async Task<DataTable> EnrichTransformDataWithMongoData(DataTable transformDataTable)
         {
             try
             {
-                Debug.WriteLine("EnrichTransformDataWithMongoData 시작");
-
-                // 원본 데이터를 수정하지 않도록 복사본 생성
-                DataTable resultTable = new DataTable();
-
-                // MongoDB 연결 확인
-                await Data.MongoDBManager.Instance.EnsureInitializedAsync();
-
-                // ColumnMapping 저장소 생성 (또는 직접 MongoDB 액세스)
-                var columnMappingFilter = Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("is_visible", true);
-                var columnMappingsResult = await Data.MongoDBManager.Instance.FindDocumentsAsync<MongoDB.Bson.BsonDocument>(
-                    "column_mapping",
-                    columnMappingFilter);
-
-                // 시각화될 컬럼명 추출
-                List<string> visibleColumns = new List<string>();
-                foreach (var doc in columnMappingsResult)
-                {
-                    if (doc.Contains("original_name"))
-                    {
-                        string originalName = doc["original_name"].AsString;
-                        visibleColumns.Add(originalName);
-                    }
-                }
-
-                Debug.WriteLine($"시각화될 컬럼: {string.Join(", ", visibleColumns)}");
-
-                if (visibleColumns.Count == 0)
-                {
-                    Debug.WriteLine("표시할 컬럼이 없습니다. column_mapping 컬렉션의 is_visible 속성을 확인하세요.");
-                    return transformDataTable.Copy();
-                }
-
-                // 1. 먼저 시각화 컬럼 추가
-                foreach (string column in visibleColumns)
-                {
-                    resultTable.Columns.Add(column, typeof(string));
-                }
-
-                // 2. 그 다음 원본 transformDataTable의 컬럼 추가 (중복 제외)
-                foreach (DataColumn column in transformDataTable.Columns)
-                {
-                    if (!resultTable.Columns.Contains(column.ColumnName))
-                    {
-                        resultTable.Columns.Add(column.ColumnName, column.DataType);
-                    }
-                }
-
-                // 3. 원본 데이터의 모든 행 복사
-                foreach (DataRow originalRow in transformDataTable.Rows)
-                {
-                    DataRow newRow = resultTable.NewRow();
-
-                    // 원본 테이블의 모든 컬럼 값을 새 행에 복사
-                    foreach (DataColumn column in transformDataTable.Columns)
-                    {
-                        if (resultTable.Columns.Contains(column.ColumnName))
-                        {
-                            newRow[column.ColumnName] = originalRow[column.ColumnName];
-                        }
-                    }
-
-                    resultTable.Rows.Add(newRow);
-                }
-
-                // 4. raw_data_id 컬럼이 있는지 확인
-                if (!resultTable.Columns.Contains("raw_data_id"))
-                {
-                    Debug.WriteLine("transformDataTable에 raw_data_id 컬럼이 없습니다.");
-                    return resultTable;
-                }
-
-                // 5. RawData 저장소 생성
-                var rawDataRepo = new Repositories.RawDataRepository();
-
-                // 6. 모든 행의 raw_data_id 목록 수집
-                HashSet<string> rawDataIds = new HashSet<string>();
-                Dictionary<string, List<DataRow>> idToRowsMap = new Dictionary<string, List<DataRow>>();
-
-                foreach (DataRow row in resultTable.Rows)
-                {
-                    if (row["raw_data_id"] != DBNull.Value)
-                    {
-                        string rawDataId = row["raw_data_id"].ToString();
-                        if (!string.IsNullOrEmpty(rawDataId))
-                        {
-                            rawDataIds.Add(rawDataId);
-
-                            if (!idToRowsMap.ContainsKey(rawDataId))
-                            {
-                                idToRowsMap[rawDataId] = new List<DataRow>();
-                            }
-                            idToRowsMap[rawDataId].Add(row);
-                        }
-                    }
-                }
-
-                if (rawDataIds.Count == 0)
-                {
-                    Debug.WriteLine("유효한 raw_data_id가 없습니다.");
-                    return resultTable;
-                }
-
-                Debug.WriteLine($"보강할 raw_data_id: {rawDataIds.Count}개");
-
-                // 7. 배치 처리로 원본 데이터 가져오기
-                /*
-                const int batchSize = 10000;
-                List<string> idList = rawDataIds.ToList();
-
-                // 안전한 배치 처리
-                for (int i = 0; i < idList.Count; i += batchSize)
-                {
-                    int currentBatchSize = Math.Min(batchSize, idList.Count - i);
-                    if (i >= idList.Count || currentBatchSize <= 0)
-                        continue;
-
-                    List<string> batchIds = idList.GetRange(i, currentBatchSize);
-
-                    // MongoDB ID 형식으로 필터 생성
-                    var batchFilter = Builders<MongoModels.RawDataDocument>.Filter.In(d => d.Id, batchIds);
-                    var batchRawDatas = await rawDataRepo.FindDocumentsAsync(batchFilter);
-
-                    //Debug.WriteLine($"배치 조회 결과: {batchRawDatas.Count}개 문서 ({i + 1}-{i + currentBatchSize}배치)");
-
-                    // 조회된 데이터를 매핑
-                    foreach (var rawData in batchRawDatas)
-                    {
-                        string id = rawData.Id;
-
-                        if (idToRowsMap.ContainsKey(id) && rawData.Data != null)
-                        {
-                            foreach (DataRow resultRow in idToRowsMap[id])
-                            {
-                                foreach (string column in visibleColumns)
-                                {
-                                    if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
-                                    {
-                                        resultRow[column] = rawData.Data[column]?.ToString() ?? string.Empty;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                */
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 원본 데이터 로드 시작: {rawDataIds.Count}개");
-
-                // 시스템 리소스에 최적화된 배치 크기 및 병렬 처리 설정
-                const int batchSize = 10000; // 더 작은 배치로 메모리 효율성 향상
-                int maxParallelism = Math.Max(Environment.ProcessorCount, 16); // 최대 8개 병렬 처리
-                List<string> idList = rawDataIds.ToList();
-
-                // 배치 생성
-                var batches = new List<List<string>>();
-                for (int i = 0; i < idList.Count; i += batchSize)
-                {
-                    batches.Add(idList.Skip(i).Take(batchSize).ToList());
-                }
-
-                // rawDataMap을 ConcurrentDictionary로 변경 (thread-safe)
-                var rawDataMap = new ConcurrentDictionary<string, MongoModels.RawDataDocument>();
-
-                // 병렬 배치 처리를 위한 동시성 제어
-                using (var semaphore = new SemaphoreSlim(maxParallelism))
-                {
-                    var processedCount = 0;
-                    var lockObject = new object();
-
-                    var batchTasks = batches.Select(async (batch, batchIndex) =>
-                    {
-                        await semaphore.WaitAsync();
-                        try
-                        {
-                            // MongoDB ID 형식으로 필터 생성
-                            var batchFilter = Builders<MongoModels.RawDataDocument>.Filter.In(d => d.Id, batch);
-                            var batchRawDatas = await rawDataRepo.FindDocumentsAsync(batchFilter);
-
-                            // 결과를 thread-safe하게 rawDataMap에 추가
-                            foreach (var rawData in batchRawDatas)
-                            {
-                                rawDataMap.TryAdd(rawData.Id, rawData);
-                            }
-
-                            // 진행상황 업데이트 (thread-safe)
-                            lock (lockObject)
-                            {
-                                processedCount += batch.Count;
-
-                                if (batchIndex % 10 == 0) // 매 10번째 배치마다 로깅
-                                {
-                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 {batchIndex + 1}/{batches.Count} 완료 ({processedCount}/{idList.Count})");
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 {batchIndex} 처리 중 오류: {ex.Message}");
-                        }
-                        finally
-                        {
-                            semaphore.Release();
-                        }
-                    });
-
-                    // 모든 배치 작업 완료 대기
-                    await Task.WhenAll(batchTasks);
-                }
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 원본 데이터 로드 완료: {rawDataMap.Count}개");
-
-                /*
-// 기존 매핑 로직을 병렬 처리로 개선
-await Task.Run(() =>
-{
-    Parallel.ForEach(resultTable.AsEnumerable(),
-        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
-        row =>
-        {
-            try
-            {
-                if (row["raw_data_id"] != DBNull.Value)
-                {
-                    string rawDataId = row["raw_data_id"].ToString();
-                    if (!string.IsNullOrEmpty(rawDataId) && rawDataMap.TryGetValue(rawDataId, out var rawData))
-                    {
-                        if (rawData.Data != null)
-                        {
-                            foreach (string column in visibleColumns)
-                            {
-                                if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
-                                {
-                                    lock (row) // 행 수준 잠금으로 동시성 제어
-                                    {
-                                        row[column] = rawData.Data[column]?.ToString() ?? string.Empty;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                // 기존 Array.Copy 방식 대신 극한 성능 방식 사용
+                return await UltraHighPerformanceEnrichTransformDataAsync(transformDataTable);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 매핑 중 오류: {ex.Message}");
+                Debug.WriteLine($"MongoDB 데이터 보강 중 오류 발생: {ex.Message}");
+                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+
+                // 오류 시 원본 테이블 반환 (안전성 확보)
+                return transformDataTable;
             }
         }
-    );
-});
-*/
-
-                // 수정된 안전한 매핑 로직
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 매핑 시작: {resultTable.Rows.Count}개 행");
-
-                // DataTable을 배열로 변환하여 안전하게 병렬 처리
-                var rowsArray = resultTable.AsEnumerable().ToArray();
-                var totalRows = rowsArray.Length;
-
-                // 배치 단위로 병렬 처리 (더 안전한 방식)
-                //const int mappingBatchSize = 10000;
-                var mappingBatches = new List<DataRow[]>();
-
-                for (int i = 0; i < totalRows; i += batchSize)
-                {
-                    //int batchSize = Math.Min(mappingBatchSize, totalRows - i);
-                    var batch = new DataRow[batchSize];
-                    Array.Copy(rowsArray, i, batch, 0, batchSize);
-                    mappingBatches.Add(batch);
-                }
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 매핑 배치 생성: {mappingBatches.Count}개 배치");
-
-                // 병렬 배치 처리
-                using (var semaphore = new SemaphoreSlim(Environment.ProcessorCount))
-                {
-                    var mappingTasks = mappingBatches.Select(async (batch, batchIndex) =>
-                    {
-                        await semaphore.WaitAsync();
-                        try
-                        {
-                            // 각 배치를 순차적으로 처리 (배치 내부는 순차, 배치 간은 병렬)
-                            foreach (var row in batch)
-                            {
-                                try
-                                {
-                                    if (row["raw_data_id"] != DBNull.Value)
-                                    {
-                                        string rawDataId = row["raw_data_id"].ToString();
-                                        if (!string.IsNullOrEmpty(rawDataId) && rawDataMap.TryGetValue(rawDataId, out var rawData))
-                                        {
-                                            if (rawData.Data != null)
-                                            {
-                                                foreach (string column in visibleColumns)
-                                                {
-                                                    if (rawData.Data.ContainsKey(column) && resultTable.Columns.Contains(column))
-                                                    {
-                                                        // DataTable 컬럼 인덱스 확인 후 안전하게 할당
-                                                        try
-                                                        {
-                                                            row[column] = rawData.Data[column]?.ToString() ?? string.Empty;
-                                                        }
-                                                        catch (ArgumentException)
-                                                        {
-                                                            // 컬럼이 존재하지 않는 경우 무시
-                                                            continue;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 개별 행 처리 중 오류: {ex.Message}");
-                                }
-                            }
-
-                            // 진행 상황 로깅
-                            if (batchIndex % 5 == 0)
-                            {
-                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 매핑 배치 {batchIndex + 1}/{mappingBatches.Count} 완료");
-                            }
-                        }
-                        finally
-                        {
-                            semaphore.Release();
-                        }
-                    });
-
-                    await Task.WhenAll(mappingTasks);
-                }
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 매핑 완료");
-
-                // 이미 필요한 메타데이터 컬럼만 있을테니 더 이상 제거할 필요 없음
-                Debug.WriteLine("EnrichTransformDataWithMongoData 완료");
-                return resultTable;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"MongoDB 데이터 보강 중 오류 발생: {ex.Message}\n{ex.StackTrace}");
-                // 예외 발생 시 원본 데이터 테이블의 복사본 반환
-                return transformDataTable.Copy();
-            }
-        }
-
 
         private bool searchYN = false;
         private async Task create_merge_keyword_list(bool progressYN = false)
