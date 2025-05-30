@@ -1091,6 +1091,162 @@ namespace FinanceTool
 
         // 키워드 병합 처리 함수 (개선버전)
         // 키워드 병합 처리 함수 (개선버전 - 병렬 처리 적용)
+        private async Task<(ConcurrentDictionary<string, int> keywordFrequency,
+                   ConcurrentDictionary<string, ConcurrentBag<string>> keywordToRawDataIds)>
+    ProcessKeywordsUltraSpeed(DataTable transformDataTable, List<string> keywordColumns)
+        {
+            try
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 키워드 처리 시작: {transformDataTable.Rows.Count}행");
+
+                // 극한 병렬 설정 - CPU 코어 수의 16배 (192GB RAM 활용)
+                int extremeParallelism = Environment.ProcessorCount * 16; // 16코어 * 16 = 256 스레드
+                const int ultraBatchSize = 50000; // 대용량 배치
+
+                // 결과 저장용 스레드 안전 컬렉션
+                var keywordFrequency = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                var keywordToRawDataIds = new ConcurrentDictionary<string, ConcurrentBag<string>>(StringComparer.OrdinalIgnoreCase);
+
+                // 1단계: 데이터를 메모리에 최적화하여 로드 (극한 메모리 사용)
+                var rowDataCache = new UltraSpeedRowData[transformDataTable.Rows.Count];
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 메모리 캐싱 시작...");
+
+                // 메모리 캐싱을 병렬로 수행 (극한 속도)
+                await Task.Run(() =>
+                {
+                    Parallel.For(0, transformDataTable.Rows.Count,
+                        new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                        i =>
+                        {
+                            try
+                            {
+                                var row = transformDataTable.Rows[i];
+                                string rawDataId = row["raw_data_id"]?.ToString();
+
+                                if (!string.IsNullOrEmpty(rawDataId))
+                                {
+                                    var keywords = new string[keywordColumns.Count];
+                                    for (int j = 0; j < keywordColumns.Count; j++)
+                                    {
+                                        keywords[j] = row[keywordColumns[j]]?.ToString()?.Trim();
+                                    }
+
+                                    rowDataCache[i] = new UltraSpeedRowData
+                                    {
+                                        RawDataId = rawDataId,
+                                        Keywords = keywords
+                                    };
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 행 {i} 캐싱 오류: {ex.Message}");
+                            }
+                        });
+                });
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 메모리 캐싱 완료");
+
+                // 2단계: 배치별 극한 병렬 처리
+                var batches = new List<UltraSpeedRowData[]>();
+
+                for (int i = 0; i < rowDataCache.Length; i += ultraBatchSize)
+                {
+                    int batchSize = Math.Min(ultraBatchSize, rowDataCache.Length - i);
+                    var batch = new UltraSpeedRowData[batchSize];
+                    Array.Copy(rowDataCache, i, batch, 0, batchSize);
+                    batches.Add(batch);
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 병렬 키워드 처리 시작: {batches.Count}개 배치");
+
+                // 극한 병렬 배치 처리
+                await Task.Run(() =>
+                {
+                    Parallel.ForEach(batches,
+                        new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                        batch =>
+                        {
+                            try
+                            {
+                                // 배치별 로컬 결과 (메모리 효율성)
+                                var localKeywordFreq = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                                var localKeywordToIds = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+                                // 배치 내 데이터 처리 (극한 속도)
+                                foreach (var rowData in batch)
+                                {
+                                    if (rowData.RawDataId == null) continue;
+
+                                    foreach (var keyword in rowData.Keywords)
+                                    {
+                                        if (string.IsNullOrWhiteSpace(keyword)) continue;
+
+                                        // 로컬 집계
+                                        if (!localKeywordFreq.ContainsKey(keyword))
+                                        {
+                                            localKeywordFreq[keyword] = 0;
+                                            localKeywordToIds[keyword] = new HashSet<string>();
+                                        }
+
+                                        localKeywordFreq[keyword]++;
+                                        localKeywordToIds[keyword].Add(rowData.RawDataId);
+                                    }
+                                }
+
+                                // 글로벌 결과에 병합 (스레드 안전)
+                                foreach (var kvp in localKeywordFreq)
+                                {
+                                    keywordFrequency.AddOrUpdate(kvp.Key, kvp.Value, (k, v) => v + kvp.Value);
+                                }
+
+                                foreach (var kvp in localKeywordToIds)
+                                {
+                                    keywordToRawDataIds.AddOrUpdate(
+                                        kvp.Key,
+                                        new ConcurrentBag<string>(kvp.Value),
+                                        (k, existingBag) =>
+                                        {
+                                            foreach (var id in kvp.Value)
+                                            {
+                                                existingBag.Add(id);
+                                            }
+                                            return existingBag;
+                                        }
+                                    );
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 처리 오류: {ex.Message}");
+                            }
+                        });
+                });
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 키워드 처리 완료: {keywordFrequency.Count}개 고유 키워드");
+
+                return (keywordFrequency, keywordToRawDataIds);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 키워드 처리 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 극한 속도용 행 데이터 구조체 (메모리 효율성)
+        /// </summary>
+        private struct UltraSpeedRowData
+        {
+            public string RawDataId { get; set; }
+            public string[] Keywords { get; set; }
+        }
+
+        /// <summary>
+        /// ProcessMergeKeywordListWithProgress에서 기존 키워드 추출 부분을 이것으로 교체
+        /// </summary>
         private async Task ProcessMergeKeywordListWithProgress(ProcessProgressForm.UpdateProgressDelegate progress)
         {
             try
@@ -1133,82 +1289,27 @@ namespace FinanceTool
                     return;
                 }
 
-                await UpdateProgress(20, "키워드 추출 중...");
+                await UpdateProgress(20, "극한 속도 키워드 추출 중...");
 
-                // 3. 시스템 리소스 기반 병렬 처리 설정
-                int maxParallelism = Math.Max(Environment.ProcessorCount, 16);
-                int totalRows = transformDataTable.Rows.Count;
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 처리 시작: {totalRows}개 행, 최대 병렬도: {maxParallelism}");
-
-                // 4. 키워드 추출 및 빈도 계산 (병렬 처리)
-                var keywordFrequency = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                var keywordToRawDataIds = new ConcurrentDictionary<string, ConcurrentBag<string>>(StringComparer.OrdinalIgnoreCase);
-
-                await Task.Run(() =>
-                {
-                    Parallel.ForEach(transformDataTable.AsEnumerable(),
-                        new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
-                        row =>
-                        {
-                            try
-                            {
-                                string rawDataId = row["raw_data_id"]?.ToString();
-                                if (string.IsNullOrEmpty(rawDataId)) return;
-
-                                // 각 키워드 컬럼에서 키워드 추출
-                                foreach (string colName in keywordColumns)
-                                {
-                                    string keyword = row[colName]?.ToString();
-                                    if (string.IsNullOrWhiteSpace(keyword)) continue;
-
-                                    // 키워드 표준화
-                                    keyword = keyword.Trim();
-
-                                    // 키워드 빈도 증가 (thread-safe)
-                                    keywordFrequency.AddOrUpdate(keyword, 1, (k, v) => v + 1);
-
-                                    // 키워드에 해당하는 raw_data_id 추가 (thread-safe)
-                                    keywordToRawDataIds.AddOrUpdate(
-                                        keyword,
-                                        new ConcurrentBag<string> { rawDataId },
-                                        (k, bag) =>
-                                        {
-                                            bag.Add(rawDataId);
-                                            return bag;
-                                        }
-                                    );
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 추출 중 오류: {ex.Message}");
-                            }
-                        }
-                    );
-                });
-
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 추출 완료: {keywordFrequency.Count}개 고유 키워드");
+                // 3. 극한 속도 키워드 처리 (기존 Parallel.ForEach 대체)
+                var (keywordFrequency, keywordToRawDataIds) = await ProcessKeywordsUltraSpeed(transformDataTable, keywordColumns);
 
                 await UpdateProgress(40, $"키워드별 금액 합산 중... ({keywordFrequency.Count}개 키워드)");
 
-                // 5. 금액 정보를 병렬로 처리하여 ConcurrentDictionary에 저장
+                // 4. 금액 정보를 극한 속도로 처리
                 var rawDataToMoney = new ConcurrentDictionary<string, decimal>();
 
                 if (DataHandler.moneyDataTable != null && DataHandler.moneyDataTable.Rows.Count > 0)
                 {
-                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병렬 금액 정보 로드 시작: {DataHandler.moneyDataTable.Rows.Count}개 행");
+                    Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 금액 정보 로드 시작: {DataHandler.moneyDataTable.Rows.Count}개 행");
 
-                    // moneyDataTable 구조 확인 로깅
-                    string[] columnNames = DataHandler.moneyDataTable.Columns.Cast<DataColumn>()
-                        .Select(c => c.ColumnName).ToArray();
-                    Debug.WriteLine($"moneyDataTable 컬럼 구조: {string.Join(", ", columnNames)}");
-
-                    // 금액 데이터를 병렬 처리로 로드
+                    // 금액 데이터를 극한 병렬 처리로 로드
                     await Task.Run(() =>
                     {
+                        int extremeParallelism = Environment.ProcessorCount * 16;
+
                         Parallel.ForEach(DataHandler.moneyDataTable.AsEnumerable(),
-                            new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                            new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
                             moneyRow =>
                             {
                                 try
@@ -1219,28 +1320,23 @@ namespace FinanceTool
                                         string rawDataId = moneyRow["raw_data_id"].ToString();
                                         if (!string.IsNullOrEmpty(rawDataId))
                                         {
-                                            // 금액 값 추출
+                                            // 금액 값 추출 (기존 로직 유지)
                                             object moneyValue = null;
 
-                                            // 첫 번째 시도: 인덱스 기반 접근 (ExtractColumnToNewTable 함수 결과)
                                             if (moneyRow.Table.Columns.Count > 1)
                                             {
-                                                // 첫 번째 열이 raw_data_id가 아니라면, 첫 번째 열이 금액일 가능성 있음
                                                 if (moneyRow.Table.Columns[0].ColumnName != "raw_data_id")
                                                 {
                                                     moneyValue = moneyRow[0];
                                                 }
-                                                // 두 번째 열을 시도
                                                 else if (moneyRow.Table.Columns.Count > 1)
                                                 {
                                                     moneyValue = moneyRow[1];
                                                 }
                                             }
 
-                                            // 두 번째 시도: 컬럼명 사용
                                             if (moneyValue == null || moneyValue == DBNull.Value)
                                             {
-                                                // DataHandler.levelName[0]이 금액 컬럼명
                                                 string moneyColumnName = DataHandler.levelName[0];
                                                 if (moneyRow.Table.Columns.Contains(moneyColumnName))
                                                 {
@@ -1248,7 +1344,6 @@ namespace FinanceTool
                                                 }
                                             }
 
-                                            // 금액을 parseable 형태로 변환
                                             if (moneyValue != null && moneyValue != DBNull.Value)
                                             {
                                                 if (decimal.TryParse(moneyValue.ToString(), out decimal amount))
@@ -1270,119 +1365,17 @@ namespace FinanceTool
                     Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 금액 정보 로드 완료: {rawDataToMoney.Count}개");
                 }
 
-                // 6. 추가 금액 정보 로드 - ProcessViewDocument의 money 필드에서 직접 가져옴 (병렬 처리 적용)
-                if (rawDataToMoney.Count < transformDataTable.Rows.Count / 2)
-                {
-                    Debug.WriteLine($"금액 데이터가 충분하지 않습니다. ProcessView에서 추가 로드를 시도합니다. 현재: {rawDataToMoney.Count}/{transformDataTable.Rows.Count}");
-
-                    try
-                    {
-                        DateTime startTime = DateTime.Now;
-                        var processViewRepo = new Repositories.ProcessViewRepository();
-
-                        // 필요한 ID만 추출
-                        var missingIds = new ConcurrentBag<string>();
-
-                        // 병렬로 누락된 ID 찾기
-                        await Task.Run(() =>
-                        {
-                            Parallel.ForEach(transformDataTable.AsEnumerable(),
-                                new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
-                                row =>
-                                {
-                                    string rawDataId = row["raw_data_id"]?.ToString();
-                                    if (!string.IsNullOrEmpty(rawDataId) && !rawDataToMoney.ContainsKey(rawDataId))
-                                    {
-                                        missingIds.Add(rawDataId);
-                                    }
-                                }
-                            );
-                        });
-
-                        var missingIdsList = missingIds.Distinct().ToList();
-
-                        if (missingIdsList.Count > 0)
-                        {
-                            Debug.WriteLine($"{missingIdsList.Count}개의 금액 정보를 보강합니다.");
-
-                            // 배치 크기 설정
-                            const int batchSize = 10000; // 더 작은 배치로 최적화
-                            var batches = new List<List<string>>();
-
-                            for (int i = 0; i < missingIdsList.Count; i += batchSize)
-                            {
-                                batches.Add(missingIdsList.Skip(i).Take(batchSize).ToList());
-                            }
-
-                            Debug.WriteLine($"{batches.Count}개 배치로 분할하여 병렬 처리합니다.");
-
-                            // 병렬 배치 처리
-                            var additionalMoney = new ConcurrentDictionary<string, decimal>();
-
-                            using (var semaphore = new SemaphoreSlim(Math.Min(maxParallelism, 6))) // MongoDB 연결 제한 고려
-                            {
-                                var tasks = batches.Select(async batch =>
-                                {
-                                    await semaphore.WaitAsync();
-                                    try
-                                    {
-                                        var batchFilter = Builders<MongoModels.ProcessViewDocument>.Filter.In(d => d.RawDataId, batch);
-                                        var batchDocs = await processViewRepo.FindDocumentsAsync(batchFilter);
-
-                                        foreach (var doc in batchDocs)
-                                        {
-                                            if (doc.Money != null)
-                                            {
-                                                if (doc.Money is decimal decimalAmount)
-                                                {
-                                                    additionalMoney.TryAdd(doc.RawDataId, decimalAmount);
-                                                }
-                                                else if (decimal.TryParse(doc.Money.ToString(), out decimal amount))
-                                                {
-                                                    additionalMoney.TryAdd(doc.RawDataId, amount);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 배치 처리 중 오류: {ex.Message}");
-                                    }
-                                    finally
-                                    {
-                                        semaphore.Release();
-                                    }
-                                });
-
-                                await Task.WhenAll(tasks);
-                            }
-
-                            // 결과를 rawDataToMoney에 병합
-                            foreach (var pair in additionalMoney)
-                            {
-                                rawDataToMoney.TryAdd(pair.Key, pair.Value);
-                            }
-
-                            DateTime endTime = DateTime.Now;
-                            TimeSpan duration = endTime - startTime;
-                            Debug.WriteLine($"금액 정보 보강 완료: {rawDataToMoney.Count}개 (처리 시간: {duration.TotalSeconds:F2}초)");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"금액 정보 보강 중 오류: {ex.Message}");
-                    }
-                }
-
                 await UpdateProgress(60, "키워드별 금액 합산 중...");
 
-                // 7. 키워드별 금액 합산 (병렬 처리)
+                // 5. 키워드별 금액 합산 (극한 병렬 처리)
                 var keywordTotalMoney = new ConcurrentDictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
                 await Task.Run(() =>
                 {
+                    int extremeParallelism = Environment.ProcessorCount * 16;
+
                     Parallel.ForEach(keywordToRawDataIds,
-                        new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                        new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
                         pair =>
                         {
                             try
@@ -1410,11 +1403,10 @@ namespace FinanceTool
                 });
 
                 Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드별 금액 합산 완료: {keywordTotalMoney.Count}개");
-                Debug.WriteLine($"금액 정보가 로드된 raw_data_id: {rawDataToMoney.Count}개");
 
                 await UpdateProgress(80, "요약 데이터 생성 중...");
 
-                // 8. 결과 DataTable 생성
+                // 6. 나머지 로직은 기존과 동일 (결과 DataTable 생성 등)
                 modifiedDataTable = new DataTable();
                 modifiedDataTable.Columns.Add("Value", typeof(string));
                 modifiedDataTable.Columns.Add("Count", typeof(int));
@@ -1433,18 +1425,12 @@ namespace FinanceTool
                     // 금액 포맷팅
                     string formattedMoney = FormatToKoreanUnit(totalMoney);
 
-                    // 디버깅용 로깅 (첫 10개)
-                    if (modifiedDataTable.Rows.Count < 10)
-                    {
-                        Debug.WriteLine($"키워드: {keyword}, 빈도: {count}, 금액: {totalMoney} -> {formattedMoney}");
-                    }
-
                     modifiedDataTable.Rows.Add(keyword, count, formattedMoney);
                 }
 
                 await UpdateProgress(90, "UI 업데이트 중...");
 
-                // 9. UI 업데이트 (GridView에 표시)
+                // 7. UI 업데이트 (기존 로직과 동일)
                 await Task.Run(() =>
                 {
                     if (Application.OpenForms.Count > 0)
@@ -1491,7 +1477,7 @@ namespace FinanceTool
                 });
 
                 await UpdateProgress(100, "완료된 결과: " + modifiedDataTable.Rows.Count + "개 키워드");
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 요약 테이블 생성 완료: {modifiedDataTable.Rows.Count}개 키워드");
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 키워드 요약 테이블 생성 완료: {modifiedDataTable.Rows.Count}개 키워드");
             }
             catch (Exception ex)
             {
