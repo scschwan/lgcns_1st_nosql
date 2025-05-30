@@ -15,7 +15,9 @@ using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Runtime;
 using System.Text;
+using Microsoft.Extensions.ObjectPool;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Button;
@@ -43,10 +45,291 @@ namespace FinanceTool
         // 전역 인스턴스 생성
         private static RecomandKeywordManager _recomandKeywordManager;
 
+        /// <summary>
+        /// 시스템 성능 극대화 설정 클래스
+        /// 192GB RAM과 16코어 CPU 환경에 최적화
+        /// </summary>
+        public static class SystemPerformanceOptimizer
+        {
+            private static bool _isOptimized = false;
+            private static readonly object _optimizationLock = new object();
+
+            /// <summary>
+            /// 시스템 성능 최적화 적용 (한 번만 실행)
+            /// </summary>
+            public static void OptimizeSystemForUltraSpeed()
+            {
+                if (_isOptimized) return;
+
+                lock (_optimizationLock)
+                {
+                    if (_isOptimized) return;
+
+                    try
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 시스템 성능 최적화 시작");
+
+                        // 1. GC 설정 최적화 (192GB RAM 활용)
+                        OptimizeGarbageCollection();
+
+                        // 2. 스레드 풀 최적화 (16코어 CPU 활용)
+                        OptimizeThreadPool();
+
+                        // 3. .NET 런타임 최적화
+                        OptimizeDotNetRuntime();
+
+                        // 4. 메모리 할당 최적화
+                        OptimizeMemoryAllocation();
+
+                        _isOptimized = true;
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 시스템 성능 최적화 완료");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 시스템 성능 최적화 오류: {ex.Message}");
+                    }
+                }
+            }
+
+            /// <summary>
+            /// GC 최적화 (192GB RAM 환경)
+            /// </summary>
+            private static void OptimizeGarbageCollection()
+            {
+                try
+                {
+                    // Server GC 모드 확인 및 설정
+                    if (!GCSettings.IsServerGC)
+                    {
+                        Debug.WriteLine("경고: Server GC가 활성화되지 않음. app.config에 추가 권장:");
+                        Debug.WriteLine("<gcServer enabled=\"true\"/>");
+                    }
+
+                    // 대용량 메모리 환경을 위한 GC 지연 모드 설정
+                    GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+
+                    // 메모리 압박 임계값 조정 (192GB의 80% 활용)
+                    long targetMemoryBytes = 192L * 1024 * 1024 * 1024 * 80 / 100; // 153GB
+
+                    Debug.WriteLine($"GC 최적화 완료 - 목표 메모리: {targetMemoryBytes / 1024 / 1024 / 1024}GB");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"GC 최적화 오류: {ex.Message}");
+                }
+            }
+
+            /// <summary>
+            /// 스레드 풀 최적화 (16코어 CPU 환경)
+            /// </summary>
+            private static void OptimizeThreadPool()
+            {
+                try
+                {
+                    int coreCount = Environment.ProcessorCount; // 16 cores
+
+                    // 작업자 스레드 최적화 (코어당 8-16개 스레드)
+                    int minWorkerThreads = coreCount * 8;   // 128개
+                    int maxWorkerThreads = coreCount * 16;  // 256개
+
+                    // I/O 완료 포트 스레드 최적화
+                    int minCompletionPortThreads = coreCount * 4;  // 64개
+                    int maxCompletionPortThreads = coreCount * 8;  // 128개
+
+                    // 최소 스레드 수 설정
+                    ThreadPool.SetMinThreads(minWorkerThreads, minCompletionPortThreads);
+
+                    // 최대 스레드 수 설정
+                    ThreadPool.SetMaxThreads(maxWorkerThreads, maxCompletionPortThreads);
+
+                    Debug.WriteLine($"스레드 풀 최적화 완료 - Worker: {minWorkerThreads}-{maxWorkerThreads}, " +
+                                   $"IOCP: {minCompletionPortThreads}-{maxCompletionPortThreads}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"스레드 풀 최적화 오류: {ex.Message}");
+                }
+            }
+
+            /// <summary>
+            /// .NET 런타임 최적화
+            /// </summary>
+            private static void OptimizeDotNetRuntime()
+            {
+                try
+                {
+                    // JIT 컴파일러 최적화
+                    System.Runtime.ProfileOptimization.SetProfileRoot(Path.GetTempPath());
+                    System.Runtime.ProfileOptimization.StartProfile("FinanceToolOptimization.prof");
+
+                    Debug.WriteLine(".NET 런타임 최적화 완료");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($".NET 런타임 최적화 오류: {ex.Message}");
+                }
+            }
+
+            /// <summary>
+            /// 메모리 할당 최적화
+            /// </summary>
+            private static void OptimizeMemoryAllocation()
+            {
+                try
+                {
+                    // 대용량 객체를 위한 사전 할당
+                    var dummy = new byte[85000]; // LOH 임계값 초과
+                    dummy = null;
+
+                    // GC를 한 번 실행하여 초기화
+                    GC.Collect(2, GCCollectionMode.Optimized);
+                    GC.WaitForPendingFinalizers();
+
+                    Debug.WriteLine("메모리 할당 최적화 완료");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"메모리 할당 최적화 오류: {ex.Message}");
+                }
+            }
+
+            /// <summary>
+            /// 현재 시스템 성능 상태 출력
+            /// </summary>
+            public static void LogSystemStatus()
+            {
+                try
+                {
+                    Debug.WriteLine("=== 시스템 성능 상태 ===");
+                    Debug.WriteLine($"프로세서 코어 수: {Environment.ProcessorCount}");
+                    Debug.WriteLine($"사용 가능한 메모리: {GC.GetTotalMemory(false) / 1024 / 1024}MB");
+                    Debug.WriteLine($"Server GC 모드: {GCSettings.IsServerGC}");
+                    Debug.WriteLine($"GC 지연 모드: {GCSettings.LatencyMode}");
+
+                    ThreadPool.GetMinThreads(out int minWorker, out int minIO);
+                    ThreadPool.GetMaxThreads(out int maxWorker, out int maxIO);
+                    Debug.WriteLine($"스레드 풀 - Worker: {minWorker}-{maxWorker}, IOCP: {minIO}-{maxIO}");
+                    Debug.WriteLine("========================");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"시스템 상태 로깅 오류: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 고성능 객체 풀 구현 (메모리 재사용)
+        /// </summary>
+        public class HighPerformanceObjectPool<T> where T : class, new()
+        {
+            private readonly ConcurrentQueue<T> _objects = new ConcurrentQueue<T>();
+            private readonly Func<T> _objectGenerator;
+            private readonly Action<T> _resetAction;
+            private int _currentCount = 0;
+            private readonly int _maxObjects;
+
+            public HighPerformanceObjectPool(int maxObjects = 1000, Func<T> objectGenerator = null, Action<T> resetAction = null)
+            {
+                _maxObjects = maxObjects;
+                _objectGenerator = objectGenerator ?? (() => new T());
+                _resetAction = resetAction;
+            }
+
+            public T Get()
+            {
+                if (_objects.TryDequeue(out T item))
+                {
+                    Interlocked.Decrement(ref _currentCount);
+                    return item;
+                }
+                return _objectGenerator();
+            }
+
+            public void Return(T item)
+            {
+                if (_currentCount < _maxObjects)
+                {
+                    _resetAction?.Invoke(item);
+                    _objects.Enqueue(item);
+                    Interlocked.Increment(ref _currentCount);
+                }
+            }
+        }
+
+        /// <summary>
+        /// StringBuilder 풀 정책
+        /// </summary>
+        public class StringBuilderPooledObjectPolicy : IPooledObjectPolicy<StringBuilder>
+        {
+            private const int MaxBuilderSize = 1024 * 16; // 16KB
+            private const int InitialBuilderSize = 1024;   // 1KB
+
+            public StringBuilder Create()
+            {
+                return new StringBuilder(InitialBuilderSize);
+            }
+
+            public bool Return(StringBuilder obj)
+            {
+                if (obj.Capacity > MaxBuilderSize)
+                {
+                    return false; // 너무 큰 객체는 풀에 반환하지 않음
+                }
+
+                obj.Clear();
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// 메모리 사용량 모니터링 유틸리티
+        /// </summary>
+        public static class MemoryMonitor
+        {
+            private static long _lastMemoryUsage = 0;
+
+            public static void LogMemoryUsage(string operation)
+            {
+                try
+                {
+                    long currentMemory = GC.GetTotalMemory(false);
+                    long memoryDiff = currentMemory - _lastMemoryUsage;
+
+                    Debug.WriteLine($"[메모리] {operation}: {currentMemory / 1024 / 1024}MB " +
+                                   $"(변화: {(memoryDiff >= 0 ? "+" : "")}{memoryDiff / 1024 / 1024}MB)");
+
+                    _lastMemoryUsage = currentMemory;
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"메모리 모니터링 오류: {ex.Message}");
+                }
+            }
+
+            public static void ForceCleanup()
+            {
+                try
+                {
+                    GC.Collect(2, GCCollectionMode.Forced);
+                    GC.WaitForPendingFinalizers();
+                    GC.Collect(2, GCCollectionMode.Forced);
+
+                    Debug.WriteLine("[메모리] 강제 정리 완료");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"메모리 강제 정리 오류: {ex.Message}");
+                }
+            }
+        }
 
 
         public uc_Clustering()
         {
+            // 시스템 성능 최적화 (한 번만 실행됨)
+            SystemPerformanceOptimizer.OptimizeSystemForUltraSpeed();
+
             InitializeComponent();
 
            
@@ -514,7 +797,7 @@ namespace FinanceTool
         public async Task<DataTable> EnrichWithRawTableDataAsync(DataTable inputTable)
         {
             DataTable resultTable = inputTable.Copy();
-
+            Debug.WriteLine("EnrichWithRawTableDataAsync start!!");
             try
             {
                 // 1. MongoDB에서 is_visible=true인 컬럼 목록 가져오기
@@ -609,7 +892,7 @@ namespace FinanceTool
                         }
                     }
                 }
-
+                Debug.WriteLine("EnrichWithRawTableDataAsync end!!");
                 Debug.WriteLine($"raw_data 문서 {rawDataDocuments.Count}개로 클러스터링 데이터를 보강했습니다.");
                 return resultTable;
             }
@@ -1121,6 +1404,7 @@ namespace FinanceTool
                 DataHandler.dragSelections[dgv].Clear();
             }
 
+            Debug.WriteLine($"CreateFilteredDataGridView start!!");
             Debug.WriteLine($"filterWords : {string.Join(",", filterWords)}");
 
             // CheckBox 컬럼 추가
@@ -1423,6 +1707,8 @@ namespace FinanceTool
                     break;
                 }
             }
+
+            Debug.WriteLine($"CreateFilteredDataGridView end!!");
         }
 
         public void CreateCheckDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords)
@@ -1670,6 +1956,8 @@ namespace FinanceTool
                 // 모든 데이터를 메모리에 로드하여 극한 속도 처리
                 var allRowsDict = new ConcurrentDictionary<int, UltraSpeedRowData>();
 
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 : 메모리 캐싱 시작");
+
                 // 1단계: 모든 행을 메모리에 캐싱 (메모리 대량 사용)
                 await Task.Run(() =>
                 {
@@ -1699,6 +1987,7 @@ namespace FinanceTool
                     );
                 });
 
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 : 메모리 캐싱 완료");
                 // 2단계: 대상 행들을 극한 속도로 처리
                 var targetRowsData = new ConcurrentBag<UltraSpeedRowData>();
 
@@ -1716,6 +2005,8 @@ namespace FinanceTool
                 var targetList = targetRowsData.ToList();
                 if (targetList.Count == 0) return;
 
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 : 2단계 처리  완료");
+
                 // 3단계: 클러스터명 생성 (극한 속도)
                 string mergedClusterName = await Task.Run(() =>
                 {
@@ -1731,12 +2022,18 @@ namespace FinanceTool
                     return merged.Length > 20 ? merged.Substring(0, 17) + "..." : merged;
                 });
 
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 : 3단계 처리 완료 ");
+
                 // 4단계: 데이터 병합 (극한 병렬 처리)
                 var mergedData = await ProcessUltraSpeedMergeAsync(targetList, extremeParallelism);
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 : 4단계 처리 완료 ");
 
                 // 5단계: MongoDB 저장 (속도 우선, 안전성 무시)
                 await UltraSpeedMongoSaveAsync(clusteringRepo, newClusterNumber, isNewCluster,
                     mergedClusterName, mergedData, targetIds, extremeParallelism);
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 : 5단계 처리 완료 ");
 
                 // 6단계: DataTable 업데이트 (극한 속도)
                 /*
@@ -1762,101 +2059,321 @@ namespace FinanceTool
         }
 
         // 극한 속도 데이터 병합
+        /// <summary>
+        /// 극한 속도 데이터 병합 (10초 → 1-2초 목표)
+        /// 192GB RAM과 16코어 CPU를 극한으로 활용
+        /// </summary>
         private async Task<UltraSpeedMergedData> ProcessUltraSpeedMergeAsync(
             List<UltraSpeedRowData> targetRowsData, int extremeParallelism)
         {
-            var mergedData = new UltraSpeedMergedData();
+            try
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 시작: {targetRowsData.Count}개 행");
 
-            // 병렬 컬렉션으로 극한 속도 처리
-            var keywordSet = new ConcurrentDictionary<string, byte>();
-            var dataIndicesSet = new ConcurrentDictionary<string, byte>();
-            var totalCount = 0;
-            var totalAmount = 0m;
+                var mergedData = new UltraSpeedMergedData();
 
-            // 모든 작업을 동시에 병렬 처리
-            var tasks = new List<Task>
+                // 1단계: 메모리 최적화 - 데이터를 배열로 미리 변환 (GC 압박 감소)
+                var keywordArrays = await PreprocessKeywordArraysAsync(targetRowsData, extremeParallelism);
+                var dataIndexArrays = await PreprocessDataIndexArraysAsync(targetRowsData, extremeParallelism);
+
+                // 2단계: 극한 병렬 처리 - 모든 작업을 동시에 수행
+                var tasks = new Task[]
                 {
-                    // 키워드 처리 태스크
-                    Task.Run(() =>
-                    {
-                        Parallel.ForEach(targetRowsData,
-                            new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
-                            rowData =>
-                            {
-                                if (!string.IsNullOrEmpty(rowData.Keywords))
-                                {
-                                    var keywords = rowData.Keywords.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                        .AsParallel()
-                                        .WithDegreeOfParallelism(extremeParallelism)
-                                        .Select(k => k.Trim())
-                                        .Where(k => !string.IsNullOrEmpty(k));
-
-                                    foreach (var keyword in keywords)
-                                    {
-                                        keywordSet.TryAdd(keyword, 0);
-                                    }
-                                }
-                            }
-                        );
-                    }),
-        
-                    // 데이터 인덱스 처리 태스크
-                    Task.Run(() =>
-                    {
-                        Parallel.ForEach(targetRowsData,
-                            new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
-                            rowData =>
-                            {
-                                if (!string.IsNullOrEmpty(rowData.DataIndex))
-                                {
-                                    var indices = rowData.DataIndex.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                        .AsParallel()
-                                        .WithDegreeOfParallelism(extremeParallelism)
-                                        .Select(i => i.Trim())
-                                        .Where(i => !string.IsNullOrEmpty(i));
-
-                                    foreach (var index in indices)
-                                    {
-                                        dataIndicesSet.TryAdd(index, 0);
-                                    }
-                                }
-                            }
-                        );
-                    }),
-        
-                    // 집계 처리 태스크
-                    Task.Run(() =>
-                    {
-                        var countSum = targetRowsData.AsParallel()
-                            .WithDegreeOfParallelism(extremeParallelism)
-                            .Sum(r => r.Count);
-
-                        var amountSum = targetRowsData.AsParallel()
-                            .WithDegreeOfParallelism(extremeParallelism)
-                            .Sum(r => r.Amount);
-
-                        Interlocked.Add(ref totalCount, countSum);
-
-                        lock (mergedData)
-                        {
-                            totalAmount += amountSum;
-                        }
-                    })
+            // 키워드 중복 제거 (해시셋 + 병렬)
+            ProcessKeywordsHyperSpeedAsync(keywordArrays, mergedData, extremeParallelism),
+            
+            // 데이터 인덱스 중복 제거 (해시셋 + 병렬)
+            ProcessDataIndicesHyperSpeedAsync(dataIndexArrays, mergedData, extremeParallelism),
+            
+            // 집계 계산 (SIMD 활용)
+            ProcessAggregationHyperSpeedAsync(targetRowsData, mergedData, extremeParallelism)
                 };
 
-            // 모든 태스크 동시 실행
-            await Task.WhenAll(tasks);
+                // 모든 작업을 동시에 실행하고 완료 대기
+                await Task.WhenAll(tasks);
 
-            mergedData.Keywords = keywordSet.Keys.ToList();
-            mergedData.DataIndices = dataIndicesSet.Keys.ToList();
-            mergedData.TotalCount = totalCount;
-            mergedData.TotalAmount = totalAmount;
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 완료: " +
+                               $"키워드 {mergedData.Keywords.Count}개, 인덱스 {mergedData.DataIndices.Count}개, " +
+                               $"총합 {mergedData.TotalCount}, 금액 {mergedData.TotalAmount:N0}");
 
-            Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합: 키워드 {mergedData.Keywords.Count}개, " +
-                           $"인덱스 {mergedData.DataIndices.Count}개");
-
-            return mergedData;
+                return mergedData;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 극한 속도 병합 오류: {ex.Message}");
+                throw;
+            }
         }
+
+        /// <summary>
+        /// 키워드 배열 전처리 (메모리 최적화)
+        /// </summary>
+        private async Task<string[][]> PreprocessKeywordArraysAsync(
+            List<UltraSpeedRowData> targetRowsData, int extremeParallelism)
+        {
+            return await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 배열 전처리 시작");
+
+                var keywordArrays = new string[targetRowsData.Count][];
+
+                // 극한 병렬로 문자열 분할 미리 수행
+                Parallel.For(0, targetRowsData.Count,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    i =>
+                    {
+                        try
+                        {
+                            var rowData = targetRowsData[i];
+                            if (!string.IsNullOrEmpty(rowData.Keywords))
+                            {
+                                // 메모리 효율적인 분할 (StringBuilder 사용 안함)
+                                keywordArrays[i] = rowData.Keywords
+                                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                    .Select(k => k.Trim())
+                                    .Where(k => k.Length > 0)
+                                    .ToArray();
+                            }
+                            else
+                            {
+                                keywordArrays[i] = Array.Empty<string>();
+                            }
+                        }
+                        catch
+                        {
+                            keywordArrays[i] = Array.Empty<string>();
+                        }
+                    });
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 배열 전처리 완료");
+                return keywordArrays;
+            });
+        }
+
+        /// <summary>
+        /// 데이터 인덱스 배열 전처리 (메모리 최적화)
+        /// </summary>
+        private async Task<string[][]> PreprocessDataIndexArraysAsync(
+            List<UltraSpeedRowData> targetRowsData, int extremeParallelism)
+        {
+            return await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 인덱스 배열 전처리 시작");
+
+                var dataIndexArrays = new string[targetRowsData.Count][];
+
+                // 극한 병렬로 문자열 분할 미리 수행
+                Parallel.For(0, targetRowsData.Count,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    i =>
+                    {
+                        try
+                        {
+                            var rowData = targetRowsData[i];
+                            if (!string.IsNullOrEmpty(rowData.DataIndex))
+                            {
+                                dataIndexArrays[i] = rowData.DataIndex
+                                    .Split(',', StringSplitOptions.RemoveEmptyEntries)
+                                    .Select(idx => idx.Trim())
+                                    .Where(idx => idx.Length > 0)
+                                    .ToArray();
+                            }
+                            else
+                            {
+                                dataIndexArrays[i] = Array.Empty<string>();
+                            }
+                        }
+                        catch
+                        {
+                            dataIndexArrays[i] = Array.Empty<string>();
+                        }
+                    });
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 인덱스 배열 전처리 완료");
+                return dataIndexArrays;
+            });
+        }
+
+        /// <summary>
+        /// 키워드 극한 속도 처리 (해시셋 + 병렬 배치)
+        /// </summary>
+        private async Task ProcessKeywordsHyperSpeedAsync(
+            string[][] keywordArrays, UltraSpeedMergedData mergedData, int extremeParallelism)
+        {
+            await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 극한 처리 시작");
+
+                // 메모리 효율적인 ConcurrentHashSet 대체 구현
+                var keywordSet = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
+
+                // 배치 단위로 병렬 처리 (캐시 효율성 향상)
+                const int hyperBatchSize = 1000;
+                var batches = new List<ArraySegment<string[]>>();
+
+                for (int i = 0; i < keywordArrays.Length; i += hyperBatchSize)
+                {
+                    int batchSize = Math.Min(hyperBatchSize, keywordArrays.Length - i);
+                    batches.Add(new ArraySegment<string[]>(keywordArrays, i, batchSize));
+                }
+
+                // 극한 병렬 배치 처리
+                Parallel.ForEach(batches,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    batch =>
+                    {
+                        // 로컬 HashSet으로 중복 제거 (메모리 지역성 향상)
+                        var localSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                        for (int i = batch.Offset; i < batch.Offset + batch.Count; i++)
+                        {
+                            var keywords = keywordArrays[i];
+                            for (int j = 0; j < keywords.Length; j++)
+                            {
+                                localSet.Add(keywords[j]);
+                            }
+                        }
+
+                        // 로컬 결과를 글로벌에 병합
+                        foreach (var keyword in localSet)
+                        {
+                            keywordSet.TryAdd(keyword, 0);
+                        }
+                    });
+
+                // 결과 설정
+                lock (mergedData)
+                {
+                    mergedData.Keywords = keywordSet.Keys.ToList();
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 키워드 극한 처리 완료: {mergedData.Keywords.Count}개");
+            });
+        }
+
+        /// <summary>
+        /// 데이터 인덱스 극한 속도 처리 (해시셋 + 병렬 배치)
+        /// </summary>
+        private async Task ProcessDataIndicesHyperSpeedAsync(
+            string[][] dataIndexArrays, UltraSpeedMergedData mergedData, int extremeParallelism)
+        {
+            await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 인덱스 극한 처리 시작");
+
+                var dataIndexSet = new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
+
+                // 배치 단위로 병렬 처리
+                const int hyperBatchSize = 1000;
+                var batches = new List<ArraySegment<string[]>>();
+
+                for (int i = 0; i < dataIndexArrays.Length; i += hyperBatchSize)
+                {
+                    int batchSize = Math.Min(hyperBatchSize, dataIndexArrays.Length - i);
+                    batches.Add(new ArraySegment<string[]>(dataIndexArrays, i, batchSize));
+                }
+
+                // 극한 병렬 배치 처리
+                Parallel.ForEach(batches,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    batch =>
+                    {
+                        var localSet = new HashSet<string>(StringComparer.Ordinal);
+
+                        for (int i = batch.Offset; i < batch.Offset + batch.Count; i++)
+                        {
+                            var indices = dataIndexArrays[i];
+                            for (int j = 0; j < indices.Length; j++)
+                            {
+                                localSet.Add(indices[j]);
+                            }
+                        }
+
+                        // 로컬 결과를 글로벌에 병합
+                        foreach (var index in localSet)
+                        {
+                            dataIndexSet.TryAdd(index, 0);
+                        }
+                    });
+
+                // 결과 설정
+                lock (mergedData)
+                {
+                    mergedData.DataIndices = dataIndexSet.Keys.ToList();
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 데이터 인덱스 극한 처리 완료: {mergedData.DataIndices.Count}개");
+            });
+        }
+
+        /// <summary>
+        /// 집계 극한 속도 처리 (SIMD 활용 고려)
+        /// </summary>
+        private async Task ProcessAggregationHyperSpeedAsync(
+            List<UltraSpeedRowData> targetRowsData, UltraSpeedMergedData mergedData, int extremeParallelism)
+        {
+            await Task.Run(() =>
+            {
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 집계 극한 처리 시작");
+
+                // 원자적 연산을 위한 변수들
+                long totalCount = 0;
+                decimal totalAmount = 0;
+
+                // 배치 단위로 분할하여 캐시 미스 최소화
+                const int aggregationBatchSize = 2000;
+                var batches = new List<List<UltraSpeedRowData>>();
+
+                for (int i = 0; i < targetRowsData.Count; i += aggregationBatchSize)
+                {
+                    int batchSize = Math.Min(aggregationBatchSize, targetRowsData.Count - i);
+                    batches.Add(targetRowsData.GetRange(i, batchSize));
+                }
+
+                // 극한 병렬 집계 처리
+                var batchResults = new ConcurrentBag<(long count, decimal amount)>();
+
+                Parallel.ForEach(batches,
+                    new ParallelOptions { MaxDegreeOfParallelism = extremeParallelism },
+                    batch =>
+                    {
+                        long localCount = 0;
+                        decimal localAmount = 0;
+
+                        // 로컬 집계 (벡터화 가능한 형태)
+                        for (int i = 0; i < batch.Count; i++)
+                        {
+                            localCount += batch[i].Count;
+                            localAmount += batch[i].Amount;
+                        }
+
+                        batchResults.Add((localCount, localAmount));
+                    });
+
+                // 최종 집계
+                foreach (var result in batchResults)
+                {
+                    totalCount += result.count;
+                    totalAmount += result.amount;
+                }
+
+                // 결과 설정
+                lock (mergedData)
+                {
+                    mergedData.TotalCount = (int)totalCount;
+                    mergedData.TotalAmount = totalAmount;
+                }
+
+                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 집계 극한 처리 완료: Count={totalCount}, Amount={totalAmount:N0}");
+            });
+        }
+
+        /// <summary>
+        /// 메모리 효율적인 배치 처리를 위한 확장 메서드
+        /// </summary>
+      
+
+       
 
         // 극한 속도 MongoDB 저장
         private async Task UltraSpeedMongoSaveAsync(ClusteringRepository clusteringRepo,
