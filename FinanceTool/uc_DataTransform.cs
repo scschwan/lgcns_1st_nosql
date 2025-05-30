@@ -128,7 +128,7 @@ namespace FinanceTool
 
                     // 원본 데이터로 뷰 데이터 보강 (극한 성능 적용)
                     await progressForm.UpdateProgressHandler(60, "극한 속도 원본 데이터 보강 중...");
-                    viewTransformDataTable = await UltraHighPerformanceEnrichTransformDataAsync(transformDataTable);
+                    viewTransformDataTable = await EnrichTransformDataWithMongoData(transformDataTable);
 
                     Debug.WriteLine("data Transform initUI -> DataGridView 바인딩 설정 완료");
 
@@ -739,16 +739,315 @@ namespace FinanceTool
         {
             try
             {
-                // 기존 Array.Copy 방식 대신 극한 성능 방식 사용
-                return await UltraHighPerformanceEnrichTransformDataAsync(transformDataTable);
+                Debug.WriteLine("EnrichTransformDataWithMongoData 시작");
+
+                // MongoDB 연결 확인
+                await Data.MongoDBManager.Instance.EnsureInitializedAsync();
+
+                // 1. 가시적 컬럼 목록 조회
+                var columnMappingFilter = Builders<MongoDB.Bson.BsonDocument>.Filter.Eq("is_visible", true);
+                var columnMappingsResult = await Data.MongoDBManager.Instance.FindDocumentsAsync<MongoDB.Bson.BsonDocument>(
+                    "column_mapping",
+                    columnMappingFilter);
+
+                // 시각화될 컬럼명 추출
+                List<string> visibleColumns = new List<string>();
+                foreach (var doc in columnMappingsResult)
+                {
+                    if (doc.Contains("original_name"))
+                    {
+                        string originalName = doc["original_name"].AsString;
+                        visibleColumns.Add(originalName);
+                    }
+                }
+
+                Debug.WriteLine($"시각화될 컬럼: {string.Join(", ", visibleColumns)}");
+
+                if (visibleColumns.Count == 0)
+                {
+                    Debug.WriteLine("표시할 컬럼이 없습니다. 원본 테이블 복사본 반환");
+                    return transformDataTable.Copy();
+                }
+
+                // 2. 안전한 결과 테이블 생성 (uc_Clustering 패턴)
+                DataTable resultTable = CreateSafeResultTable(transformDataTable, visibleColumns);
+
+                // 3. raw_data_id 수집 및 유효성 검증
+                var rawDataIds = new HashSet<string>();
+                var rowToIdMap = new Dictionary<int, string>();
+
+                for (int i = 0; i < transformDataTable.Rows.Count; i++)
+                {
+                    DataRow row = transformDataTable.Rows[i];
+                    if (row["raw_data_id"] != DBNull.Value && row["raw_data_id"] != null)
+                    {
+                        string rawDataId = row["raw_data_id"].ToString();
+                        if (!string.IsNullOrEmpty(rawDataId))
+                        {
+                            rawDataIds.Add(rawDataId);
+                            rowToIdMap[i] = rawDataId;
+                        }
+                    }
+                }
+
+                if (rawDataIds.Count == 0)
+                {
+                    Debug.WriteLine("유효한 raw_data_id가 없습니다.");
+                    return CopyDataSafely(transformDataTable, resultTable);
+                }
+
+                Debug.WriteLine($"보강할 raw_data_id: {rawDataIds.Count}개");
+
+                // 4. MongoDB에서 안전한 배치 조회
+                var mongoDataLookup = await LoadMongoDataSafely(rawDataIds);
+                Debug.WriteLine($"MongoDB 데이터 로드 완료: {mongoDataLookup.Count}개");
+
+                // 5. 안전한 데이터 보강 (행별 순차 처리)
+                await EnrichDataSafely(transformDataTable, resultTable, mongoDataLookup, visibleColumns, rowToIdMap);
+
+                Debug.WriteLine($"EnrichTransformDataWithMongoData 완료: {resultTable.Rows.Count}행");
+                return resultTable;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"MongoDB 데이터 보강 중 오류 발생: {ex.Message}");
-                Debug.WriteLine($"Stack Trace: {ex.StackTrace}");
+                Debug.WriteLine($"MongoDB 데이터 보강 중 오류 발생: {ex.Message}\n{ex.StackTrace}");
+                // 예외 발생 시 원본 데이터 테이블의 복사본 반환
+                return transformDataTable.Copy();
+            }
+        }
 
-                // 오류 시 원본 테이블 반환 (안전성 확보)
-                return transformDataTable;
+        /// <summary>
+        /// 안전한 결과 테이블 생성 (uc_Clustering 패턴)
+        /// </summary>
+        private DataTable CreateSafeResultTable(DataTable sourceTable, List<string> visibleColumns)
+        {
+            DataTable resultTable = new DataTable();
+
+            try
+            {
+                // 1. 먼저 원본 테이블의 컬럼들 추가
+                foreach (DataColumn sourceColumn in sourceTable.Columns)
+                {
+                    Type columnType = sourceColumn.DataType;
+                    // 안전성을 위해 모든 컬럼을 string 타입으로 통일
+                    resultTable.Columns.Add(sourceColumn.ColumnName, typeof(string));
+                }
+
+                // 2. 가시적 컬럼들 추가 (중복 제외)
+                foreach (string columnName in visibleColumns)
+                {
+                    if (!resultTable.Columns.Contains(columnName))
+                    {
+                        resultTable.Columns.Add(columnName, typeof(string));
+                    }
+                }
+
+                Debug.WriteLine($"결과 테이블 컬럼 생성 완료: {resultTable.Columns.Count}개");
+                return resultTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"결과 테이블 생성 오류: {ex.Message}");
+                // 오류 시 최소한의 테이블 반환
+                DataTable fallbackTable = new DataTable();
+                fallbackTable.Columns.Add("raw_data_id", typeof(string));
+                return fallbackTable;
+            }
+        }
+
+        /// <summary>
+        /// MongoDB 데이터 안전 로드 (uc_Clustering 배치 패턴)
+        /// </summary>
+        private async Task<Dictionary<string, Dictionary<string, object>>> LoadMongoDataSafely(HashSet<string> rawDataIds)
+        {
+            var mongoDataLookup = new Dictionary<string, Dictionary<string, object>>();
+
+            try
+            {
+                var rawDataRepo = new Repositories.RawDataRepository();
+                const int batchSize = 10000; // 안전한 배치 크기
+                var idList = rawDataIds.ToList();
+
+                // 배치별 순차 처리 (병렬 처리 제거로 안정성 확보)
+                for (int i = 0; i < idList.Count; i += batchSize)
+                {
+                    int currentBatchSize = Math.Min(batchSize, idList.Count - i);
+                    var batchIds = idList.GetRange(i, currentBatchSize);
+
+                    try
+                    {
+                        var batchFilter = Builders<MongoModels.RawDataDocument>.Filter.In(d => d.Id, batchIds);
+                        var batchRawDatas = await rawDataRepo.FindDocumentsAsync(batchFilter);
+
+                        foreach (var rawData in batchRawDatas)
+                        {
+                            if (rawData.Data != null)
+                            {
+                                mongoDataLookup[rawData.Id] = rawData.Data;
+                            }
+                        }
+
+                        if (i % (batchSize * 5) == 0) // 매 5번째 배치마다 로깅
+                        {
+                            Debug.WriteLine($"MongoDB 배치 로드 진행: {i + currentBatchSize}/{idList.Count}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"배치 {i / batchSize + 1} 로드 오류: {ex.Message}");
+                        // 배치 오류 시 다음 배치 계속 진행
+                    }
+                }
+
+                return mongoDataLookup;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"MongoDB 데이터 로드 전체 오류: {ex.Message}");
+                return new Dictionary<string, Dictionary<string, object>>();
+            }
+        }
+
+        /// <summary>
+        /// 안전한 데이터 복사 (NewRow() 대신 직접 구성)
+        /// </summary>
+        private DataTable CopyDataSafely(DataTable sourceTable, DataTable targetTable)
+        {
+            try
+            {
+                for (int i = 0; i < sourceTable.Rows.Count; i++)
+                {
+                    DataRow sourceRow = sourceTable.Rows[i];
+
+                    // 값 배열 직접 구성 (NewRow() 사용 안함)
+                    object[] rowValues = new object[targetTable.Columns.Count];
+
+                    // 각 컬럼별로 안전하게 값 설정
+                    for (int j = 0; j < targetTable.Columns.Count; j++)
+                    {
+                        string columnName = targetTable.Columns[j].ColumnName;
+
+                        if (sourceTable.Columns.Contains(columnName))
+                        {
+                            object sourceValue = sourceRow[columnName];
+                            rowValues[j] = sourceValue == null || sourceValue == DBNull.Value ?
+                                           string.Empty : sourceValue.ToString();
+                        }
+                        else
+                        {
+                            rowValues[j] = string.Empty;
+                        }
+                    }
+
+                    // 직접 행 추가 (NewRow() 대신)
+                    targetTable.Rows.Add(rowValues);
+                }
+
+                Debug.WriteLine($"안전한 데이터 복사 완료: {targetTable.Rows.Count}행");
+                return targetTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"안전한 데이터 복사 오류: {ex.Message}");
+                return targetTable;
+            }
+        }
+
+        /// <summary>
+        /// 안전한 데이터 보강 (순차 처리)
+        /// </summary>
+        private async Task EnrichDataSafely(
+            DataTable sourceTable,
+            DataTable targetTable,
+            Dictionary<string, Dictionary<string, object>> mongoLookup,
+            List<string> visibleColumns,
+            Dictionary<int, string> rowToIdMap)
+        {
+            try
+            {
+                Debug.WriteLine($"안전한 데이터 보강 시작: {sourceTable.Rows.Count}행");
+
+                // 순차 처리로 안정성 확보 (병렬 처리 제거)
+                for (int i = 0; i < sourceTable.Rows.Count; i++)
+                {
+                    try
+                    {
+                        DataRow sourceRow = sourceTable.Rows[i];
+
+                        // 값 배열 직접 구성
+                        object[] enrichedValues = new object[targetTable.Columns.Count];
+
+                        // 1. 원본 데이터 복사
+                        for (int j = 0; j < targetTable.Columns.Count; j++)
+                        {
+                            string columnName = targetTable.Columns[j].ColumnName;
+
+                            if (sourceTable.Columns.Contains(columnName))
+                            {
+                                object sourceValue = sourceRow[columnName];
+                                enrichedValues[j] = sourceValue == null || sourceValue == DBNull.Value ?
+                                                   string.Empty : sourceValue.ToString();
+                            }
+                            else
+                            {
+                                enrichedValues[j] = string.Empty;
+                            }
+                        }
+
+                        // 2. MongoDB 데이터로 보강
+                        if (rowToIdMap.TryGetValue(i, out string rawDataId) &&
+                            mongoLookup.TryGetValue(rawDataId, out var mongoData))
+                        {
+                            foreach (string visibleColumn in visibleColumns)
+                            {
+                                if (targetTable.Columns.Contains(visibleColumn) &&
+                                    mongoData.TryGetValue(visibleColumn, out object mongoValue))
+                                {
+                                    int columnIndex = targetTable.Columns.IndexOf(visibleColumn);
+                                    if (columnIndex >= 0 && columnIndex < enrichedValues.Length)
+                                    {
+                                        enrichedValues[columnIndex] = mongoValue == null ?
+                                                                     string.Empty : mongoValue.ToString();
+                                    }
+                                }
+                            }
+                        }
+
+                        // 직접 행 추가
+                        targetTable.Rows.Add(enrichedValues);
+
+                        // 진행 상황 로깅
+                        if (i > 0 && i % 50000 == 0)
+                        {
+                            Debug.WriteLine($"데이터 보강 진행: {i}/{sourceTable.Rows.Count}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"행 {i} 보강 오류: {ex.Message}");
+
+                        // 오류 시 기본 행 추가
+                        try
+                        {
+                            object[] fallbackValues = new object[targetTable.Columns.Count];
+                            for (int k = 0; k < fallbackValues.Length; k++)
+                            {
+                                fallbackValues[k] = string.Empty;
+                            }
+                            targetTable.Rows.Add(fallbackValues);
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            Debug.WriteLine($"대체 행 추가도 실패: {fallbackEx.Message}");
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"안전한 데이터 보강 완료: {targetTable.Rows.Count}행");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"데이터 보강 전체 오류: {ex.Message}");
             }
         }
 
