@@ -398,7 +398,7 @@ namespace FinanceTool
             // 우선 순위가 높은 컬럼 배치 (merge_cluster_table과 유사하게)
             ArrangeColumnsOrder();
 
-           
+
         }
 
         private void ArrangeColumnsOrder()
@@ -730,6 +730,11 @@ namespace FinanceTool
             {
                 ShowClusterDetail(_currentClusterId).ConfigureAwait(false);
             }
+        }
+
+        private void unmerge_selected_btn_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }

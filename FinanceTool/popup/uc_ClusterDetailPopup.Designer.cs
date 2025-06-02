@@ -78,6 +78,7 @@
             unmerge_selected_btn.TabIndex = 2;
             unmerge_selected_btn.Text = "선택 항목 병합 해제";
             unmerge_selected_btn.UseVisualStyleBackColor = true;
+            unmerge_selected_btn.Click += unmerge_selected_btn_Click;
             // 
             // close_btn
             // 
@@ -126,7 +127,6 @@
             panel_top.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)detail_grid_view).EndInit();
             ResumeLayout(false);
-
         }
 
         #endregion

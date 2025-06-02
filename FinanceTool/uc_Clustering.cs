@@ -433,100 +433,21 @@ namespace FinanceTool
 
                 // 검색 UI 초기화
                 set_keyword_combo_list();
-                create_merge_keyword_list(true);
+                
 
                 // 최초 수행 시 별도 수행
                 supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
 
-
-                // 새로운 클러스터링 매니저 초기화
+                // 4. *** 핵심 수정: ClusteringManager를 초기화 ***
                 _clusteringManager = new ClusteringManager();
                 await _clusteringManager.InitializeAsync(mergeClusterDataTable, merge_cluster_table,
                     num_pageNumber, cmb_pageSize, btn_prevPage, btn_nextPage, lbl_pagination2, merge_all_check);
 
+                // 5. *** 수정: 초기 전체 검색을 안전하게 실행 ***
+                await PerformInitialSearch();
 
-                // 메인 UI 스레드로 돌아가서 DataGridView 설정
-                await Task.Run(() =>
-                {
-                    if (Application.OpenForms.Count > 0)
-                    {
-                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                        {
-                            
-                            
-                            // merge_check_table 초기화
-                            merge_check_table.DataSource = null;
-                            merge_check_table.Rows.Clear();
-                            merge_check_table.Columns.Clear();
-                            if (DataHandler.dragSelections.ContainsKey(merge_check_table))
-                            {
-                                DataHandler.dragSelections[merge_check_table].Clear();
-                            }
-
-                            Debug.WriteLine("RegisterDataGridView->match_keyword_table");
-                            DataHandler.RegisterDataGridView(merge_cluster_table);
-                            DataHandler.RegisterDataGridView(dataGridView_lv1);
-                            DataHandler.RegisterDataGridView(dataGridView_recoman_keyword);
-
-                            Debug.WriteLine("RegisterDataGridView->complete");
-
-                            // 이벤트 핸들러 중복 등록 방지
-                            decimal_combo.SelectedIndexChanged -= decimal_combo_SelectedIndexChanged;
-                            decimal_combo.SelectedIndex = 0;
-                            decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
-
-                            // sorting 기준 변환
-                            merge_cluster_table.SortCompare -= DataHandler.money_SortCompare;
-                            merge_check_table.SortCompare -= DataHandler.money_SortCompare;
-                            dataGridView_modified.SortCompare -= DataHandler.money_SortCompare;
-
-                            merge_cluster_table.SortCompare += DataHandler.money_SortCompare;
-                            merge_check_table.SortCompare += DataHandler.money_SortCompare;
-                            dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
-
-                            dataGridView_modified.CellClick -= dataGridView_keyword_CellClick;
-
-                            if (dataGridView_modified.Rows.Count > 0)
-                            {
-                                dataGridView_modified.DataSource = null;
-                                dataGridView_modified.Rows.Clear();
-                                dataGridView_modified.Columns.Clear();
-                            }
-
-                            // 페이징 이벤트 핸들러 초기화 추가
-                            /*
-                            InitializePaginationEventsMerge();
-                            Debug.WriteLine("페이징 초기화 완료");
-                            */
-                          
-
-                            Debug.WriteLine("클러스터링 매니저 초기화 완료");
-
-                            // 초기 데이터 로드 후 업데이트
-                            UpdateModifiedDataGridView();
-
-                            // DataGridView 속성 설정
-                            dataGridView_modified.AllowUserToAddRows = false;
-                            dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                            dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                            dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-
-                            // 나머지 컬럼들은 읽기 전용으로 설정
-                            for (int i = 1; i < dataGridView_modified.Columns.Count; i++)
-                            {
-                                dataGridView_modified.Columns[i].ReadOnly = true;
-                            }
-
-                            dataGridView_modified.CellClick += dataGridView_keyword_CellClick;
-                            dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
-
-                            Debug.WriteLine("LoadSeparatorsAndRemovers");
-                            LoadSeparatorsAndRemovers();
-
-                            EnablePaginationControlsMerge(true);
-                        });
-                    }
-                });
+                // 6. 나머지 UI 초기화 작업들 (기존 코드 그대로 유지)
+                await InitializeRemainingUI();
             }
             catch (Exception ex)
             {
@@ -536,6 +457,113 @@ namespace FinanceTool
             }
         }
 
+
+        // *** 새로 추가: 초기 전체 검색 메서드 ***
+        private async Task PerformInitialSearch()
+        {
+            try
+            {
+                // 전체 검색 조건으로 초기 검색 실행
+                var searchCriteria = new SearchCriteria
+                {
+                    Keywords = new List<string>(), // 빈 키워드 = 전체 검색
+                    ExcludeKeywords = null,
+                    IsKeywordSearch = keyword_radio1.Checked,
+                    IsSupplierSearch = keyword_radio2.Checked,
+                    ExactMatch = false,
+                    AndSearch = false
+                };
+
+                await _clusteringManager.SearchAsync(searchCriteria);
+
+                // 선택 상태 초기화
+                merge_all_check.Checked = false;
+                change_row_count();
+
+                Debug.WriteLine("초기 전체 검색 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"초기 검색 실행 오류: {ex.Message}");
+            }
+        }
+
+        // *** 새로 추가: 나머지 UI 초기화 작업들 (기존 코드 모두 포함) ***
+        private async Task InitializeRemainingUI()
+        {
+            await Task.Run(() =>
+            {
+                if (Application.OpenForms.Count > 0)
+                {
+                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                    {
+                        // merge_check_table 초기화
+                        merge_check_table.DataSource = null;
+                        merge_check_table.Rows.Clear();
+                        merge_check_table.Columns.Clear();
+                        if (DataHandler.dragSelections.ContainsKey(merge_check_table))
+                        {
+                            DataHandler.dragSelections[merge_check_table].Clear();
+                        }
+
+                        Debug.WriteLine("RegisterDataGridView->match_keyword_table");
+                        DataHandler.RegisterDataGridView(merge_cluster_table);
+                        DataHandler.RegisterDataGridView(dataGridView_lv1);
+                        DataHandler.RegisterDataGridView(dataGridView_recoman_keyword);
+
+                        Debug.WriteLine("RegisterDataGridView->complete");
+
+                        // 이벤트 핸들러 중복 등록 방지
+                        decimal_combo.SelectedIndexChanged -= decimal_combo_SelectedIndexChanged;
+                        decimal_combo.SelectedIndex = 0;
+                        decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
+
+                        // sorting 기준 변환
+                        merge_cluster_table.SortCompare -= DataHandler.money_SortCompare;
+                        merge_check_table.SortCompare -= DataHandler.money_SortCompare;
+                        dataGridView_modified.SortCompare -= DataHandler.money_SortCompare;
+
+                        merge_cluster_table.SortCompare += DataHandler.money_SortCompare;
+                        merge_check_table.SortCompare += DataHandler.money_SortCompare;
+                        dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
+
+                        dataGridView_modified.CellClick -= dataGridView_keyword_CellClick;
+
+                        if (dataGridView_modified.Rows.Count > 0)
+                        {
+                            dataGridView_modified.DataSource = null;
+                            dataGridView_modified.Rows.Clear();
+                            dataGridView_modified.Columns.Clear();
+                        }
+
+                        Debug.WriteLine("클러스터링 매니저 초기화 완료");
+
+                        // 초기 데이터 로드 후 업데이트
+                        UpdateModifiedDataGridView();
+
+                        // DataGridView 속성 설정
+                        dataGridView_modified.AllowUserToAddRows = false;
+                        dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                        dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                        dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+
+                        // 나머지 컬럼들은 읽기 전용으로 설정
+                        for (int i = 1; i < dataGridView_modified.Columns.Count; i++)
+                        {
+                            dataGridView_modified.Columns[i].ReadOnly = true;
+                        }
+
+                        dataGridView_modified.CellClick += dataGridView_keyword_CellClick;
+                        dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
+
+                        Debug.WriteLine("LoadSeparatorsAndRemovers");
+                        LoadSeparatorsAndRemovers();
+
+                        EnablePaginationControlsMerge(true);
+                    });
+                }
+            });
+        }
         private void merge_cluster_table_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.ColumnIndex == 0 && e.RowIndex >= 0) // 체크박스 컬럼
@@ -1667,16 +1695,14 @@ namespace FinanceTool
             merge_keyword_list = ExtractUniqueKeywords(DataHandler.finalClusteringData, 0);
             check_keyword_list = ExtractUniqueKeywords(DataHandler.finalClusteringData, 1);
 
-            // 공급업체 리스트는 mergeClusterDataTable에서 생성
+            // 공급업체 리스트 생성
             if (mergeClusterDataTable != null && mergeClusterDataTable.Columns.Contains(DataHandler.prod_col_name))
             {
                 supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
-                Debug.WriteLine($"공급업체 리스트 생성 완료: {supplier_keyword_list.Count}개 항목");
             }
             else
             {
                 supplier_keyword_list = new List<string>();
-                Debug.WriteLine("공급업체 리스트 생성 실패: mergeClusterDataTable이 null이거나 컬럼이 없음");
             }
 
             // 현재 선택된 검색 모드에 따라 콤보박스 내용 업데이트
@@ -1685,14 +1711,15 @@ namespace FinanceTool
             // 검증 콤보박스는 항상 키워드 기준
             foreach (string keyword in check_keyword_list)
             {
-                if ("\\".Equals(keyword))
+                if (!"\\".Equals(keyword))
                 {
-                    continue;
+                    check_search_combo.Items.Add(keyword);
                 }
-                check_search_combo.Items.Add(keyword);
             }
 
-            check_search_combo.SelectedIndex = 0; // 첫 번째 열 선택
+            check_search_combo.SelectedIndex = 0;
+
+            // *** 제거: create_merge_keyword_list(true) 호출 삭제 ***
         }
 
         public void CreateFilteredDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords, string except_keyword = null, bool isSupplierSearch = false)
@@ -3385,16 +3412,19 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
                         foreach (var child in childClusters)
                         {
                             await clusteringRepo.UpdateClusterIdAsync(child.ClusterNumber, -1);
-                            Debug.WriteLine($"클러스터 {child.ClusterNumber}의 병합 상태 해제");
+                            //Debug.WriteLine($"클러스터 {child.ClusterNumber}의 병합 상태 해제");
                         }
 
                         // 3. 클러스터 자체 삭제
                         await clusteringRepo.DeleteByClusterNumberAsync(targetId);
-                        Debug.WriteLine($"클러스터 {targetId} 삭제 완료");
+                        //Debug.WriteLine($"클러스터 {targetId} 삭제 완료");
                     }
                 }
 
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(dataTable);
+                await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
+                var searchCriteria = CreateSearchCriteriaFromCurrentUI();
+                await _clusteringManager.SearchAsync(searchCriteria);
 
                 Debug.WriteLine("병합 해제 완료");
             }
@@ -4386,8 +4416,6 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
                 Dictionary<string, KeywordData> keywordDict = new Dictionary<string, KeywordData>();
 
 
-
-
                 // 모든 키워드 추출 및 집계
                 foreach (var row in unboundClusters)
                 {
@@ -4769,6 +4797,8 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
                                 Debug.WriteLine("this.InvokeRequired => true");
                                 this.Invoke(new Action(() =>
                                 {
+                                   
+
                                     // 화면 갱신
                                     Debug.WriteLine("this.InvokeRequired => true => set_keyword_combo_list();");
                                     set_keyword_combo_list();
@@ -4828,7 +4858,35 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
             }
         }
 
+        /// <summary>
+        /// 병합 해제 후 검색 엔진 갱신 (공통 사용)
+        /// </summary>
+        private async Task RefreshSearchEngineAfterUnmerge()
+        {
+            try
+            {
+                // 1. mergeClusterDataTable 업데이트
+                mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
+                // 2. ClusteringManager 새로고침  
+                if (_clusteringManager != null)
+                {
+                    await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
+                }
+
+                // 3. 현재 검색 조건으로 재검색
+                var searchCriteria = CreateSearchCriteriaFromCurrentUI();
+                await _clusteringManager.SearchAsync(searchCriteria);
+
+                // 4. UI 상태 초기화
+                merge_all_check.Checked = false;
+                change_row_count();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"검색 엔진 갱신 오류: {ex.Message}");
+            }
+        }
         private void button2_Click(object sender, EventArgs e)
         {
             ShowMergeClusterDetail();
