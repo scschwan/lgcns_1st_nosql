@@ -115,16 +115,20 @@ namespace FinanceTool.Repositories
         {
             try
             {
-                var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber);
+                var filter = Builders<ClusteringResultDocument>.Filter.Eq(d => d.ClusterNumber, clusterNumber);
+
                 var update = Builders<ClusteringResultDocument>.Update
-                    .Set(c => c.ClusterName, clusterName)
-                    .Set(c => c.Keywords, keywords)
-                    .Set(c => c.Count, count)
-                    .Set(c => c.TotalAmount, totalAmount)
-                    .Set(c => c.DataIndices, dataIndices);
+                    .Set(d => d.ClusterName, clusterName)
+                    .Set(d => d.Keywords, keywords ?? new List<string>())
+                    .Set(d => d.Count, count)
+                    .Set(d => d.TotalAmount, totalAmount)
+                    .Set(d => d.DataIndices, dataIndices ?? new List<string>());
 
                 var result = await _collection.UpdateOneAsync(filter, update);
-                return result.ModifiedCount > 0 || result.MatchedCount > 0;
+
+                Debug.WriteLine($"클러스터 {clusterNumber} 전체 정보 업데이트: {result.MatchedCount}개 매치, {result.ModifiedCount}개 수정");
+
+                return result.MatchedCount > 0;
             }
             catch (Exception ex)
             {

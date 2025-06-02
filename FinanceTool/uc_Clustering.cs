@@ -4791,6 +4791,10 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
                             // 이 부분이 중요합니다!
                             mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
+                            await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
+                            var searchCriteria = CreateSearchCriteriaFromCurrentUI();
+                            await _clusteringManager.SearchAsync(searchCriteria);
+
                             // UI 스레드에서 실행
                             if (this.InvokeRequired)
                             {

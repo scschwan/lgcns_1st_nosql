@@ -489,21 +489,18 @@ namespace FinanceTool
             if (result != DialogResult.Yes)
                 return;
 
+            var clusteringRepo = new ClusteringRepository();
+
             try
             {
                 using (var progressForm = new ProcessProgressForm())
                 {
                     progressForm.Show();
-                    await progressForm.UpdateProgressHandler(10, "선택한 클러스터 병합 해제 시작");
+                    await progressForm.UpdateProgressHandler(10, "병합 해제 작업 시작");
 
-                    // ClusteringRepository 인스턴스 생성
-                    var clusteringRepo = new ClusteringRepository();
+                    // *** 1단계: 부모 클러스터와 모든 하위 클러스터 정보 미리 수집 ***
+                    await progressForm.UpdateProgressHandler(20, "클러스터 정보 수집 중");
 
-                    // 진행 상황 계산을 위한 변수
-                    int totalItems = selectedClusterIds.Count;
-                    int processedItems = 0;
-
-                    // 부모 클러스터 정보 가져오기
                     var parentCluster = await clusteringRepo.GetByClusterNumberAsync(_currentClusterId);
                     if (parentCluster == null)
                     {
@@ -512,131 +509,135 @@ namespace FinanceTool
                         return;
                     }
 
-                    // 디버깅 정보
-                    Debug.WriteLine($"병합 해제 시작 - 부모 클러스터 상태:");
-                    Debug.WriteLine($"  클러스터 번호: {parentCluster.ClusterNumber}");
-                    Debug.WriteLine($"  클러스터 이름: {parentCluster.ClusterName}");
-                    Debug.WriteLine($"  데이터 인덱스 개수: {parentCluster.DataIndices?.Count ?? 0}");
-                    Debug.WriteLine($"  Count: {parentCluster.Count}");
-                    Debug.WriteLine($"  합산금액: {parentCluster.TotalAmount}");
+                    var allChildClusters = await clusteringRepo.GetChildClustersAsync(_currentClusterId);
 
-                    // 하위 항목 조회
-                    var childClusters = await clusteringRepo.GetChildClustersAsync(_currentClusterId);
-                    Debug.WriteLine($"  하위 클러스터 개수(병합 해제 전): {childClusters.Count}");
-
-                    // 선택된 항목의 세부 정보
-                    Debug.WriteLine($"선택된 항목 ({selectedClusterIds.Count}개):");
+                    // 선택된 클러스터들의 상세 정보 수집
+                    var selectedClusters = new List<ClusteringResultDocument>();
                     foreach (int clusterId in selectedClusterIds)
                     {
-                        var cluster = await clusteringRepo.GetByClusterNumberAsync(clusterId);
+                        var cluster = allChildClusters.FirstOrDefault(c => c.ClusterNumber == clusterId);
                         if (cluster != null)
                         {
-                            Debug.WriteLine($"  클러스터 번호: {cluster.ClusterNumber}, Count: {cluster.Count}, 데이터 인덱스 개수: {cluster.DataIndices?.Count ?? 0}");
+                            selectedClusters.Add(cluster);
                         }
                     }
 
-                    // 부모 클러스터의 남아있는 하위 클러스터 계산
-                    int remainingChildCount = childClusters.Count - selectedClusterIds.Count;
-                    Debug.WriteLine($"  남아있을 하위 클러스터 개수(예상): {remainingChildCount}");
+                    Debug.WriteLine($"부모 클러스터: {parentCluster.ClusterNumber}, 전체 하위: {allChildClusters.Count}개, 선택: {selectedClusters.Count}개");
 
-                    // 병합 해제 작업 진행 - ClusterId만 업데이트하고 부모 클러스터 상태는 수정하지 않음
+                    // *** 2단계: 선택된 클러스터들을 차감한 새로운 부모 데이터 계산 ***
+                    await progressForm.UpdateProgressHandler(30, "새로운 부모 클러스터 데이터 계산 중");
+
+                    // 현재 부모 클러스터에서 선택된 항목들을 차감
+                    var newDataIndices = new HashSet<string>(parentCluster.DataIndices ?? new List<string>());
+                    int newCount = parentCluster.Count;
+                    decimal newTotalAmount = parentCluster.TotalAmount;
+                    var newKeywords = new HashSet<string>(parentCluster.Keywords ?? new List<string>());
+
+                    // 선택된 클러스터들의 데이터를 부모에서 차감
+                    foreach (var selectedCluster in selectedClusters)
+                    {
+                        // DataIndices 차감
+                        foreach (var index in selectedCluster.DataIndices ?? new List<string>())
+                        {
+                            newDataIndices.Remove(index);
+                        }
+
+                        // Count와 TotalAmount 차감
+                        newCount -= selectedCluster.Count;
+                        newTotalAmount -= selectedCluster.TotalAmount;
+
+                        Debug.WriteLine($"차감: ID {selectedCluster.ClusterNumber}, Count: {selectedCluster.Count}, Amount: {selectedCluster.TotalAmount}");
+                    }
+
+                    // *** 키워드 재계산: 남은 하위 클러스터들의 키워드만 유지 ***
+                    var remainingChildClusters = allChildClusters.Where(c => !selectedClusterIds.Contains(c.ClusterNumber)).ToList();
+                    newKeywords.Clear();
+                    foreach (var remainingChild in remainingChildClusters)
+                    {
+                        foreach (var keyword in remainingChild.Keywords ?? new List<string>())
+                        {
+                            newKeywords.Add(keyword);
+                        }
+                    }
+
+                    Debug.WriteLine($"계산 결과 - Count: {parentCluster.Count} -> {newCount}, Amount: {parentCluster.TotalAmount} -> {newTotalAmount}");
+                    Debug.WriteLine($"DataIndices: {parentCluster.DataIndices?.Count ?? 0} -> {newDataIndices.Count}");
+
+                    // *** 3단계: 선택된 클러스터들의 ClusterID를 -1로 업데이트 (병합 해제) ***
+                    await progressForm.UpdateProgressHandler(50, "선택된 클러스터 병합 해제 중");
+
+                    int processedCount = 0;
                     foreach (int clusterId in selectedClusterIds)
                     {
-                        // MongoDB에서 클러스터 ID 업데이트
                         await clusteringRepo.UpdateClusterIdAsync(clusterId, -1);
 
-                        // 메모리 상의 DataHandler.finalClusteringData도 업데이트
-                        var rows = DataHandler.finalClusteringData.Select($"ID = {clusterId}");
-                        if (rows.Length > 0)
+                        // 메모리 상의 DataHandler.finalClusteringData도 즉시 업데이트
+                        var memoryRows = DataHandler.finalClusteringData.Select($"ID = {clusterId}");
+                        if (memoryRows.Length > 0)
                         {
-                            rows[0]["ClusterID"] = -1;
+                            memoryRows[0]["ClusterID"] = -1;
                         }
 
-                        // 진행 상황 업데이트
-                        processedItems++;
-                        int progress = 10 + (int)((double)processedItems / totalItems * 40);
-                        await progressForm.UpdateProgressHandler(progress, $"{processedItems}/{totalItems} 처리 중...");
+                        processedCount++;
+                        int progress = 50 + (int)((double)processedCount / selectedClusterIds.Count * 20);
+                        await progressForm.UpdateProgressHandler(progress, $"병합 해제: {processedCount}/{selectedClusterIds.Count}");
                     }
 
-                    // 변경사항 적용
-                    DataHandler.finalClusteringData.AcceptChanges();
+                    // *** 4단계: 부모 클러스터 상태 결정 및 업데이트 ***
+                    await progressForm.UpdateProgressHandler(75, "부모 클러스터 상태 업데이트 중");
 
-                    await progressForm.UpdateProgressHandler(50, "부모 클러스터 상태 확인 중...");
-
-                    // 병합 해제 후 부모 클러스터의 하위 클러스터 다시 조회
-                    var updatedChildClusters = await clusteringRepo.GetChildClustersAsync(_currentClusterId);
-                    Debug.WriteLine($"  하위 클러스터 개수(병합 해제 후): {updatedChildClusters.Count}");
-
-                    // 실제 남아있는 하위 클러스터가 있는지 확인
-                    if (updatedChildClusters.Count > 0)
+                    if (remainingChildClusters.Count > 0)
                     {
-                        Debug.WriteLine("  남아있는 하위 클러스터가 있으므로 부모 클러스터 유지");
+                        // 남은 하위 클러스터가 있으면 부모 클러스터 업데이트
+                        Debug.WriteLine($"부모 클러스터 업데이트: 남은 하위 클러스터 {remainingChildClusters.Count}개");
 
-                        // 부모 클러스터 상태 재계산
-                        await progressForm.UpdateProgressHandler(70, "부모 클러스터 상태 업데이트 중...");
-
-                        // 모든 하위 클러스터의 데이터 인덱스와 Count 등을 합산
-                        HashSet<string> allDataIndices = new HashSet<string>();
-                        int totalCount = 0;
-                        decimal totalAmount = 0;
-
-                        foreach (var childCluster in updatedChildClusters)
-                        {
-                            foreach (var index in childCluster.DataIndices)
-                            {
-                                allDataIndices.Add(index);
-                            }
-                            totalCount += childCluster.Count;
-                            totalAmount += childCluster.TotalAmount;
-                        }
-
-                        Debug.WriteLine($"  재계산된 데이터 인덱스 개수: {allDataIndices.Count}");
-                        Debug.WriteLine($"  재계산된 Count: {totalCount}");
-                        Debug.WriteLine($"  재계산된 합산금액: {totalAmount}");
-
-                        // 부모 클러스터 업데이트
-                        await clusteringRepo.UpdateClusterFullInfoAsync(
+                        bool updateSuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
                             _currentClusterId,
-                            parentCluster.ClusterName,
-                            parentCluster.Keywords,
-                            totalCount,
-                            totalAmount,
-                            allDataIndices.ToList()
+                            parentCluster.ClusterName, // 클러스터명은 유지
+                            newKeywords.ToList(),
+                            newCount,
+                            newTotalAmount,
+                            newDataIndices.ToList()
                         );
 
-                        // DataHandler.finalClusteringData 업데이트
-                        var parentRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
-                        if (parentRows.Length > 0)
+                        if (!updateSuccess)
                         {
-                            parentRows[0]["Count"] = totalCount;
-                            parentRows[0]["합산금액"] = totalAmount;
-                            parentRows[0]["dataIndex"] = string.Join(",", allDataIndices);
+                            throw new Exception($"부모 클러스터 {_currentClusterId} 업데이트 실패");
                         }
 
-                        // 세부 정보 다시 표시
-                        await progressForm.UpdateProgressHandler(90, "데이터 갱신 중...");
-                        await ShowClusterDetail(_currentClusterId);
+                        // 메모리 상의 부모 클러스터 데이터도 업데이트
+                        var parentMemoryRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
+                        if (parentMemoryRows.Length > 0)
+                        {
+                            parentMemoryRows[0]["Count"] = newCount;
+                            parentMemoryRows[0]["합산금액"] = newTotalAmount;
+                            parentMemoryRows[0]["dataIndex"] = string.Join(",", newDataIndices);
+                            parentMemoryRows[0]["키워드목록"] = string.Join(",", newKeywords);
+                        }
+
+                        Debug.WriteLine("부모 클러스터 업데이트 완료");
                     }
                     else
                     {
-                        Debug.WriteLine("  남아있는 하위 클러스터가 없으므로 부모 클러스터 삭제");
+                        // 남은 하위 클러스터가 없으면 부모 클러스터 삭제
+                        Debug.WriteLine("남은 하위 클러스터가 없어 부모 클러스터 삭제");
 
-                        // 부모 클러스터 삭제
-                        await progressForm.UpdateProgressHandler(70, "빈 부모 클러스터 삭제 중...");
                         await clusteringRepo.DeleteByClusterNumberAsync(_currentClusterId);
 
-                        // DataHandler.finalClusteringData에서도 제거
-                        var parentRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
-                        if (parentRows.Length > 0)
+                        // 메모리에서도 삭제
+                        var parentMemoryRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
+                        if (parentMemoryRows.Length > 0)
                         {
-                            parentRows[0].Delete();
-                            DataHandler.finalClusteringData.AcceptChanges();
+                            parentMemoryRows[0].Delete();
                         }
-
-                        await progressForm.UpdateProgressHandler(90, "데이터 갱신 중...");
                     }
 
-                    // 이벤트 발생 - 부모 컨트롤에 병합 해제 완료 알림
+                    // *** 5단계: 메모리 변경사항 확정 ***
+                    DataHandler.finalClusteringData.AcceptChanges();
+
+                    await progressForm.UpdateProgressHandler(90, "UI 갱신 중");
+
+                    // *** 6단계: 이벤트 발생 및 UI 갱신 ***
                     var unmergeEventArgs = new ClusterUnmergeEventArgs
                     {
                         UnmergedClusterIds = selectedClusterIds,
@@ -649,10 +650,14 @@ namespace FinanceTool
                     await progressForm.UpdateProgressHandler(100);
                     progressForm.Close();
 
-                    if (updatedChildClusters.Count > 0)
+                    // 결과 메시지 및 UI 처리
+                    if (remainingChildClusters.Count > 0)
                     {
                         MessageBox.Show($"선택한 {selectedClusterIds.Count}개 항목이 병합에서 해제되었습니다.", "완료",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                        // 세부 정보 다시 표시
+                        await ShowClusterDetail(_currentClusterId);
                     }
                     else
                     {
