@@ -42,43 +42,16 @@ namespace FinanceTool
         List<string> check_keyword_list;
         List<string> supplier_keyword_list;
 
-        // === 페이징 관련 새 멤버 변수들 ===
-        private DataTable _fullMergeClusterData = null;
-        private int _currentPageMerge = 1;
-        private int _pageSizeMerge = 1000;
-        private int _totalPagesMerge = 1;
 
-        // === 선택 상태 관리 (cluster_number 기반) ===
-        private HashSet<int> _selectedClusterNumbers = new HashSet<int>();
+        // 이 변수는 유지 (새로운 아키텍처에서 완전히 대체되지 않음)
         private bool _allSelectedInCurrentFilter = false;
 
+        //2025.06.02
+        //검색엔진 객체 신규 생성
+        private ClusteringManager _clusteringManager;
+
         // === 페이징 초기화 메서드 ===
-        private void InitializePaginationEventsMerge()
-        {
-            try
-            {
-                // 페이징 컨트롤 설정
-                cmb_pageSize.Items.Clear();
-                cmb_pageSize.Items.AddRange(new object[] { 100, 200, 500, 1000, 2000 });
-                cmb_pageSize.SelectedItem = _pageSizeMerge;
-                cmb_pageSize.DropDownStyle = ComboBoxStyle.DropDownList;
-                cmb_pageSize.SelectedIndexChanged += cmb_pageSize_SelectedIndexChangedMerge;
-
-                num_pageNumber.Minimum = 1;
-                num_pageNumber.ValueChanged += num_pageNumber_ValueChangedMerge;
-                btn_prevPage.Click += btn_prevPage_ClickMerge;
-                btn_nextPage.Click += btn_nextPage_ClickMerge;
-
-                // 초기비활성화
-                EnablePaginationControlsMerge(false);
-
-                Debug.WriteLine("merge_cluster_table 페이징 이벤트 핸들러 초기화 완료");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"페이징 초기화 오류: {ex.Message}");
-            }
-        }
+        
 
         // === 페이징 컨트롤 활성화/비활성화 ===
         private void EnablePaginationControlsMerge(bool enabled)
@@ -89,271 +62,50 @@ namespace FinanceTool
             cmb_pageSize.Enabled = enabled;
         }
 
-        // === 페이징 이벤트 핸들러들 ===
-        private void num_pageNumber_ValueChangedMerge(object sender, EventArgs e)
-        {
-            if (num_pageNumber.Value < 1 || num_pageNumber.Value > _totalPagesMerge)
-                return;
-
-            if (_currentPageMerge == (int)num_pageNumber.Value)
-                return;
-
-            _currentPageMerge = (int)num_pageNumber.Value;
-            DisplayPageMerge();
-            UpdatePaginationControlsMerge();
-        }
-
-        private void btn_prevPage_ClickMerge(object sender, EventArgs e)
-        {
-            if (_currentPageMerge > 1)
-            {
-                num_pageNumber.Value--;
-            }
-        }
-
-        private void btn_nextPage_ClickMerge(object sender, EventArgs e)
-        {
-            if (_currentPageMerge < _totalPagesMerge)
-            {
-                num_pageNumber.Value++;
-            }
-        }
-
-        private void cmb_pageSize_SelectedIndexChangedMerge(object sender, EventArgs e)
-        {
-            if (cmb_pageSize.SelectedItem != null)
-            {
-                _pageSizeMerge = (int)cmb_pageSize.SelectedItem;
-                _currentPageMerge = 1;
-                if (_fullMergeClusterData != null)
-                    SetFullMergeClusterData(_fullMergeClusterData);
-            }
-        }
-
-        // === 페이지 표시 메서드 ===
-        private void DisplayPageMerge()
-        {
-            try
-            {
-                if (_fullMergeClusterData == null || _fullMergeClusterData.Rows.Count == 0)
-                {
-                    merge_cluster_table.DataSource = null;
-                    return;
-                }
-
-                int startIndex = (_currentPageMerge - 1) * _pageSizeMerge;
-                int endIndex = Math.Min(startIndex + _pageSizeMerge, _fullMergeClusterData.Rows.Count);
-
-                DataTable pageData = _fullMergeClusterData.Clone();
-
-                // 현재 페이지 데이터 복사
-                for (int i = startIndex; i < endIndex; i++)
-                {
-                    if (i < _fullMergeClusterData.Rows.Count)
-                    {
-                        pageData.ImportRow(_fullMergeClusterData.Rows[i]);
-                    }
-                }
-
-                // DataGridView 설정 (기존 CreateFilteredDataGridView 로직 재사용)
-                ApplyFilteredDataGridViewSettings(merge_cluster_table, pageData);
-
-                // 선택 상태 복원
-                RestoreSelectionState();
-
-                Debug.WriteLine($"merge_cluster_table 페이지 {_currentPageMerge} 표시: {pageData.Rows.Count}개 행");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"merge_cluster_table 페이지 표시 오류: {ex.Message}");
-            }
-        }
-
-        // === 페이징 컨트롤 업데이트 ===
-        private void UpdatePaginationControlsMerge()
-        {
-            try
-            {
-                int totalRecords = _fullMergeClusterData?.Rows.Count ?? 0;
-
-                lbl_pagination2.Text = $"/ {_totalPagesMerge} (총 {totalRecords:N0}개)";
-
-                num_pageNumber.Maximum = Math.Max(1, _totalPagesMerge);
-                if (num_pageNumber.Value != _currentPageMerge)
-                    num_pageNumber.Value = _currentPageMerge;
-
-                btn_prevPage.Enabled = _currentPageMerge > 1;
-                btn_nextPage.Enabled = _currentPageMerge < _totalPagesMerge;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"merge_cluster_table 페이징 컨트롤 업데이트 오류: {ex.Message}");
-            }
-        }
-
-        // === 전체 데이터 설정 메서드 ===
-        private void SetFullMergeClusterData(DataTable fullData)
-        {
-            try
-            {
-                _fullMergeClusterData = fullData;
-                _currentPageMerge = 1;
-
-                if (fullData != null && fullData.Rows.Count > 0)
-                {
-                    _totalPagesMerge = (int)Math.Ceiling((double)fullData.Rows.Count / _pageSizeMerge);
-                    EnablePaginationControlsMerge(true);
-                }
-                else
-                {
-                    _totalPagesMerge = 1;
-                    EnablePaginationControlsMerge(false);
-                }
-
-                DisplayPageMerge();
-                UpdatePaginationControlsMerge();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"merge_cluster_table 전체 데이터 설정 오류: {ex.Message}");
-            }
-        }
-
-        // === 기존 CreateFilteredDataGridView 로직을 페이징용으로 분리 ===
-        private void ApplyFilteredDataGridViewSettings(DataGridView dgv, DataTable pageData)
-        {
-            // DataGridView 초기화
-            dgv.DataSource = null;
-            dgv.Rows.Clear();
-            dgv.Columns.Clear();
-            if (DataHandler.dragSelections.ContainsKey(dgv))
-            {
-                DataHandler.dragSelections[dgv].Clear();
-            }
-
-            // CheckBox 컬럼 추가
-            DataGridViewCheckBoxColumn checkColumn = new DataGridViewCheckBoxColumn()
-            {
-                Name = "CheckBox",
-                HeaderText = "",
-                Width = 50,
-                ThreeState = false,
-                Frozen = true,
-                FillWeight = 20
-            };
-            dgv.Columns.Add(checkColumn);
-
-            // 원본 DataTable의 컬럼들 추가
-            foreach (DataColumn col in pageData.Columns)
-            {
-                dgv.Columns.Add(col.ColumnName, col.ColumnName);
-            }
-
-            // 데이터 행 추가
-            foreach (DataRow row in pageData.Rows)
-            {
-                int rowIndex = dgv.Rows.Add();
-                dgv.Rows[rowIndex].Cells["CheckBox"].Value = false; // 기본값, 나중에 복원
-
-                for (int i = 0; i < pageData.Columns.Count; i++)
-                {
-                    // 합산금액 컬럼 포맷팅
-                    if ("합산금액".Equals(pageData.Columns[i].ColumnName))
-                    {
-                        dgv.Rows[rowIndex].Cells[i + 1].Value = FormatToKoreanUnit(Convert.ToDecimal(row[i]));
-                    }
-                    else
-                    {
-                        dgv.Rows[rowIndex].Cells[i + 1].Value = row[i];
-                    }
-                }
-            }
-
-            // 기존 CreateFilteredDataGridView의 컬럼 설정 적용
-            ApplyColumnSettings(dgv);
-        }
-
-        
 
         // === 선택 상태 관리 메서드들 ===
-        private void SaveCurrentSelectionState()
+        /// <summary>
+        /// 현재 필터 결과의 전체 선택 상태 관리
+        /// </summary>
+        private void UpdateAllSelectedInCurrentFilter()
         {
-            try
-            {
-                foreach (DataGridViewRow row in merge_cluster_table.Rows)
-                {
-                    if (row.Cells["CheckBox"].Value != null && Convert.ToBoolean(row.Cells["CheckBox"].Value))
-                    {
-                        if (row.Cells["ID"].Value != null && int.TryParse(row.Cells["ID"].Value.ToString(), out int clusterId))
-                        {
-                            _selectedClusterNumbers.Add(clusterId);
-                        }
-                    }
-                    else
-                    {
-                        // 체크 해제된 경우 선택 목록에서 제거
-                        if (row.Cells["ID"].Value != null && int.TryParse(row.Cells["ID"].Value.ToString(), out int clusterId))
-                        {
-                            _selectedClusterNumbers.Remove(clusterId);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"선택 상태 저장 오류: {ex.Message}");
-            }
+            var selectedIds = _clusteringManager.GetSelectedClusterIds();
+            var currentFilterIds = GetCurrentFilterClusterIds();
+
+            _allSelectedInCurrentFilter = currentFilterIds.Count > 0 &&
+                                         currentFilterIds.All(id => selectedIds.Contains(id));
+
+            // 이벤트 핸들러 제거 후 설정하여 재귀 호출 방지
+            merge_all_check.CheckedChanged -= merge_all_check_CheckedChanged;
+            merge_all_check.Checked = _allSelectedInCurrentFilter;
+            merge_all_check.CheckedChanged += merge_all_check_CheckedChanged;
         }
 
-        private void RestoreSelectionState()
+        private HashSet<int> GetCurrentFilterClusterIds()
         {
-            try
-            {
-                foreach (DataGridViewRow row in merge_cluster_table.Rows)
-                {
-                    if (row.Cells["ID"].Value != null && int.TryParse(row.Cells["ID"].Value.ToString(), out int clusterId))
-                    {
-                        row.Cells["CheckBox"].Value = _selectedClusterNumbers.Contains(clusterId);
-                    }
-                }
-
-                // 전체 선택 체크박스 상태 업데이트
-                UpdateMergeAllCheckState();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"선택 상태 복원 오류: {ex.Message}");
-            }
+            return _clusteringManager.GetCurrentResultClusterIds().ToHashSet();
         }
 
         private void UpdateMergeAllCheckState()
         {
             try
             {
-                if (_fullMergeClusterData == null || _fullMergeClusterData.Rows.Count == 0)
-                {
-                    merge_all_check.Checked = false;
-                    return;
-                }
-
-                // 현재 필터된 데이터의 모든 ID 수집
-                HashSet<int> currentFilterIds = new HashSet<int>();
-                foreach (DataRow row in _fullMergeClusterData.Rows)
-                {
-                    if (int.TryParse(row["ID"].ToString(), out int id))
-                    {
-                        currentFilterIds.Add(id);
-                    }
-                }
+                // 현재 검색 결과의 모든 ID 수집
+                var currentFilterIds = GetCurrentFilterClusterIds();
+                var selectedIds = _clusteringManager.GetSelectedClusterIds();
 
                 // 현재 필터의 모든 항목이 선택되었는지 확인
-                bool allSelected = currentFilterIds.Count > 0 && currentFilterIds.All(id => _selectedClusterNumbers.Contains(id));
+                bool allSelected = currentFilterIds.Count > 0 &&
+                                  currentFilterIds.All(id => selectedIds.Contains(id));
 
+                // 이벤트 핸들러 제거 후 설정 (재귀 호출 방지)
                 merge_all_check.CheckedChanged -= merge_all_check_CheckedChanged;
                 merge_all_check.Checked = allSelected;
                 merge_all_check.CheckedChanged += merge_all_check_CheckedChanged;
 
                 _allSelectedInCurrentFilter = allSelected;
+
+                Debug.WriteLine($"전체 선택 상태 업데이트: {allSelected}, 필터 항목: {currentFilterIds.Count}개, 선택 항목: {selectedIds.Count}개");
             }
             catch (Exception ex)
             {
@@ -685,6 +437,11 @@ namespace FinanceTool
                 // 최초 수행 시 별도 수행
                 supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
 
+                // 새로운 클러스터링 매니저 초기화
+                _clusteringManager = new ClusteringManager();
+                _clusteringManager.InitializeAsync(mergeClusterDataTable, merge_cluster_table,
+                    num_pageNumber, cmb_pageSize, btn_prevPage, btn_nextPage, lbl_pagination2, merge_all_check);
+
                 // 메인 UI 스레드로 돌아가서 DataGridView 설정
                 await Task.Run(() =>
                 {
@@ -734,11 +491,13 @@ namespace FinanceTool
                             }
 
                             // 페이징 이벤트 핸들러 초기화 추가
+                            /*
                             InitializePaginationEventsMerge();
-
-
-
                             Debug.WriteLine("페이징 초기화 완료");
+                            */
+                          
+
+                            Debug.WriteLine("클러스터링 매니저 초기화 완료");
 
                             // 초기 데이터 로드 후 업데이트
                             UpdateModifiedDataGridView();
@@ -779,7 +538,8 @@ namespace FinanceTool
             if (e.ColumnIndex == 0 && e.RowIndex >= 0) // 체크박스 컬럼
             {
                 // 현재 페이지의 선택 상태 저장
-                SaveCurrentSelectionState();
+                //SaveCurrentSelectionState();
+                _clusteringManager.SaveCurrentSelectionState();
 
                 // 전체 선택 체크박스 상태 업데이트
                 UpdateMergeAllCheckState();
@@ -859,7 +619,11 @@ namespace FinanceTool
                 }
 
                 // 페이징으로 설정
-                SetFullMergeClusterData(filteredData);
+                //SetFullMergeClusterData(filteredData);
+                // 새로운 검색 결과 표시
+                var searchResult = new SearchResult { Data = filteredData, TotalCount = filteredData.Rows.Count };
+                await _clusteringManager.DisplaySearchResultAsync(searchResult);
+
             }
             // 전체 검색
             else
@@ -872,7 +636,12 @@ namespace FinanceTool
 
                 // 전체 데이터를 페이징으로 설정
                 DataTable filteredData = ApplyDataFiltering(mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
-                SetFullMergeClusterData(filteredData);
+                //SetFullMergeClusterData(filteredData);
+                // 페이징으로 설정
+                //SetFullMergeClusterData(filteredData);
+                // 새로운 검색 결과 표시
+                var searchResult = new SearchResult { Data = filteredData, TotalCount = filteredData.Rows.Count };
+                await _clusteringManager.DisplaySearchResultAsync(searchResult);
             }
 
             andSearchYN = false;
@@ -884,15 +653,79 @@ namespace FinanceTool
             await progressForm.UpdateProgressHandler(10, "데이터 검색 시작");
             await Task.Delay(10);
 
-            await PerformSearch();
+            //await PerformSearch();
+            // PerformSearch 내용을 SearchCriteria로 변환하여 호출
+            var searchCriteria = CreateSearchCriteriaFromCurrentUI();
+            await _clusteringManager.SearchAsync(searchCriteria);
 
             await progressForm.UpdateProgressHandler(90, "데이터 검색 완료");
             await Task.Delay(10);
         }
 
-        // merge_cluster_table 초기화
-        private void ClearMergeClusterTable()
+        /// <summary>
+        /// 현재 UI 상태에서 SearchCriteria 생성
+        /// </summary>
+        private SearchCriteria CreateSearchCriteriaFromCurrentUI()
         {
+            string targetKeyword = "";
+
+            // 검색어 수집
+            if (merge_search_radio1.Checked)
+            {
+                if (merge_keyword_combo.SelectedIndex != 0)
+                {
+                    targetKeyword = merge_keyword_combo.SelectedItem.ToString();
+                }
+            }
+            else if (merge_search_radio2.Checked)
+            {
+                if (!string.IsNullOrEmpty(merge_search_keyword.Text))
+                {
+                    targetKeyword = merge_search_keyword.Text;
+                }
+            }
+
+            List<string> keywords = new List<string>();
+            if (!string.IsNullOrEmpty(targetKeyword))
+            {
+                // 키워드 매칭 수행
+                List<string> searchList = keyword_radio1.Checked ? merge_keyword_list : supplier_keyword_list;
+
+                if (equalsSearchYN)
+                {
+                    keywords = DataHandler.FindMachEqualsKeyword(searchList, targetKeyword);
+                }
+                else
+                {
+                    keywords = DataHandler.FindMachKeyword(searchList, targetKeyword);
+                }
+            }
+
+            // 제외 키워드 처리
+            List<string> excludeKeywords = null;
+            if (!string.IsNullOrEmpty(except_keyword.Text))
+            {
+                excludeKeywords = except_keyword.Text.Split(',')
+                                                   .Select(k => k.Trim())
+                                                   .Where(k => !string.IsNullOrEmpty(k))
+                                                   .ToList();
+            }
+
+            return new SearchCriteria
+            {
+                Keywords = keywords,
+                ExcludeKeywords = excludeKeywords,
+                IsKeywordSearch = keyword_radio1.Checked,
+                IsSupplierSearch = keyword_radio2.Checked,
+                ExactMatch = equalsSearchYN,
+                AndSearch = andSearchYN
+            };
+        }
+
+        // merge_cluster_table 초기화
+        private async void ClearMergeClusterTable()
+        {
+            /*
             merge_cluster_table.DataSource = null;
             merge_cluster_table.Rows.Clear();
             merge_cluster_table.Columns.Clear();
@@ -906,6 +739,10 @@ namespace FinanceTool
             _fullMergeClusterData = null;
             EnablePaginationControlsMerge(false);
 
+            change_row_count();
+            */
+            var emptyCriteria = new SearchCriteria { Keywords = new List<string>() };
+            await _clusteringManager.SearchAsync(emptyCriteria);
             change_row_count();
         }
 
@@ -1102,7 +939,7 @@ namespace FinanceTool
         }
 
 
-        private void dataGridView_keyword_CellClick(object sender, DataGridViewCellEventArgs e)
+        private async void dataGridView_keyword_CellClick(object sender, DataGridViewCellEventArgs e)
         {
 
             DataGridView dgv = sender as DataGridView;
@@ -1147,6 +984,7 @@ namespace FinanceTool
                     }
 
                     // 필터링된 결과를 페이징으로 표시
+                    /*
                     if (!"".Equals(except_keyword.Text))
                     {
                         CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString());
@@ -1155,10 +993,18 @@ namespace FinanceTool
                     {
                         CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs);
                     }
+                    */
+                    var searchCriteria = new SearchCriteria
+                    {
+                        Keywords = MathcingPairs,
+                        ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
+                        ExactMatch = true
+                    };
+                    await _clusteringManager.SearchAsync(searchCriteria);
 
                     // 선택 상태 초기화
                     merge_all_check.Checked = false;
-                    _selectedClusterNumbers.Clear();
+                    //_selectedClusterNumbers.Clear();
 
                     change_row_count();
                 }
@@ -1175,7 +1021,7 @@ namespace FinanceTool
                     }
 
                     // 페이징 데이터도 초기화
-                    _fullMergeClusterData = null;
+                  
                     EnablePaginationControlsMerge(false);
 
                     change_row_count();
@@ -1364,7 +1210,7 @@ namespace FinanceTool
                         Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
                         return; // 또는 적절한 오류 처리
                     }
-
+                    /*
                     if (!"".Equals(except_keyword.Text))
                     {
                         CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString(), keyword_radio2.Checked);
@@ -1373,6 +1219,16 @@ namespace FinanceTool
                     {
                         CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
                     }
+                    */
+                    var searchCriteria = new SearchCriteria
+                    {
+                        Keywords = MathcingPairs,
+                        ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
+                        IsSupplierSearch = keyword_radio2.Checked,
+                        ExactMatch = equalsSearchYN,
+                        AndSearch = andSearchYN
+                    };
+                    await _clusteringManager.SearchAsync(searchCriteria);
                 }
                 //전체 검색
                 else
@@ -1473,6 +1329,7 @@ namespace FinanceTool
                             return; // 또는 적절한 오류 처리
                         }
 
+                        /*
                         if (!"".Equals(except_keyword.Text))
                         {
                             CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString(), keyword_radio2.Checked);
@@ -1481,6 +1338,16 @@ namespace FinanceTool
                         {
                             CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
                         }
+                        */
+                        var searchCriteria = new SearchCriteria
+                        {
+                            Keywords = MathcingPairs,
+                            ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
+                            IsSupplierSearch = keyword_radio2.Checked,
+                            ExactMatch = equalsSearchYN,
+                            AndSearch = andSearchYN
+                        };
+                        await _clusteringManager.SearchAsync(searchCriteria);
                     }
                     //전체 검색
                     else
@@ -1494,7 +1361,16 @@ namespace FinanceTool
                             return; // 또는 적절한 오류 처리
                         }
 
-                        CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
+                        //CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
+                        var searchCriteria = new SearchCriteria
+                        {
+                            Keywords = MathcingPairs,
+                            ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
+                            IsSupplierSearch = keyword_radio2.Checked,
+                            ExactMatch = equalsSearchYN,
+                            AndSearch = andSearchYN
+                        };
+                        await _clusteringManager.SearchAsync(searchCriteria);
                     }
 
                     await progressForm.UpdateProgressHandler(90, "데이터 검색 완료");
@@ -1510,50 +1386,9 @@ namespace FinanceTool
                 }
             }
 
-            if (isAlreadyProgress)
-            {
-                // 기존 검색 로직 실행
-                await PerformSearch();
-
-                // 페이징 설정 추가
-                if (mergeClusterDataTable != null && mergeClusterDataTable.Rows.Count > 0)
-                {
-                    // 페이징 이벤트 핸들러 초기화 (아직 안했다면)
-                    if (cmb_pageSize.Items.Count == 0)
-                    {
-                        InitializePaginationEventsMerge();
-                    }
-
-                    SetFullMergeClusterData(mergeClusterDataTable);
-                }
-            }
-            else
-            {
-                using (var progressForm = new ProcessProgressForm())
-                {
-                    progressForm.Show();
-
-                    // 기존 검색 로직 실행
-                    await PerformSearchWithProgress(progressForm);
-
-                    // 페이징 설정 추가
-                    if (mergeClusterDataTable != null && mergeClusterDataTable.Rows.Count > 0)
-                    {
-                        // 페이징 이벤트 핸들러 초기화 (아직 안했다면)
-                        if (cmb_pageSize.Items.Count == 0)
-                        {
-                            InitializePaginationEventsMerge();
-                        }
-
-                        SetFullMergeClusterData(mergeClusterDataTable);
-                    }
-
-                    progressForm.Close();
-                }
-            }
 
             merge_all_check.Checked = false;
-            _selectedClusterNumbers.Clear();
+            //_selectedClusterNumbers.Clear();
             change_row_count();
         }
 
@@ -2442,8 +2277,9 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
             // 현재 페이지의 선택 상태 저장
             if (dgv == merge_cluster_table)
             {
-                SaveCurrentSelectionState();
-                return _selectedClusterNumbers.ToList();
+                //SaveCurrentSelectionState();
+                //return _selectedClusterNumbers.ToList();
+                return _clusteringManager.GetSelectedClusterIds();
             }
 
             // 기존 로직 (다른 DataGridView용)
@@ -3468,42 +3304,41 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
         {
             try
             {
-                if (_fullMergeClusterData == null || _fullMergeClusterData.Rows.Count == 0)
-                    return;
+                bool selectAll = merge_all_check.Checked;
 
-                // 현재 필터된 데이터의 모든 ID 수집
-                HashSet<int> currentFilterIds = new HashSet<int>();
-                foreach (DataRow row in _fullMergeClusterData.Rows)
+                // 1. 현재 표시된 그리드의 모든 행 체크박스 변경
+                foreach (DataGridViewRow row in merge_cluster_table.Rows)
                 {
-                    if (int.TryParse(row["ID"].ToString(), out int id))
-                    {
-                        currentFilterIds.Add(id);
-                    }
+                    row.Cells["CheckBox"].Value = selectAll;
                 }
 
-                if (merge_all_check.Checked)
+                // 2. 현재 필터 결과의 모든 클러스터 ID 처리
+                if (selectAll)
                 {
-                    // 현재 필터의 모든 항목 선택
-                    foreach (int id in currentFilterIds)
+                    // 전체 선택: 현재 필터 결과의 모든 ID를 선택 목록에 추가
+                    var currentFilterIds = GetCurrentFilterClusterIds();
+                    foreach (int clusterId in currentFilterIds)
                     {
-                        _selectedClusterNumbers.Add(id);
+                        _clusteringManager.AddToSelection(clusterId);
                     }
-                    _allSelectedInCurrentFilter = true;
                 }
                 else
                 {
-                    // 현재 필터의 모든 항목 선택 해제
-                    foreach (int id in currentFilterIds)
+                    // 전체 해제: 현재 필터 결과의 모든 ID를 선택 목록에서 제거
+                    var currentFilterIds = GetCurrentFilterClusterIds();
+                    foreach (int clusterId in currentFilterIds)
                     {
-                        _selectedClusterNumbers.Remove(id);
+                        _clusteringManager.RemoveFromSelection(clusterId);
                     }
-                    _allSelectedInCurrentFilter = false;
                 }
 
-                // 현재 페이지의 체크박스 상태 업데이트
-                RestoreSelectionState();
+                // 3. 선택 상태 저장
+                _clusteringManager.SaveCurrentSelectionState();
 
-                Debug.WriteLine($"전체 선택 변경: {merge_all_check.Checked}, 선택된 클러스터 수: {_selectedClusterNumbers.Count}");
+                // 4. 전체 선택 플래그 업데이트
+                _allSelectedInCurrentFilter = selectAll;
+
+                Debug.WriteLine($"전체 선택 변경: {selectAll}, 대상 항목: {GetCurrentFilterClusterIds().Count}개");
             }
             catch (Exception ex)
             {
@@ -3515,17 +3350,18 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
         {
             try
             {
-                // 현재 페이지의 선택 상태 저장
-                SaveCurrentSelectionState();
+                // 현재 선택 상태 저장 후 선택된 ID 목록 조회
+                _clusteringManager.SaveCurrentSelectionState();
+                var selectedClusterIds = _clusteringManager.GetSelectedClusterIds();
 
-                if (_selectedClusterNumbers.Count == 0)
+                if (selectedClusterIds.Count == 0)
                 {
                     MessageBox.Show("병합할 클러스터를 선택해주세요.", "알림",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                if (_selectedClusterNumbers.Count < 2)
+                if (selectedClusterIds.Count < 2)
                 {
                     MessageBox.Show("병합하려면 최소 2개 이상의 클러스터를 선택해야 합니다.", "알림",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -3533,7 +3369,7 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
                 }
 
                 DialogResult result = MessageBox.Show(
-                    $"선택된 {_selectedClusterNumbers.Count}개의 클러스터를 병합하시겠습니까?",
+                    $"선택된 {selectedClusterIds.Count}개의 클러스터를 병합하시겠습니까?",
                     "클러스터 병합 확인",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
@@ -3542,12 +3378,12 @@ private void AddRowToGrid(DataGridView dgv, DataRow row, DataTable dt)
                 if (result == DialogResult.Yes)
                 {
                     // 기존 병합 로직 호출 (cluster_number 리스트 전달)
-                    List<int> clusterNumbersToMerge = _selectedClusterNumbers.ToList();
+                    List<int> clusterNumbersToMerge = selectedClusterIds.ToList();
 
                     await MergeAndCreateNewCluster(DataHandler.finalClusteringData, clusterNumbersToMerge);
 
                     // 병합 후 선택 상태 초기화
-                    _selectedClusterNumbers.Clear();
+                    //_selectedClusterNumbers.Clear();
                     merge_all_check.Checked = false;
 
                     // 데이터 다시 로드
