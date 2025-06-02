@@ -23,7 +23,7 @@ namespace FinanceTool.Repositories
             Task.Run(async () => await EnsureIndexesCreatedAsync()).Wait();
         }
 
-        /// <summary>
+                /// <summary>
         /// 필요한 인덱스 생성
         /// </summary>
         private async Task EnsureIndexesCreatedAsync()

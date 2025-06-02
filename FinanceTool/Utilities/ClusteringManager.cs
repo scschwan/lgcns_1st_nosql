@@ -256,11 +256,13 @@ public class ClusterSearchEngine
                             int clusterId = Convert.ToInt32(row["ClusterID"]);
                             int rowId = Convert.ToInt32(row["ID"]);
 
-                            // 병합된 하위 클러스터 제외
-                            return clusterId <= 0 || clusterId == rowId;
+                            // *** 수정된 조건: 병합되지 않은 클러스터만 표시 ***
+                            // ClusterID가 -1이거나, ClusterID와 ID가 다르면서 ClusterID < 0인 경우만 포함
+                            return clusterId == -1 || (clusterId != rowId && clusterId < 0);
                         }
 
-                        return true;
+                        // ClusterID나 ID가 null인 경우는 제외
+                        return false;
                     })
                     .ToList();
 

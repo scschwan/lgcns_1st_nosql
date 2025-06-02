@@ -952,7 +952,8 @@ namespace FinanceTool
                     new Dictionary<string, (int, int, decimal, HashSet<string>)>();
 
                 // 그룹 ID 카운터
-                int nextGroupId = 0;
+                //int nextGroupId = 0;
+                int nextGroupId = 1;
 
                 // 시스템 리소스에 맞게 병렬 처리 최적화
                 int batchSize = CalculateOptimalBatchSize(sourceTable.Rows.Count);
