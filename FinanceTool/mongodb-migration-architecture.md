@@ -258,6 +258,23 @@ FinanceTool/
   "last_modified_date": ISODate("2025-05-14T12:45:00Z")
 }
 ```
+## Clustering.cs 의 검색 알고리므
+### initUI에서의 데이터 로딩 과정
+1. clustering_results 컬렉션에서 클러스터 데이터 조회
+2. EnrichWithRawTableDataAsync()에서 raw_data와 조인
+   - clustering의 dataIndex → raw_data의 ID로 매핑
+   - 필요한 컬럼들(공급업체명, 부서명 등) 추가
+3. 완성된 데이터를 mergeClusterDataTable에 저장
+4. 이후 모든 검색은 mergeClusterDataTable에서 수행
+
+### 사용자 검색 요청
+    ↓
+ClusterSearchEngine: 메모리에서 고속 필터링
+    ↓
+ClusterDisplayManager: 검색 결과를 페이징으로 표시
+    ↓
+UI 업데이트 완료
+
 ## 주요 변경 사항
 
 ### 데이터 숨김 처리
@@ -396,4 +413,4 @@ var batches = documents
 2.clustering 병합 결과 페이지 개성
 3.clustering 페이지 데이터 전송 구간 개선 -> 신규 로직 적용
 
-  
+##

@@ -351,33 +351,42 @@ namespace FinanceTool
 
             viewDetailsItem.Click += (s, e) =>
             {
-                // merge_check_table에서 체크된 항목이 있는지 확인
-                bool hasCheckedItems = false;
-                foreach (DataGridViewRow row in merge_check_table.Rows)
+                // *** 핵심 개선: 우클릭한 행을 우선시 ***
+
+                // 1. 먼저 현재 우클릭된 행 정보 확인
+                DataGridViewRow rightClickedRow = null;
+                if (merge_check_table.SelectedRows.Count > 0)
                 {
-                    if (row.Cells["CheckBox"].Value != null && Convert.ToBoolean(row.Cells["CheckBox"].Value))
-                    {
-                        hasCheckedItems = true;
-                        break;
-                    }
+                    rightClickedRow = merge_check_table.SelectedRows[0];
+                }
+                else if (merge_check_table.CurrentRow != null)
+                {
+                    rightClickedRow = merge_check_table.CurrentRow;
                 }
 
-                if (hasCheckedItems)
-                {
-                    ShowMergeClusterDetail();
-                }
-                else if (merge_check_table.SelectedRows.Count > 0)
-                {
-                    // 선택된 행이 있으면 해당 행을 체크하고 세부 정보 표시
-                    DataGridViewRow row = merge_check_table.SelectedRows[0];
-                    row.Cells["CheckBox"].Value = true;
-                    ShowMergeClusterDetail();
-                }
-                else
+                if (rightClickedRow == null)
                 {
                     MessageBox.Show("세부 정보를 확인할 클러스터를 선택해주세요.", "알림",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
                 }
+
+                // 2. 모든 기존 체크 상태 초기화
+                foreach (DataGridViewRow row in merge_check_table.Rows)
+                {
+                    if (row.Cells["CheckBox"].Value != null)
+                    {
+                        row.Cells["CheckBox"].Value = false;
+                    }
+                }
+
+                // 3. 우클릭한 행만 체크 상태로 설정
+                rightClickedRow.Cells["CheckBox"].Value = true;
+
+                // 4. 세부 정보 표시
+                ShowMergeClusterDetail();
+
+                Debug.WriteLine($"컨텍스트 메뉴: 행 {rightClickedRow.Index}를 선택하고 세부정보 표시");
             };
 
             contextMenu.Items.Add(viewDetailsItem);
@@ -862,17 +871,7 @@ namespace FinanceTool
                         return;
                     }
 
-                    // 필터링된 결과를 페이징으로 표시
-                    /*
-                    if (!"".Equals(except_keyword.Text))
-                    {
-                        CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString());
-                    }
-                    else
-                    {
-                        CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs);
-                    }
-                    */
+                   
                     var searchCriteria = new SearchCriteria
                     {
                         Keywords = MathcingPairs,
@@ -2312,15 +2311,30 @@ namespace FinanceTool
                     rows[0]["클러스터명"] = newValue;
                 }
 
-                await progressForm.UpdateProgressHandler(50, "클러스터명 변경 진행중...");
-                await Task.Delay(10);
+                await progressForm.UpdateProgressHandler(30, "메모리 데이터 업데이트 완료");
 
+                // 2. MongoDB 업데이트 추가
+                var clusteringRepo = new ClusteringRepository();
+                bool mongoUpdateSuccess = await clusteringRepo.UpdateClusterNameAsync(id, newValue);
+
+                if (!mongoUpdateSuccess)
+                {
+                    throw new Exception("MongoDB 클러스터명 업데이트 실패");
+                }
+
+                await progressForm.UpdateProgressHandler(60, "MongoDB 업데이트 완료");
                 // 변경 사항 저장
                 DataHandler.finalClusteringData.AcceptChanges();
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
                 await progressForm.UpdateProgressHandler(70, "클러스터명 변경 결과 출력 중...");
                 await Task.Delay(10);
+
+                // 4. ClusteringManager 데이터 새로고침
+                if (_clusteringManager != null)
+                {
+                    await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
+                }
 
                 create_check_keyword_list();
 
@@ -2643,7 +2657,24 @@ namespace FinanceTool
                 divider = divider / 10;
             }
             decimalDivider = (decimal)divider;
-            decimalDividerName = decimal_combo.SelectedItem.ToString();
+            //decimalDividerName = decimal_combo.SelectedItem.ToString();
+            // 단위명 설정
+            switch (decimal_combo.SelectedIndex)
+            {
+                case 0: decimalDividerName = "원"; break;
+                case 1: decimalDividerName = "천원"; break;
+                case 2: decimalDividerName = "백만원"; break;
+                case 3: decimalDividerName = "억원"; break;
+                default: decimalDividerName = "원"; break;
+            }
+
+            // ClusteringManager에 단위 정보 전달
+            if (_clusteringManager != null)
+            {
+                _clusteringManager.UpdateCurrencyFormat(decimalDivider, decimalDividerName);
+                // 현재 표시된 데이터 새로고침
+                _clusteringManager.RefreshCurrentDisplay();
+            }
 
             //리스트 재 조회
             // 나머지 초기화 로직

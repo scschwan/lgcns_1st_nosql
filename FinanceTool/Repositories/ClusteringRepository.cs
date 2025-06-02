@@ -59,49 +59,22 @@ namespace FinanceTool.Repositories
             }
         }
 
-        /// <summary>
-        /// 병합되지 않은 클러스터만 가져와서 DataTable로 변환 (UI 표시용)
-        /// ClusterId <= 0 또는 ClusterId == ClusterNumber인 클러스터만 포함
-        /// </summary>
-        public async Task<DataTable> GetUnmergedClustersAsDataTableAsync()
+        // ClusteringRepository.cs에 추가
+        public async Task<bool> UpdateClusterNameAsync(int clusterNumber, string newClusterName)
         {
-            // 병합되지 않은 클러스터만 필터링
-            var filter = Builders<ClusteringResultDocument>.Filter.Or(
-                Builders<ClusteringResultDocument>.Filter.Lte(c => c.ClusterId, 0),
-                Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterId == c.ClusterNumber)
-            );
-
-            var clusters = await _collection.Find(filter)
-                .Sort(Builders<ClusteringResultDocument>.Sort.Ascending(c => c.ClusterNumber))
-                .ToListAsync();
-
-            // 기존 ToDataTableAsync()와 동일한 DataTable 생성 로직
-            var dataTable = new DataTable();
-            dataTable.Columns.Add("ID", typeof(int));
-            dataTable.Columns.Add("ClusterID", typeof(int));
-            dataTable.Columns.Add("클러스터명", typeof(string));
-            dataTable.Columns.Add("키워드목록", typeof(string));
-            dataTable.Columns.Add("Count", typeof(int));
-            dataTable.Columns.Add("합산금액", typeof(decimal));
-            dataTable.Columns.Add("dataIndex", typeof(string));
-            dataTable.Columns.Add("_MongoId", typeof(string));
-
-            foreach (var cluster in clusters)
+            try
             {
-                var row = dataTable.NewRow();
-                row["ID"] = cluster.ClusterNumber;
-                row["ClusterID"] = cluster.ClusterId;
-                row["클러스터명"] = cluster.ClusterName;
-                row["키워드목록"] = string.Join(",", cluster.Keywords);
-                row["Count"] = cluster.Count;
-                row["합산금액"] = cluster.TotalAmount;
-                row["dataIndex"] = string.Join(",", cluster.DataIndices);
-                row["_MongoId"] = cluster.Id;
+                var filter = Builders<ClusteringResultDocument>.Filter.Eq(d => d.ClusterNumber, clusterNumber);
+                var update = Builders<ClusteringResultDocument>.Update.Set(d => d.ClusterName, newClusterName);
 
-                dataTable.Rows.Add(row);
+                var result = await _collection.UpdateOneAsync(filter, update);
+                return result.ModifiedCount > 0;
             }
-
-            return dataTable;
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"클러스터명 업데이트 오류: {ex.Message}");
+                return false;
+            }
         }
 
         // 클러스터 전체 정보 업데이트
@@ -164,63 +137,13 @@ namespace FinanceTool.Repositories
             }
         }
 
-        /// <summary>
-        /// 새 클러스터링 결과 생성
-        /// </summary>
-        public async Task<string> CreateClusterAsync(
-            string clusterName,
-            List<string> keywords,
-            List<string> documentIds,
-            decimal totalAmount = 0)
-        {
-            // 다음 클러스터 번호 가져오기
-            int nextClusterNumber = await GetNextClusterNumberAsync();
-
-            var cluster = new ClusteringResultDocument
-            {
-                ClusterNumber = nextClusterNumber,
-                ClusterId = -1, // 초기값은 미병합 상태
-                ClusterName = clusterName,
-                Keywords = keywords,
-                DataIndices = documentIds,
-                Count = documentIds.Count,
-                TotalAmount = totalAmount,
-                CreatedAt = DateTime.Now
-            };
-
-            return await CreateAsync(cluster);
-        }
-
-        /// <summary>
-        /// 클러스터 구성원 업데이트
-        /// </summary>
-        public async Task<bool> UpdateClusterMembersAsync(
-            int clusterNumber,
-            List<string> documentIds,
-            decimal totalAmount = 0)
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber);
-            var update = Builders<ClusteringResultDocument>.Update
-                .Set(c => c.DataIndices, documentIds)
-                .Set(c => c.Count, documentIds.Count)
-                .Set(c => c.TotalAmount, totalAmount);
-
-            var result = await _collection.UpdateOneAsync(filter, update);
-            return result.ModifiedCount > 0;
-        }
+       
 
         // 클러스터 번호로 클러스터 검색
         public async Task<ClusteringResultDocument> GetByClusterNumberAsync(int clusterNumber)
         {
             var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber);
             return await _collection.Find(filter).FirstOrDefaultAsync();
-        }
-
-        // 상위 클러스터 번호로 하위 클러스터 찾기
-        public async Task<List<ClusteringResultDocument>> GetByParentClusterNumberAsync(int parentClusterNumber)
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterId, parentClusterNumber);
-            return await _collection.Find(filter).ToListAsync();
         }
 
         // 클러스터 ID 업데이트
@@ -242,56 +165,7 @@ namespace FinanceTool.Repositories
             return result.DeletedCount > 0;
         }
 
-        /// <summary>
-        /// 여러 클러스터의 ClusterId를 일괄 업데이트
-        /// </summary>
-        public async Task<bool> UpdateMultipleClusterIdsAsync(List<int> clusterNumbers, int newClusterId)
-        {
-            try
-            {
-                var filter = Builders<ClusteringResultDocument>.Filter.In(c => c.ClusterNumber, clusterNumbers);
-                var update = Builders<ClusteringResultDocument>.Update.Set(c => c.ClusterId, newClusterId);
-
-                var result = await _collection.UpdateManyAsync(filter, update);
-                return result.ModifiedCount > 0;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"다중 ClusterId 업데이트 오류: {ex.Message}");
-                return false;
-            }
-        }
-
-        // 클러스터 정보 전체 업데이트
-        public async Task<bool> UpdateClusterByNumberAsync(
-            int clusterNumber,
-            string clusterName,
-            List<string> keywords,
-            int count,
-            decimal totalAmount,
-            List<string> dataIndices)
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber);
-            var update = Builders<ClusteringResultDocument>.Update
-                .Set(c => c.ClusterName, clusterName)
-                .Set(c => c.Keywords, keywords)
-                .Set(c => c.Count, count)
-                .Set(c => c.TotalAmount, totalAmount)
-                .Set(c => c.DataIndices, dataIndices);
-
-            var result = await _collection.UpdateOneAsync(filter, update);
-            return result.ModifiedCount > 0;
-        }
-
-        // 병합된 하위 클러스터만 가져오기 (ClusterId > 0 && ClusterId != ClusterNumber)
-        // 병합된 하위 클러스터만 가져오기 (ClusterId > 0 && ClusterId != ClusterNumber)
-        public async Task<List<ClusteringResultDocument>> GetMergedChildClustersAsync()
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Where(c =>
-                c.ClusterId > 0 && c.ClusterId != c.ClusterNumber);
-
-            return await _collection.Find(filter).ToListAsync();
-        }
+       
 
         // 특정 상위 클러스터에 속한 하위 클러스터 찾기
         public async Task<List<ClusteringResultDocument>> GetChildClustersAsync(int parentClusterNumber)
@@ -418,66 +292,6 @@ namespace FinanceTool.Repositories
         }
 
         /// <summary>
-        /// 병합된 클러스터 해제 (ClusterId 초기화)
-        /// </summary>
-        public async Task<bool> UnmergeClusterAsync(int clusterNumber)
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber);
-            var update = Builders<ClusteringResultDocument>.Update
-                .Set(c => c.ClusterId, -1); // 미병합 상태로 변경
-
-            var result = await _collection.UpdateOneAsync(filter, update);
-            return result.ModifiedCount > 0;
-        }
-
-        /// <summary>
-        /// 클러스터 삭제 및 관련 클러스터 상태 재설정
-        /// </summary>
-        public async Task DeleteClusterAndResetMembersAsync(int clusterNumber)
-        {
-            // 1. 삭제할 클러스터가 병합 클러스터인지 확인
-            var clusterToDelete = await _collection.Find(
-                Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber)
-            ).FirstOrDefaultAsync();
-
-            if (clusterToDelete != null)
-            {
-                // 2. 이 클러스터에 병합된 다른 클러스터들의 상태 재설정
-                if (clusterToDelete.IsMergedCluster)
-                {
-                    var membersFilter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterId, clusterNumber);
-                    var resetUpdate = Builders<ClusteringResultDocument>.Update
-                        .Set(c => c.ClusterId, -1); // 미병합 상태로 변경
-
-                    await _collection.UpdateManyAsync(membersFilter, resetUpdate);
-                }
-
-                // 3. 클러스터 삭제
-                await _collection.DeleteOneAsync(
-                    Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber)
-                );
-            }
-        }
-
-        /// <summary>
-        /// 모든 미병합 클러스터 가져오기
-        /// </summary>
-        public async Task<List<ClusteringResultDocument>> GetUnmergedClustersAsync()
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterId, -1);
-            return await _collection.Find(filter).ToListAsync();
-        }
-
-        /// <summary>
-        /// 특정 클러스터에 병합된 모든 클러스터 가져오기
-        /// </summary>
-        public async Task<List<ClusteringResultDocument>> GetMergedClustersAsync(int parentClusterNumber)
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterId, parentClusterNumber);
-            return await _collection.Find(filter).ToListAsync();
-        }
-
-        /// <summary>
         /// 클러스터링 결과를 DataTable 형태로 변환 (UI 표시용)
         /// </summary>
         public async Task<DataTable> ToDataTableAsync()
@@ -515,52 +329,152 @@ namespace FinanceTool.Repositories
         }
 
         /// <summary>
-        /// DataTable에서 클러스터링 결과 가져오기 (메모리 객체 변환용)
+        /// cluster_number == cluster_id인 최종 클러스터만 조회
         /// </summary>
-        public async Task<List<ClusteringResultDocument>> FromDataTableAsync(DataTable dataTable)
+        /// <returns>최종 클러스터 문서 목록</returns>
+        public async Task<List<ClusteringResultDocument>> GetFinalClustersAsync()
         {
-            if (dataTable == null || dataTable.Rows.Count == 0)
-                return new List<ClusteringResultDocument>();
-
-            var clusters = new List<ClusteringResultDocument>();
-
-            foreach (DataRow row in dataTable.Rows)
+            try
             {
-                var cluster = new ClusteringResultDocument();
+                // cluster_number == cluster_id 조건으로 필터링
+                var filter = Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterNumber == c.ClusterId);
 
-                // MongoDB ID 처리 (있으면 사용, 없으면 새로 생성)
-                if (row.Table.Columns.Contains("_MongoId") && row["_MongoId"] != DBNull.Value && !string.IsNullOrEmpty(row["_MongoId"].ToString()))
+                // 정렬 조건 추가 (클러스터 번호 기준 오름차순)
+                var sort = Builders<ClusteringResultDocument>.Sort.Ascending(c => c.ClusterNumber);
+
+                var cursor = await _collection.FindAsync(filter, new FindOptions<ClusteringResultDocument>
                 {
-                    cluster.Id = row["_MongoId"].ToString();
+                    Sort = sort
+                });
+
+                var results = await cursor.ToListAsync();
+
+                Debug.WriteLine($"GetFinalClustersAsync: {results.Count}개의 최종 클러스터 조회 완료");
+                return results;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GetFinalClustersAsync 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 특정 raw_data ID가 속한 클러스터 정보 조회
+        /// </summary>
+        /// <param name="rawDataId">raw_data 문서 ID</param>
+        /// <returns>해당 클러스터 정보 (없으면 null)</returns>
+        public async Task<ClusteringResultDocument> GetClusterByRawDataIdAsync(string rawDataId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(rawDataId))
+                    return null;
+
+                // data_indices 배열에 해당 rawDataId가 포함된 클러스터 검색
+                var filter = Builders<ClusteringResultDocument>.Filter.AnyEq(c => c.DataIndices, rawDataId);
+
+                // cluster_number == cluster_id인 최종 클러스터만 조회
+                var finalClusterFilter = Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterNumber == c.ClusterId);
+
+                // 두 조건을 AND로 결합
+                var combinedFilter = Builders<ClusteringResultDocument>.Filter.And(filter, finalClusterFilter);
+
+                var cursor = await _collection.FindAsync(combinedFilter);
+                var result = await cursor.FirstOrDefaultAsync();
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GetClusterByRawDataIdAsync 오류 (rawDataId: {rawDataId}): {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 여러 raw_data ID에 대한 클러스터명 매핑 일괄 조회
+        /// </summary>
+        /// <param name="rawDataIds">raw_data ID 목록</param>
+        /// <returns>raw_data ID → cluster_name 매핑 딕셔너리</returns>
+        public async Task<Dictionary<string, string>> GetClusterNameMappingAsync(List<string> rawDataIds)
+        {
+            var mappingDict = new Dictionary<string, string>();
+
+            if (rawDataIds == null || rawDataIds.Count == 0)
+                return mappingDict;
+
+            try
+            {
+                // 최종 클러스터만 조회 (cluster_number == cluster_id)
+                var finalClusterFilter = Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterNumber == c.ClusterId);
+
+                var cursor = await _collection.FindAsync(finalClusterFilter);
+                var finalClusters = await cursor.ToListAsync();
+
+                // 각 클러스터의 data_indices를 확인하여 매핑 생성
+                foreach (var cluster in finalClusters)
+                {
+                    if (cluster.DataIndices != null && !string.IsNullOrEmpty(cluster.ClusterName))
+                    {
+                        foreach (var dataIndex in cluster.DataIndices)
+                        {
+                            if (rawDataIds.Contains(dataIndex) && !mappingDict.ContainsKey(dataIndex))
+                            {
+                                mappingDict[dataIndex] = cluster.ClusterName;
+                            }
+                        }
+                    }
                 }
 
-                // ClusterNumber 처리
-                if (row["ID"] != DBNull.Value)
-                    cluster.ClusterNumber = Convert.ToInt32(row["ID"]);
-
-                // ClusterId 처리
-                if (row["ClusterID"] != DBNull.Value)
-                    cluster.ClusterId = Convert.ToInt32(row["ClusterID"]);
-
-                if (row["클러스터명"] != DBNull.Value)
-                    cluster.ClusterName = row["클러스터명"].ToString();
-
-                if (row["키워드목록"] != DBNull.Value)
-                    cluster.Keywords = row["키워드목록"].ToString().Split(',').Select(k => k.Trim()).ToList();
-
-                if (row["Count"] != DBNull.Value)
-                    cluster.Count = Convert.ToInt32(row["Count"]);
-
-                if (row["합산금액"] != DBNull.Value)
-                    cluster.TotalAmount = Convert.ToDecimal(row["합산금액"]);
-
-                if (row["dataIndex"] != DBNull.Value)
-                    cluster.DataIndices = row["dataIndex"].ToString().Split(',').Select(id => id.Trim()).ToList();
-
-                clusters.Add(cluster);
+                Debug.WriteLine($"GetClusterNameMappingAsync: {rawDataIds.Count}개 ID 중 {mappingDict.Count}개 매핑 완료");
+                return mappingDict;
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GetClusterNameMappingAsync 오류: {ex.Message}");
+                return mappingDict;
+            }
+        }
 
-            return clusters;
+        /// <summary>
+        /// 전체 raw_data → cluster_name 매핑 조회 (캐싱용)
+        /// </summary>
+        /// <returns>전체 매핑 딕셔너리</returns>
+        public async Task<Dictionary<string, string>> GetAllClusterNameMappingAsync()
+        {
+            var mappingDict = new Dictionary<string, string>();
+
+            try
+            {
+                // 최종 클러스터만 조회 (cluster_number == cluster_id)
+                var filter = Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterNumber == c.ClusterId);
+
+                var cursor = await _collection.FindAsync(filter);
+                var finalClusters = await cursor.ToListAsync();
+
+                foreach (var cluster in finalClusters)
+                {
+                    if (cluster.DataIndices != null && !string.IsNullOrEmpty(cluster.ClusterName))
+                    {
+                        foreach (var dataIndex in cluster.DataIndices)
+                        {
+                            if (!string.IsNullOrEmpty(dataIndex) && !mappingDict.ContainsKey(dataIndex))
+                            {
+                                mappingDict[dataIndex] = cluster.ClusterName;
+                            }
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"GetAllClusterNameMappingAsync: 전체 {mappingDict.Count}개 매핑 조회 완료");
+                return mappingDict;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"GetAllClusterNameMappingAsync 오류: {ex.Message}");
+                return mappingDict;
+            }
         }
     }
 }

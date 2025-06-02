@@ -29,10 +29,50 @@ namespace FinanceTool
 
         private bool isProcessingSearch = false;
 
+        
+
         public uc_Classification()
         {
             InitializeComponent();
             //lb_priority.Items.Add("총 금액");
+        }
+
+        // *** 1. 캐시 관련 변수들 모두 삭제 (클래스 상단에서 제거할 것들) ***
+        // private static Dictionary<string, string> _cachedClusterNameMapping = null;
+        // private static DateTime _cacheLastUpdated = DateTime.MinValue;
+        // private static readonly TimeSpan CacheValidDuration = TimeSpan.FromMinutes(5);
+
+        
+
+        // *** 4. 페이징 초기화 함수 추가 (dataTransform.cs, clustering.cs와 동일한 패턴) ***
+        private void InitializePagination()
+        {
+            try
+            {
+                // 페이지 크기 콤보박스 초기화
+                cmb_pageSize.Items.Clear();
+                cmb_pageSize.Items.AddRange(new object[] { 1000, 2000, 5000, 10000});
+                cmb_pageSize.SelectedIndex = 0; // 1000을 기본값으로 설정
+                pageSize = 1000;
+
+                // 페이지 번호 초기화
+                currentPage = 1;
+                num_pageNumber.Value = 1;
+                num_pageNumber.Minimum = 1;
+
+                // 페이징 컨트롤 초기 상태
+                btn_prevPage.Enabled = false;
+                btn_nextPage.Enabled = false;
+
+                // 페이징 이벤트 핸들러 연결
+                AttachPagingEvents();
+
+                Debug.WriteLine("페이징 초기화 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"페이징 초기화 중 오류: {ex.Message}");
+            }
         }
 
         // uc_Classification.cs의 initUI 메서드 - MongoDB 활용
@@ -46,6 +86,9 @@ namespace FinanceTool
                     progressForm.Show();
                     await progressForm.UpdateProgressHandler(10, "초기화 준비 중...");
                     await Task.Delay(10);
+
+                    // *** 페이징 초기화 추가 ***
+                    InitializePagination();
 
                     // 1. MongoDB에서 visible 컬럼 목록 가져오기
                     await progressForm.UpdateProgressHandler(20, "컬럼 정보 로드 중...");
@@ -698,39 +741,70 @@ namespace FinanceTool
         private async void dataGridView_classify_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
             Debug.WriteLine("call dataGridView_classify_CellValueChanged");
-            // "클러스터명" 컬럼이 변경되었을 때만 처리
 
             if (e.ColumnIndex == dataGridView_classify.Columns["클러스터명"].Index && e.RowIndex >= 0)
             {
-                //UpdateClusterName(dataGridView_keyword, DataHandler.processTable, DataHandler.finalClusteringData, e.RowIndex);
-
-                // 수정된 값 가져오기
                 string newValue = dataGridView_classify.Rows[e.RowIndex].Cells[e.ColumnIndex].Value?.ToString() ?? "";
 
                 if ("".Equals(newValue))
                 {
-                    //함수 재조회로 변경
                     CreateCheckDataGridView(dataGridView_classify, DataHandler.finalClusteringData);
                     return;
                 }
 
-                // DataHandler.finalClusteringData 업데이트
-                int id = Convert.ToInt32(dataGridView_classify.Rows[e.RowIndex].Cells["ID"].Value);
-                DataRow[] rows = DataHandler.finalClusteringData.Select($"ID = {id}");
-                if (rows.Length > 0)
+                try
                 {
-                    rows[0]["클러스터명"] = newValue;
+                    using (var progressForm = new ProcessProgressForm())
+                    {
+                        progressForm.Show();
+                        await progressForm.UpdateProgressHandler(10, "클러스터명 변경 시작");
+
+                        // 1. DataHandler.finalClusteringData 업데이트
+                        int id = Convert.ToInt32(dataGridView_classify.Rows[e.RowIndex].Cells["ID"].Value);
+                        DataRow[] rows = DataHandler.finalClusteringData.Select($"ID = {id}");
+                        if (rows.Length > 0)
+                        {
+                            rows[0]["클러스터명"] = newValue;
+                        }
+
+                        await progressForm.UpdateProgressHandler(30, "메모리 데이터 업데이트 완료");
+
+                        // 2. MongoDB 클러스터명 업데이트
+                        var clusteringRepo = new ClusteringRepository();
+                        bool mongoUpdateResult = await clusteringRepo.UpdateClusterNameAsync(id, newValue);
+
+                        if (!mongoUpdateResult)
+                        {
+                            Debug.WriteLine($"MongoDB 클러스터명 업데이트 실패: ID={id}, 새 이름={newValue}");
+                            // 실패 시 메모리 데이터도 롤백
+                            MessageBox.Show("클러스터명 변경에 실패했습니다. 다시 시도해주세요.", "오류",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+
+                        await progressForm.UpdateProgressHandler(60, "MongoDB 업데이트 완료");
+
+                        // 3. 변경 사항 저장
+                        DataHandler.finalClusteringData.AcceptChanges();
+
+                        await progressForm.UpdateProgressHandler(80, "현재 페이지 데이터 갱신 중");
+
+                        // 4. 현재 페이지 데이터 즉시 갱신
+                        await LoadPagedDataAsync();
+
+                        await progressForm.UpdateProgressHandler(100, "클러스터명 변경 완료");
+                        await Task.Delay(300);
+                        progressForm.Close();
+
+                        Debug.WriteLine($"클러스터명 변경 완료: ID={id}, 새 이름={newValue}");
+                    }
                 }
-
-                Debug.WriteLine($"변경된 클러스터명 {newValue}");
-
-                // 변경 사항 저장
-                DataHandler.finalClusteringData.AcceptChanges();
-
-                //화면 갱신
-                await LoadPagedDataAsync();
-
-                //PopulateDataGridViewWithClusterNames(dataGridView_keyword, DataHandler.processTable, DataHandler.finalClusteringData);
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"클러스터명 변경 중 오류: {ex.Message}");
+                    MessageBox.Show($"클러스터명 변경 중 오류가 발생했습니다: {ex.Message}", "오류",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
 
         }
@@ -990,9 +1064,9 @@ namespace FinanceTool
 
         // 실제 데이터 로드 로직을 분리하는 헬퍼 메서드
         // 실제 데이터 로드 로직을 분리하는 헬퍼 메서드
+        // *** 2. 개선된 PerformLoadPagedData 함수 (캐시 제거 + 간단한 실시간 조회) ***
         private async Task PerformLoadPagedData(ProcessProgressForm.UpdateProgressDelegate progressHandler = null)
         {
-            // 컬럼 가시성 정보
             List<ColumnMappingDocument> visibleColumns = null;
             DataTable pageData = null;
 
@@ -1005,7 +1079,6 @@ namespace FinanceTool
                     visibleColumns = await columnMappingRepo.GetVisibleColumnsAsync();
                     Debug.WriteLine($"조회된 가시적 컬럼 수: {visibleColumns.Count}");
 
-                    // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
                     if (progressHandler != null)
                     {
                         await progressHandler(20, "컬럼 정보 로드 완료");
@@ -1020,24 +1093,39 @@ namespace FinanceTool
                     totalRows = (int)totalCount;
                     totalPages = (int)Math.Ceiling((double)totalRows / pageSize);
 
-                    // MongoDB 문서를 DataTable로 변환
-                    pageData = ConvertRawDocumentsToDataTable(documents);
-                    Debug.WriteLine($"변환된 pageData 컬럼 수: {pageData.Columns.Count}");
-
-                    // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
                     if (progressHandler != null)
                     {
-                        await progressHandler(70, "데이터 로드 완료");
+                        await progressHandler(50, "Raw 데이터 로드 완료");
+                    }
+
+                    // 3. 현재 페이지 데이터의 raw_data ID 목록 추출
+                    var currentPageRawDataIds = documents.Select(d => d.Id).ToList();
+
+                    // 4. 현재 페이지 데이터에 대해서만 클러스터명 매핑 조회
+                    var clusterNameMapping = await GetClusterNameMappingForPageAsync(currentPageRawDataIds);
+                    Debug.WriteLine($"현재 페이지 클러스터 매핑: {clusterNameMapping.Count}개 항목");
+
+                    if (progressHandler != null)
+                    {
+                        await progressHandler(65, "클러스터 매핑 조회 완료");
+                    }
+
+                    // 5. MongoDB 문서를 DataTable로 변환 (클러스터명 포함)
+                    pageData = ConvertRawDocumentsToDataTableWithClusterName(documents, clusterNameMapping);
+                    Debug.WriteLine($"변환된 pageData: {pageData.Rows.Count}행, 클러스터명 매핑: {GetClusterNameMappingStats(pageData)}");
+
+                    if (progressHandler != null)
+                    {
+                        await progressHandler(70, "데이터 변환 완료");
                     }
                 }
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"데이터 로드 작업 중 오류: {ex.Message}");
-                    throw; // 예외를 상위로 전파
+                    throw;
                 }
             });
 
-            // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
             if (progressHandler != null)
             {
                 await progressHandler(80, "UI 업데이트 중...");
@@ -1046,7 +1134,6 @@ namespace FinanceTool
             // UI 업데이트
             try
             {
-                // DataGridView 업데이트
                 if (pageData != null)
                 {
                     // 원본 그리드와 키워드 그리드 모두 동일한 데이터로 설정
@@ -1061,9 +1148,11 @@ namespace FinanceTool
                         ApplyColumnVisibilityExplicit(dataGridView_keyword, visibleColumns);
                         Debug.WriteLine("컬럼 가시성 적용 완료");
                     }
+
+                    // 클러스터명 컬럼 스타일 적용
+                    ApplyClusterNameColumnStyle(dataGridView_keyword);
                 }
 
-                // dataGridView_delete_col2 업데이트 - 컬럼 목록 채우기 (비동기 메서드 사용)
                 await AddSelectedColumnToGridAsync(dataGridView_delete_col2, dataGridView_keyword);
                 Debug.WriteLine($"dataGridView_delete_col2 설정 완료 (행 수: {dataGridView_delete_col2.Rows.Count})");
 
@@ -1072,16 +1161,106 @@ namespace FinanceTool
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"UI 업데이트 중 오류: {ex.Message}\n{ex.StackTrace}");
+                Debug.WriteLine($"UI 업데이트 중 오류: {ex.Message}\\n{ex.StackTrace}");
             }
 
-            // 진행 상황 업데이트 (해당하는 경우) - 수정된 부분
             if (progressHandler != null)
             {
                 await progressHandler(90, "데이터 로드 마무리 중...");
             }
         }
 
+        // *** 3. 현재 페이지 데이터에 대해서만 클러스터명 매핑 조회 (캐시 제거) ***
+        private async Task<Dictionary<string, string>> GetClusterNameMappingForPageAsync(List<string> rawDataIds)
+        {
+            var mappingDict = new Dictionary<string, string>();
+
+            if (rawDataIds == null || rawDataIds.Count == 0)
+                return mappingDict;
+
+            try
+            {
+                var clusteringRepo = new ClusteringRepository();
+
+                // clustering_results에서 cluster_number == cluster_id인 최종 클러스터만 조회
+                var filter = Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterNumber == c.ClusterId);
+                var finalClusters = await clusteringRepo.FindDocumentsAsync(filter);
+
+                // 현재 페이지의 raw_data ID에 대해서만 매핑 생성
+                foreach (var cluster in finalClusters)
+                {
+                    if (cluster.DataIndices != null && !string.IsNullOrEmpty(cluster.ClusterName))
+                    {
+                        foreach (var dataIndex in cluster.DataIndices)
+                        {
+                            if (rawDataIds.Contains(dataIndex) && !mappingDict.ContainsKey(dataIndex))
+                            {
+                                mappingDict[dataIndex] = cluster.ClusterName;
+                            }
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"현재 페이지 클러스터 매핑 생성: {rawDataIds.Count}개 ID 중 {mappingDict.Count}개 매핑");
+                return mappingDict;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"클러스터명 매핑 조회 중 오류: {ex.Message}");
+                return mappingDict;
+            }
+        }
+        // 클러스터명 매핑 통계 확인 (새로 추가할 메서드)
+        private string GetClusterNameMappingStats(DataTable dataTable)
+        {
+            if (dataTable == null || !dataTable.Columns.Contains("클러스터명"))
+                return "매핑 통계 없음";
+
+            int totalRows = dataTable.Rows.Count;
+            int mappedRows = 0;
+
+            foreach (DataRow row in dataTable.Rows)
+            {
+                if (row["클러스터명"] != null && !string.IsNullOrEmpty(row["클러스터명"].ToString()))
+                {
+                    mappedRows++;
+                }
+            }
+
+            return $"{totalRows}행 중 {mappedRows}행 매핑됨 ({(double)mappedRows / totalRows * 100:F1}%)";
+        }
+
+        // 클러스터명 컬럼 스타일 적용 (새로 추가할 메서드)
+        private void ApplyClusterNameColumnStyle(DataGridView dgv)
+        {
+            try
+            {
+                if (dgv.Columns.Contains("클러스터명"))
+                {
+                    var clusterColumn = dgv.Columns["클러스터명"];
+
+                    // 클러스터명 컬럼 스타일 설정
+                    clusterColumn.DefaultCellStyle.BackColor = System.Drawing.Color.LightBlue;
+                    clusterColumn.DefaultCellStyle.Font = new System.Drawing.Font("맑은 고딕", 9.0f, FontStyle.Bold);
+                    clusterColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+                    // 컬럼 너비 조정
+                    clusterColumn.Width = 120;
+                    clusterColumn.MinimumWidth = 100;
+
+                    // 항상 표시되도록 설정
+                    clusterColumn.Visible = true;
+
+                    Debug.WriteLine("클러스터명 컬럼 스타일 적용 완료");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"클러스터명 컬럼 스타일 적용 중 오류: {ex.Message}");
+            }
+        }
+
+      
         // 컬럼 가시성 적용 함수 - 명시적 처리 방식
         private void ApplyColumnVisibilityExplicit(DataGridView dgv, List<ColumnMappingDocument> visibleColumns)
         {
@@ -1212,7 +1391,10 @@ namespace FinanceTool
 
 
         // MongoDB RawDataDocument를 DataTable로 변환
-        private DataTable ConvertRawDocumentsToDataTable(List<RawDataDocument> documents)
+        // 기존 ConvertRawDocumentsToDataTable 메서드를 아래 메서드로 교체
+        private DataTable ConvertRawDocumentsToDataTableWithClusterName(
+            List<RawDataDocument> documents,
+            Dictionary<string, string> clusterNameMapping)
         {
             DataTable dataTable = new DataTable();
 
@@ -1220,6 +1402,7 @@ namespace FinanceTool
             dataTable.Columns.Add("id", typeof(string));
             dataTable.Columns.Add("import_date", typeof(DateTime));
             dataTable.Columns.Add("is_hidden", typeof(bool));
+            dataTable.Columns.Add("클러스터명", typeof(string)); // 클러스터명 컬럼을 먼저 추가
 
             // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
             if (documents.Count > 0 && documents[0].Data != null)
@@ -1233,6 +1416,10 @@ namespace FinanceTool
                 }
             }
 
+            // 통계 추적
+            int mappedCount = 0;
+            int totalCount = documents.Count;
+
             // 문서 데이터를 DataTable에 추가
             foreach (var doc in documents)
             {
@@ -1240,6 +1427,17 @@ namespace FinanceTool
                 row["id"] = doc.Id;
                 row["import_date"] = doc.ImportDate;
                 row["is_hidden"] = doc.IsHidden;
+
+                // 클러스터명 매핑
+                if (clusterNameMapping != null && clusterNameMapping.TryGetValue(doc.Id, out string clusterName))
+                {
+                    row["클러스터명"] = clusterName;
+                    mappedCount++;
+                }
+                else
+                {
+                    row["클러스터명"] = ""; // 매핑되지 않은 경우 빈 문자열
+                }
 
                 // 동적 데이터 필드 추가
                 if (doc.Data != null)
@@ -1256,6 +1454,7 @@ namespace FinanceTool
                 dataTable.Rows.Add(row);
             }
 
+            Debug.WriteLine($"클러스터명이 포함된 DataTable 생성 완료: {dataTable.Rows.Count}행, {mappedCount}개 행에 클러스터명 매핑됨 ({(double)mappedCount / totalCount * 100:F1}%)");
             return dataTable;
         }
 

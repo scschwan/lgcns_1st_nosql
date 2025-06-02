@@ -571,51 +571,5 @@ namespace FinanceTool
         }
 
        
-        /// <summary>
-        /// 행 숨기기
-        /// </summary>
-        public async Task HideDocumentAsync(string docId, string reason = null)
-        {
-            var filter = Builders<RawDataDocument>.Filter.Eq(d => d.Id, docId);
-            var update = Builders<RawDataDocument>.Update
-                .Set(d => d.IsHidden, true)
-                .Set(d => d.HiddenReason, reason);
-
-            await _dbManager.UpdateDocumentsAsync("raw_data", filter, update);
-            Debug.WriteLine($"문서 숨김 처리: {docId}, 이유: {reason}");
-        }
-
-        /// <summary>
-        /// 모든 행 표시 (숨김 해제)
-        /// </summary>
-        public async Task UnhideAllDocumentsAsync()
-        {
-            var filter = Builders<RawDataDocument>.Filter.Eq(d => d.IsHidden, true);
-            var update = Builders<RawDataDocument>.Update
-                .Set(d => d.IsHidden, false)
-                .Unset(d => d.HiddenReason);
-
-            var count = await _dbManager.UpdateDocumentsAsync("raw_data", filter, update);
-            Debug.WriteLine($"모든 숨겨진 문서 표시 처리: {count}개 문서");
-        }
-
-        // MongoDataConverter.cs 클래스에 추가할 메서드
-        public async Task HideDocumentsByFieldAsync(string fieldName, object fieldValue, string reason = null)
-        {
-            if (string.IsNullOrEmpty(fieldName) || fieldValue == null)
-                return;
-
-            // 필드 값 기준으로 문서 필터 생성
-            var filter = Builders<RawDataDocument>.Filter.Eq($"Data.{fieldName}", fieldValue);
-
-            // 숨김 상태로 업데이트
-            var update = Builders<RawDataDocument>.Update
-                .Set(d => d.IsHidden, true)
-                .Set(d => d.HiddenReason, reason);
-
-            // 일치하는 모든 문서 업데이트
-            var result = await _dbManager.UpdateDocumentsAsync("raw_data", filter, update);
-            Debug.WriteLine($"필드 {fieldName}={fieldValue} 기준으로 {result}개 문서가 숨겨짐");
-        }
     }
 }

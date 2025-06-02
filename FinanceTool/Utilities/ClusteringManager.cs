@@ -735,10 +735,34 @@ public class ClusterDisplayManager
         }
     }
 
+
+    private decimal _decimalDivider = 1;
+    private string _decimalDividerName = "원";
+
+    // 통화 포맷 업데이트 메서드 추가
+    public void UpdateCurrencyFormat(decimal divider, string unitName)
+    {
+        _decimalDivider = divider;
+        _decimalDividerName = unitName;
+    }
+
+    // FormatToKoreanUnit 함수 개선
     private string FormatToKoreanUnit(decimal amount)
     {
-        // 기존 FormatToKoreanUnit 로직 구현
-        return amount.ToString("N0");
+        if (_decimalDivider <= 1)
+            return amount.ToString("N0") + _decimalDividerName;
+
+        decimal dividedAmount = amount / _decimalDivider;
+        return dividedAmount.ToString("N0") + _decimalDividerName;
+    }
+
+    // 현재 표시 새로고침 메서드 추가
+    public void RefreshCurrentDisplay()
+    {
+        if (_currentSearchResult != null)
+        {
+            DisplayCurrentPage();
+        }
     }
 }
 
@@ -778,6 +802,18 @@ public class ClusteringManager
         _dataManager = new ClusterDataManager();
         _searchEngine = new ClusterSearchEngine(_dataManager);
         _displayManager = new ClusterDisplayManager();
+    }
+
+    // 통화 포맷 업데이트 래퍼 메서드
+    public void UpdateCurrencyFormat(decimal divider, string unitName)
+    {
+        _displayManager.UpdateCurrencyFormat(divider, unitName);
+    }
+
+    // 현재 표시 새로고침 래퍼 메서드
+    public void RefreshCurrentDisplay()
+    {
+        _displayManager.RefreshCurrentDisplay();
     }
 
     /// <summary>
@@ -842,13 +878,7 @@ public class ClusteringManager
         return _displayManager.SelectedClusterIds.ToList();
     }
 
-    /// <summary>
-    /// 검색 결과를 직접 표시 (DisplayManager 접근용)
-    /// </summary>
-    public async Task DisplaySearchResultAsync(SearchResult searchResult)
-    {
-        await _displayManager.DisplaySearchResultAsync(searchResult);
-    }
+  
 
     /// <summary>
     /// 현재 선택 상태 저장 (래퍼 메서드)

@@ -79,67 +79,8 @@ namespace FinanceTool.Repositories
             return await _collection.Find(filter ?? Builders<T>.Filter.Empty).ToListAsync();
         }
 
-        /// <summary>
-        /// 페이징 처리된 문서 조회
-        /// </summary>
-        public virtual async Task<(List<T> Items, long TotalCount)> GetPagedAsync(
-            Expression<Func<T, bool>> filter = null,
-            int pageNumber = 1,
-            int pageSize = 10,
-            Expression<Func<T, object>> sortExpression = null,
-            bool ascending = true)
-        {
-            var findOptions = new FindOptions<T>
-            {
-                Skip = (pageNumber - 1) * pageSize,
-                Limit = pageSize
-            };
-
-            if (sortExpression != null)
-            {
-                findOptions.Sort = ascending
-                    ? Builders<T>.Sort.Ascending(sortExpression)
-                    : Builders<T>.Sort.Descending(sortExpression);
-            }
-
-            var actualFilter = filter ?? Builders<T>.Filter.Empty;
-            var query = _collection.Find(actualFilter);
-
-            long totalCount = await query.CountDocumentsAsync();
-            List<T> items = await query.Skip((pageNumber - 1) * pageSize).Limit(pageSize).ToListAsync();
-
-            return (items, totalCount);
-        }
-
-        /// <summary>
-        /// 문서 업데이트
-        /// </summary>
-        public virtual async Task<bool> UpdateAsync(string id, T document)
-        {
-            var filter = Builders<T>.Filter.Eq("_id", id);
-            var result = await _collection.ReplaceOneAsync(filter, document);
-            return result.ModifiedCount > 0;
-        }
-
-        /// <summary>
-        /// 부분 업데이트
-        /// </summary>
-        public virtual async Task<bool> UpdateFieldsAsync(string id, UpdateDefinition<T> update)
-        {
-            var filter = Builders<T>.Filter.Eq("_id", id);
-            var result = await _collection.UpdateOneAsync(filter, update);
-            return result.ModifiedCount > 0;
-        }
-
-        /// <summary>
-        /// 문서 삭제
-        /// </summary>
-        public virtual async Task<bool> DeleteAsync(string id)
-        {
-            var filter = Builders<T>.Filter.Eq("_id", id);
-            var result = await _collection.DeleteOneAsync(filter);
-            return result.DeletedCount > 0;
-        }
+     
+      
 
         /// <summary>
         /// 문서에서 ID 가져오기 (리플렉션 사용)
@@ -173,24 +114,6 @@ namespace FinanceTool.Repositories
             }
         }
 
-        /// <summary>
-        /// 필터 조건과 정렬 방식을 적용하여 문서 목록을 조회합니다.
-        /// </summary>
-        /// <param name="filter">적용할 필터 조건</param>
-        /// <param name="sort">적용할 정렬 방식</param>
-        /// <returns>조건에 맞는 정렬된 문서 목록</returns>
-        public async Task<List<T>> FindDocumentsAsync(FilterDefinition<T> filter, SortDefinition<T> sort)
-        {
-            try
-            {
-                return await _collection.Find(filter).Sort(sort).ToListAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"FindDocumentsAsync 오류: {ex.Message}");
-                return new List<T>();
-            }
-        }
 
         /// <summary>
         /// 필터 조건, 정렬 방식 및 페이징을 적용하여 문서 목록을 조회합니다.

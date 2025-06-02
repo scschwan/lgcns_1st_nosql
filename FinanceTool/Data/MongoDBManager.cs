@@ -191,56 +191,7 @@ namespace FinanceTool.Data
 
 
 
-        // 비동기 컬렉션 확인 메서드 (기존 메서드 대체)
-        private async Task EnsureCollectionsExistAsync()
-        {
-            var collectionNames = await _database.ListCollectionNames().ToListAsync();
 
-            if (!collectionNames.Contains("column_mapping"))
-            {
-                await _database.CreateCollectionAsync("column_mapping");
-                var collection = _database.GetCollection<BsonDocument>("column_mapping");
-                var indexKeys = Builders<BsonDocument>.IndexKeys.Ascending("original_name");
-                var indexOptions = new CreateIndexOptions { Unique = true };
-                await collection.Indexes.CreateOneAsync(new CreateIndexModel<BsonDocument>(indexKeys, indexOptions));
-            }
-
-            string[] requiredCollections = { "raw_data", "process_data" };
-            foreach (string collName in requiredCollections)
-            {
-                if (!collectionNames.Contains(collName))
-                {
-                    await _database.CreateCollectionAsync(collName);
-                    Debug.WriteLine($"컬렉션 생성됨: {collName}");
-                }
-            }
-
-            await CreateDefaultIndexesAsync();
-        }
-
-
-        private async Task CreateDefaultIndexesAsync()
-        {
-            var rawDataCollection = _database.GetCollection<BsonDocument>("raw_data");
-            await rawDataCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<BsonDocument>(Builders<BsonDocument>.IndexKeys.Ascending("import_date")));
-
-            var processDataCollection = _database.GetCollection<BsonDocument>("process_data");
-            await processDataCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<BsonDocument>(Builders<BsonDocument>.IndexKeys.Ascending("raw_data_id")));
-        }
-
-        public static void EnableDataPersistence()
-        {
-            _resetDatabaseOnStartup = false;
-            Debug.WriteLine("데이터 영속성 모드가 활성화되었습니다. 다음 실행 시 데이터가 유지됩니다.");
-        }
-
-        public static void DisableDataPersistence()
-        {
-            _resetDatabaseOnStartup = true;
-            Debug.WriteLine("데이터 영속성 모드가 비활성화되었습니다. 다음 실행 시 데이터가 초기화됩니다.");
-        }
 
         // 컬렉션 존재 여부 확인
         public async Task<bool> CollectionExists(string collectionName)
@@ -263,34 +214,7 @@ namespace FinanceTool.Data
             }
         }
 
-        // 문서 삽입 - 단일 문서
-        public async Task<string> InsertDocumentAsync<T>(string collectionName, T document)
-        {
-            bool ensureResult = await EnsureInitializedAsync();
-
-            if (!ensureResult)
-                throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
-
-            try
-            {
-                var collection = _database.GetCollection<T>(collectionName);
-                await collection.InsertOneAsync(document);
-
-                // MongoDB의 _id 값 반환 (BsonDocument인 경우)
-                if (document is BsonDocument doc && doc.Contains("_id"))
-                {
-                    return doc["_id"].ToString();
-                }
-
-                return "Document inserted successfully";
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"문서 삽입 오류: {ex.Message}");
-                throw;
-            }
-        }
-
+        
         // 문서 삽입 - 다중 문서
         public async Task InsertManyDocumentsAsync<T>(string collectionName, IEnumerable<T> documents)
         {
@@ -379,46 +303,8 @@ namespace FinanceTool.Data
             }
         }
 
-        // 문서 삭제
-        public async Task<long> DeleteDocumentsAsync<T>(string collectionName, FilterDefinition<T> filter)
-        {
-            bool ensureResult = await EnsureInitializedAsync();
 
-            if (!ensureResult)
-                throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
-
-            try
-            {
-                var collection = _database.GetCollection<T>(collectionName);
-                var result = await collection.DeleteManyAsync(filter);
-                return result.DeletedCount;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"문서 삭제 오류: {ex.Message}");
-                throw;
-            }
-        }
-
-        // 컬렉션 삭제
-        public async Task DropCollectionAsync(string collectionName)
-        {
-            bool ensureResult = await EnsureInitializedAsync();
-
-            if (!ensureResult)
-                throw new InvalidOperationException("MongoDB가 초기화되지 않았습니다.");
-
-            try
-            {
-                await _database.DropCollectionAsync(collectionName);
-                Debug.WriteLine($"컬렉션이 삭제됨: {collectionName}");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"컬렉션 삭제 오류: {ex.Message}");
-                throw;
-            }
-        }
+    
 
         // 페이징 처리된 결과 조회
         public async Task<(List<T> Items, long TotalCount)> FindWithPaginationAsync<T>(
@@ -518,28 +404,7 @@ namespace FinanceTool.Data
         }
 
         // MongoDBManager.cs에 인덱스 생성 메서드 추가
-        public async Task CreateIndexesAsync()
-        {
-            try
-            {
-                // raw_data 컬렉션에 인덱스 생성
-                var rawDataCollection = _database.GetCollection<RawDataDocument>("raw_data");
-                await rawDataCollection.Indexes.CreateOneAsync(
-                    Builders<RawDataDocument>.IndexKeys.Ascending("import_date"));
-
-                // process_data 컬렉션에 인덱스 생성
-                var processDataCollection = _database.GetCollection<ProcessDataDocument>("process_data");
-                await processDataCollection.Indexes.CreateOneAsync(
-                    Builders<ProcessDataDocument>.IndexKeys.Ascending("raw_data_id"));
-
-                // 필요한 경우 다른 컬렉션에도 인덱스 추가
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"인덱스 생성 중 오류: {ex.Message}");
-                throw;
-            }
-        }
+      
 
         // FinanceTool/Data/MongoDBManager.cs 파일에 추가
         public void Cleanup()
