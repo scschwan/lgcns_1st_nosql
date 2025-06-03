@@ -3,6 +3,7 @@
 using FinanceTool.Models.MongoModels;
 using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
+using FinanceTool.Utilities;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Newtonsoft.Json

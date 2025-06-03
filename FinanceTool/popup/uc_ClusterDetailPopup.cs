@@ -1,4 +1,5 @@
-﻿using FinanceTool.MongoModels;
+﻿using FinanceTool.Data;
+using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
 using MongoDB.Driver;
 using System;

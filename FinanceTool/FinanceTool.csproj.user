@@ -7,25 +7,28 @@
     <Compile Update="popup\uc_ClusterDetailPopup.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="ProcessProgressForm.cs">
+    <Compile Update="uc\uc_MultiFileUpload.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Utilities\ProcessProgressForm.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Update="uc_Classification.cs">
+    <Compile Update="uc\uc_Classification.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="uc_Clustering.cs">
+    <Compile Update="uc\uc_Clustering.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="uc_clusteringPopup.cs">
+    <Compile Update="popup\uc_clusteringPopup.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="uc_FileLoad.cs">
+    <Compile Update="uc\uc_FileLoad.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="uc_preprocessing.cs">
+    <Compile Update="uc\uc_preprocessing.cs">
       <SubType>UserControl</SubType>
     </Compile>
-    <Compile Update="uc_DataTransform.cs">
+    <Compile Update="uc\uc_DataTransform.cs">
       <SubType>UserControl</SubType>
     </Compile>
   </ItemGroup>
