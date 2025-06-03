@@ -28,12 +28,12 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle13 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle14 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle15 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle16 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle17 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle18 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_header = new Panel();
             tableLayoutHeader = new TableLayoutPanel();
@@ -43,6 +43,7 @@
             lbl_instruction = new Label();
             lbl_title = new Label();
             pnl_button_area = new Panel();
+            button1 = new Button();
             tableLayoutContent = new TableLayoutPanel();
             pnl_left = new Panel();
             dgv_files = new DataGridView();
@@ -63,7 +64,6 @@
             col_session_status = new DataGridViewCheckBoxColumn();
             col_download = new DataGridViewButtonColumn();
             lbl_sessions = new Label();
-            button1 = new Button();
             tableLayoutMain.SuspendLayout();
             pnl_header.SuspendLayout();
             tableLayoutHeader.SuspendLayout();
@@ -163,6 +163,7 @@
             btn_upload_files.TabIndex = 0;
             btn_upload_files.Text = "Excel 파일 업로드";
             btn_upload_files.UseVisualStyleBackColor = false;
+            btn_upload_files.Click += btn_upload_files_Click;
             // 
             // lbl_instruction
             // 
@@ -197,6 +198,22 @@
             pnl_button_area.Size = new Size(742, 126);
             pnl_button_area.TabIndex = 1;
             // 
+            // button1
+            // 
+            button1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            button1.BackColor = Color.LimeGreen;
+            button1.FlatStyle = FlatStyle.Flat;
+            button1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button1.ForeColor = Color.White;
+            button1.Location = new Point(589, 62);
+            button1.Margin = new Padding(3, 4, 3, 4);
+            button1.MinimumSize = new Size(120, 44);
+            button1.Name = "button1";
+            button1.Size = new Size(150, 50);
+            button1.TabIndex = 2;
+            button1.Text = "계정 분석 시작";
+            button1.UseVisualStyleBackColor = false;
+            // 
             // tableLayoutContent
             // 
             tableLayoutContent.ColumnCount = 2;
@@ -228,30 +245,30 @@
             // 
             dgv_files.AllowUserToAddRows = false;
             dgv_files.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle13.BackColor = Color.AliceBlue;
-            dgv_files.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle13;
+            dataGridViewCellStyle1.BackColor = Color.AliceBlue;
+            dgv_files.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
             dgv_files.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgv_files.BackgroundColor = Color.White;
             dgv_files.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle14.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle14.BackColor = Color.LightSteelBlue;
-            dataGridViewCellStyle14.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
-            dataGridViewCellStyle14.ForeColor = Color.Black;
-            dataGridViewCellStyle14.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle14.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle14.WrapMode = DataGridViewTriState.True;
-            dgv_files.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle14;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle2.BackColor = Color.LightSteelBlue;
+            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle2.ForeColor = Color.Black;
+            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
+            dgv_files.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
             dgv_files.ColumnHeadersHeight = 35;
             dgv_files.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dgv_files.Columns.AddRange(new DataGridViewColumn[] { col_file_check, col_filename, col_row_count, col_account_column, col_amount_column, col_total_amount });
-            dataGridViewCellStyle15.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle15.BackColor = SystemColors.Window;
-            dataGridViewCellStyle15.Font = new Font("맑은 고딕", 9F);
-            dataGridViewCellStyle15.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle15.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle15.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle15.WrapMode = DataGridViewTriState.False;
-            dgv_files.DefaultCellStyle = dataGridViewCellStyle15;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = SystemColors.Window;
+            dataGridViewCellStyle3.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle3.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
+            dgv_files.DefaultCellStyle = dataGridViewCellStyle3;
             dgv_files.EnableHeadersVisualStyles = false;
             dgv_files.GridColor = Color.LightGray;
             dgv_files.Location = new Point(0, 50);
@@ -346,30 +363,30 @@
             // 
             dgv_sessions.AllowUserToAddRows = false;
             dgv_sessions.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle16.BackColor = Color.AliceBlue;
-            dgv_sessions.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle16;
+            dataGridViewCellStyle4.BackColor = Color.AliceBlue;
+            dgv_sessions.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle4;
             dgv_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgv_sessions.BackgroundColor = Color.White;
             dgv_sessions.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle17.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle17.BackColor = Color.LightSteelBlue;
-            dataGridViewCellStyle17.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
-            dataGridViewCellStyle17.ForeColor = Color.Black;
-            dataGridViewCellStyle17.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle17.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle17.WrapMode = DataGridViewTriState.True;
-            dgv_sessions.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle17;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle5.BackColor = Color.LightSteelBlue;
+            dataGridViewCellStyle5.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle5.ForeColor = Color.Black;
+            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.True;
+            dgv_sessions.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle5;
             dgv_sessions.ColumnHeadersHeight = 35;
             dgv_sessions.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dgv_sessions.Columns.AddRange(new DataGridViewColumn[] { col_session_name, col_file_list, col_session_account, col_session_rows, col_session_amount, col_session_status, col_download });
-            dataGridViewCellStyle18.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle18.BackColor = SystemColors.Window;
-            dataGridViewCellStyle18.Font = new Font("맑은 고딕", 9F);
-            dataGridViewCellStyle18.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle18.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle18.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle18.WrapMode = DataGridViewTriState.False;
-            dgv_sessions.DefaultCellStyle = dataGridViewCellStyle18;
+            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle6.BackColor = SystemColors.Window;
+            dataGridViewCellStyle6.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle6.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle6.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle6.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.False;
+            dgv_sessions.DefaultCellStyle = dataGridViewCellStyle6;
             dgv_sessions.EnableHeadersVisualStyles = false;
             dgv_sessions.GridColor = Color.LightGray;
             dgv_sessions.Location = new Point(0, 50);
@@ -455,22 +472,6 @@
             lbl_sessions.TabIndex = 1;
             lbl_sessions.Text = "생성된 세션 목록";
             lbl_sessions.TextAlign = ContentAlignment.MiddleCenter;
-            // 
-            // button1
-            // 
-            button1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            button1.BackColor = Color.LimeGreen;
-            button1.FlatStyle = FlatStyle.Flat;
-            button1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            button1.ForeColor = Color.White;
-            button1.Location = new Point(589, 62);
-            button1.Margin = new Padding(3, 4, 3, 4);
-            button1.MinimumSize = new Size(120, 44);
-            button1.Name = "button1";
-            button1.Size = new Size(150, 50);
-            button1.TabIndex = 2;
-            button1.Text = "계정 분석 시작";
-            button1.UseVisualStyleBackColor = false;
             // 
             // uc_MultiFileUpload
             // 

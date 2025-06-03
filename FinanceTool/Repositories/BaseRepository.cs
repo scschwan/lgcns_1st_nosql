@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using MongoDB.Bson;
+using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -141,6 +142,90 @@ namespace FinanceTool.Repositories
             {
                 Debug.WriteLine($"FindDocumentsAsync 오류: {ex.Message}");
                 return new List<T>();
+            }
+        }
+
+        /// <summary>
+        /// ID로 문서 삭제
+        /// </summary>
+        /// <param name="id">삭제할 문서의 ID</param>
+        /// <returns>삭제 성공 여부</returns>
+        public async Task<bool> DeleteAsync(ObjectId id)
+        {
+            try
+            {
+                var filter = Builders<T>.Filter.Eq("_id", id);
+                var result = await _collection.DeleteOneAsync(filter);
+
+                Debug.WriteLine($"{typeof(T).Name} 문서 삭제: ID={id}, 삭제된 문서 수={result.DeletedCount}");
+                return result.DeletedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 문서 삭제 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 조건에 맞는 문서들 삭제
+        /// </summary>
+        /// <param name="filter">삭제 조건</param>
+        /// <returns>삭제된 문서 수</returns>
+        public async Task<long> DeleteManyAsync(FilterDefinition<T> filter)
+        {
+            try
+            {
+                var result = await _collection.DeleteManyAsync(filter);
+
+                Debug.WriteLine($"{typeof(T).Name} 다중 문서 삭제: 삭제된 문서 수={result.DeletedCount}");
+                return result.DeletedCount;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 다중 문서 삭제 오류: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// 조건에 맞는 문서들 삭제 (람다 표현식 사용)
+        /// </summary>
+        /// <param name="predicate">삭제 조건</param>
+        /// <returns>삭제된 문서 수</returns>
+        public async Task<long> DeleteManyAsync(Expression<Func<T, bool>> predicate)
+        {
+            try
+            {
+                var filter = Builders<T>.Filter.Where(predicate);
+                return await DeleteManyAsync(filter);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 다중 문서 삭제 (람다) 오류: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// 단일 문서 삭제 (람다 표현식 사용)
+        /// </summary>
+        /// <param name="predicate">삭제 조건</param>
+        /// <returns>삭제 성공 여부</returns>
+        public async Task<bool> DeleteOneAsync(Expression<Func<T, bool>> predicate)
+        {
+            try
+            {
+                var filter = Builders<T>.Filter.Where(predicate);
+                var result = await _collection.DeleteOneAsync(filter);
+
+                Debug.WriteLine($"{typeof(T).Name} 단일 문서 삭제 (람다): 삭제된 문서 수={result.DeletedCount}");
+                return result.DeletedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 단일 문서 삭제 (람다) 오류: {ex.Message}");
+                return false;
             }
         }
     }
