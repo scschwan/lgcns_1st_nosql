@@ -132,6 +132,9 @@
             this.tableLayoutMain.ColumnCount = 2;
             this.tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
             this.tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
+            // 수정: 100% : 450px 고정 (여백 해결)
+            //this.tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 80F));
+            //this.tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 650F));
             this.tableLayoutMain.Controls.Add(this.pnl_left, 0, 0);
             this.tableLayoutMain.Controls.Add(this.pnl_right, 1, 0);
             this.tableLayoutMain.Dock = DockStyle.Fill;
@@ -832,8 +835,9 @@
             this.BackColor = Color.White;
             this.Controls.Add(this.tableLayoutMain);
             this.MinimumSize = new Size(1280, 800);
+            //this.MinimumSize = new Size(1904, 1017);
             this.Name = "uc_DataTransform";
-            //this.Size = new Size(1904, 1017);
+            this.Size = new Size(1904, 1017);
             //this.Dock = DockStyle.Fill;           // 추가
             //this.MinimumSize = new Size(1280, 800);  // ← 이거만 유지
 

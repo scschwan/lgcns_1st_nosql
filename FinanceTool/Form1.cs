@@ -116,7 +116,7 @@ namespace FinanceTool
 
             // 새 컨트롤 추가 및 레이아웃 설정
             control.Dock = DockStyle.Fill;
-            control.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            //control.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             mainPanel.Controls.Add(control);
 
             // 레이아웃 업데이트
