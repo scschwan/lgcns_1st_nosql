@@ -34,25 +34,25 @@
             dataAnalToolStripMenuItem = new ToolStripMenuItem();
             classificationToolStripMenuItem = new ToolStripMenuItem();
             exportToolStripMenuItem = new ToolStripMenuItem();
+            fileUploadToolStripMenuItem = new ToolStripMenuItem();
             mainPanel = new Panel();
             menuStrip1.SuspendLayout();
             SuspendLayout();
             // 
             // menuStrip1
             // 
-            menuStrip1.Items.AddRange(new ToolStripItem[] { fileLoadToolStripMenuItem, dataPreprocessingToolStripMenuItem, dataAnalToolStripMenuItem, classificationToolStripMenuItem, exportToolStripMenuItem });
+            menuStrip1.Items.AddRange(new ToolStripItem[] { fileUploadToolStripMenuItem, fileLoadToolStripMenuItem, dataPreprocessingToolStripMenuItem, dataAnalToolStripMenuItem, classificationToolStripMenuItem, exportToolStripMenuItem });
             menuStrip1.Location = new Point(0, 0);
             menuStrip1.Name = "menuStrip1";
             menuStrip1.Size = new Size(1904, 24);
             menuStrip1.TabIndex = 0;
             menuStrip1.Text = "menuStrip1";
-            menuStrip1.Dock = DockStyle.Top;
             // 
             // fileLoadToolStripMenuItem
             // 
             fileLoadToolStripMenuItem.Name = "fileLoadToolStripMenuItem";
-            fileLoadToolStripMenuItem.Size = new Size(67, 20);
-            fileLoadToolStripMenuItem.Text = "File Load";
+            fileLoadToolStripMenuItem.Size = new Size(109, 20);
+            fileLoadToolStripMenuItem.Text = "raw Data Setting";
             fileLoadToolStripMenuItem.Click += fileLoadToolStripMenuItem_Click;
             // 
             // dataPreprocessingToolStripMenuItem
@@ -83,25 +83,31 @@
             exportToolStripMenuItem.Text = "Export";
             exportToolStripMenuItem.Click += exportToolStripMenuItem_Click;
             // 
+            // fileUploadToolStripMenuItem
+            // 
+            fileUploadToolStripMenuItem.Name = "fileUploadToolStripMenuItem";
+            fileUploadToolStripMenuItem.Size = new Size(79, 20);
+            fileUploadToolStripMenuItem.Text = "File Upload";
+            fileUploadToolStripMenuItem.Click += fileUploadToolStripMenuItem_Click;
+            // 
             // mainPanel
             // 
-            mainPanel.Dock = DockStyle.Fill;
+            mainPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             mainPanel.Location = new Point(0, 24);
             mainPanel.Name = "mainPanel";
+            mainPanel.Padding = new Padding(5);
             mainPanel.Size = new Size(1904, 1017);
             mainPanel.TabIndex = 1;
-            mainPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-            mainPanel.Padding = new Padding(5);
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
-            MinimumSize = new Size(800, 600);
             ClientSize = new Size(1904, 1041);
             Controls.Add(mainPanel);
             Controls.Add(menuStrip1);
             MainMenuStrip = menuStrip1;
+            MinimumSize = new Size(800, 600);
             Name = "Form1";
             Text = "Finance Tool";
             FormClosing += Form1_FormClosing;
@@ -121,5 +127,6 @@
         private ToolStripMenuItem dataAnalToolStripMenuItem;
         private ToolStripMenuItem classificationToolStripMenuItem;
         private ToolStripMenuItem exportToolStripMenuItem;
+        private ToolStripMenuItem fileUploadToolStripMenuItem;
     }
 }

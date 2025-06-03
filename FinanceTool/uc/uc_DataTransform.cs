@@ -512,29 +512,7 @@ namespace FinanceTool
                             Application.OpenForms[0].Invoke((MethodInvoker)delegate
                             {
 
-                                /*
-                                // 보강된 viewTransformDataTable로 dataGridView_2nd 업데이트
-                                Debug.WriteLine($"viewTransformDataTable 표시 준비: {viewTransformDataTable.Rows.Count}개 행");
-
-                                // 기존 데이터 소스 제거
-                                dataGridView_2nd.DataSource = null;
-
-                                // 새 데이터 소스 설정
-                                dataGridView_2nd.DataSource = viewTransformDataTable;
-
-                                // 필요한 컬럼 숨김 처리 다시 수행
-                                if (dataGridView_2nd.Columns["raw_data_id"] != null)
-                                    dataGridView_2nd.Columns["raw_data_id"].Visible = false;
-
-                                // 필요한 경우 열 너비 조정
-                                dataGridView_2nd.AutoResizeColumns(DataGridViewAutoSizeColumnsMode.AllCells);
-
-                                // 행 카운트 로깅
-                                Debug.WriteLine($"viewTransformDataTable 표시 완료: 표시된 행 수={dataGridView_2nd.Rows.Count}");
-
-                                // 데이터그리드뷰 새로고침 강제
-                                dataGridView_2nd.Refresh();
-                                */
+                               
 
                                 // 페이징 이벤트 핸들러 초기화 (아직 안했다면)
                                 if (cmb_pageSize.Items.Count == 0)
@@ -660,15 +638,8 @@ namespace FinanceTool
 
             try
             {
-                // 1. 먼저 원본 테이블의 컬럼들 추가
-                foreach (DataColumn sourceColumn in sourceTable.Columns)
-                {
-                    Type columnType = sourceColumn.DataType;
-                    // 안전성을 위해 모든 컬럼을 string 타입으로 통일
-                    resultTable.Columns.Add(sourceColumn.ColumnName, typeof(string));
-                }
-
-                // 2. 가시적 컬럼들 추가 (중복 제외)
+                
+                //1. 가시적 컬럼들 추가 (중복 제외)
                 foreach (string columnName in visibleColumns)
                 {
                     if (!resultTable.Columns.Contains(columnName))
@@ -676,6 +647,14 @@ namespace FinanceTool
                         resultTable.Columns.Add(columnName, typeof(string));
                     }
                 }
+                // 2. 먼저 원본 테이블의 컬럼들 추가
+                foreach (DataColumn sourceColumn in sourceTable.Columns)
+                {
+                    Type columnType = sourceColumn.DataType;
+                    // 안전성을 위해 모든 컬럼을 string 타입으로 통일
+                    resultTable.Columns.Add(sourceColumn.ColumnName, typeof(string));
+                }
+
 
                 Debug.WriteLine($"결과 테이블 컬럼 생성 완료: {resultTable.Columns.Count}개");
                 return resultTable;

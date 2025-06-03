@@ -19,7 +19,8 @@ namespace FinanceTool
         private void SetFormLayout()
         {
             // DPI 변경 이벤트 처리 - 해상도가 변경될 때 호출됨
-            this.DpiChanged += (sender, e) => {
+            this.DpiChanged += (sender, e) =>
+            {
                 // DPI 변경 시 컨트롤 크기 및 위치 재조정
                 this.SuspendLayout();
                 ResizeControls();
@@ -27,7 +28,8 @@ namespace FinanceTool
             };
 
             // 폼 리사이즈 이벤트 처리
-            this.ResizeEnd += (sender, e) => {
+            this.ResizeEnd += (sender, e) =>
+            {
                 ResizeControls();
             };
         }
@@ -54,7 +56,8 @@ namespace FinanceTool
         {
 
             // 메인 화면 초기화 작업
-            mainPanel.Controls.Add(userControlHandler.uc_fileLoad);
+            //mainPanel.Controls.Add(userControlHandler.uc_fileLoad);
+            mainPanel.Controls.Add(userControlHandler.uc_multiFileUpload);
 
             // 폼을 일시적으로 비활성화 (ProcessProgressForm은 별도 폼이므로 영향 없음)
             this.Enabled = false;
@@ -94,7 +97,7 @@ namespace FinanceTool
             }
             finally
             {
-               
+
 
                 // 레이아웃 최종 조정
                 ResizeControls();
@@ -143,13 +146,19 @@ namespace FinanceTool
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
-            
+
         }
 
         private void exportToolStripMenuItem_Click(object sender, EventArgs e)
         {
             LoadUserControl(userControlHandler.uc_classification);
         }
+
+
+        private void fileUploadToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            LoadUserControl(userControlHandler.uc_multiFileUpload);
+        }
     }
-   
+
 }

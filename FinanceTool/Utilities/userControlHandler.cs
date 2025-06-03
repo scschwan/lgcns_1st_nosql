@@ -13,5 +13,7 @@ namespace FinanceTool
         public static uc_Classification uc_classification = new uc_Classification();
         public static uc_DataTransform uc_dataTransform = new uc_DataTransform();
         public static uc_Clustering uc_clustering = new uc_Clustering();
+        public static uc_MultiFileUpload uc_multiFileUpload = new uc_MultiFileUpload();
+
     }
 }

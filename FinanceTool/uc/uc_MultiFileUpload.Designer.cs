@@ -1,4 +1,4 @@
-﻿namespace FinanceTool.uc
+﻿namespace FinanceTool
 {
     partial class uc_MultiFileUpload
     {
@@ -28,394 +28,476 @@
         /// </summary>
         private void InitializeComponent()
         {
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            tableLayoutMain = new TableLayoutPanel();
+            pnl_header = new Panel();
+            tableLayoutHeader = new TableLayoutPanel();
+            pnl_title_area = new Panel();
+            btn_create_sessions = new Button();
+            btn_upload_files = new Button();
+            lbl_instruction = new Label();
+            lbl_title = new Label();
+            pnl_button_area = new Panel();
+            tableLayoutContent = new TableLayoutPanel();
+            pnl_left = new Panel();
+            dgv_files = new DataGridView();
+            col_file_check = new DataGridViewCheckBoxColumn();
+            col_filename = new DataGridViewTextBoxColumn();
+            col_row_count = new DataGridViewTextBoxColumn();
+            col_account_column = new DataGridViewComboBoxColumn();
+            col_amount_column = new DataGridViewComboBoxColumn();
+            col_total_amount = new DataGridViewTextBoxColumn();
+            lbl_files = new Label();
+            pnl_right = new Panel();
+            dgv_sessions = new DataGridView();
+            col_session_name = new DataGridViewTextBoxColumn();
+            col_file_list = new DataGridViewTextBoxColumn();
+            col_session_account = new DataGridViewTextBoxColumn();
+            col_session_rows = new DataGridViewTextBoxColumn();
+            col_session_amount = new DataGridViewTextBoxColumn();
+            col_session_status = new DataGridViewCheckBoxColumn();
+            col_download = new DataGridViewButtonColumn();
+            lbl_sessions = new Label();
+            tableLayoutMain.SuspendLayout();
+            pnl_header.SuspendLayout();
+            tableLayoutHeader.SuspendLayout();
+            pnl_title_area.SuspendLayout();
+            tableLayoutContent.SuspendLayout();
+            pnl_left.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dgv_files).BeginInit();
+            pnl_right.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dgv_sessions).BeginInit();
             SuspendLayout();
             // 
-            // uc_fileUpload
+            // tableLayoutMain
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
-            AutoScaleMode = AutoScaleMode.Font;
-            Name = "uc_fileUpload";
-            Size = new Size(1904, 1017);
-            ResumeLayout(false);
-
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle4 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle5 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle6 = new System.Windows.Forms.DataGridViewCellStyle();
-            this.pnl_main = new System.Windows.Forms.Panel();
-            this.pnl_content = new System.Windows.Forms.Panel();
-            this.pnl_right = new System.Windows.Forms.Panel();
-            this.lbl_sessions = new System.Windows.Forms.Label();
-            this.dgv_sessions = new System.Windows.Forms.DataGridView();
-            this.col_session_name = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_file_list = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_session_account = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_session_rows = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_session_amount = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_session_status = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.col_download = new System.Windows.Forms.DataGridViewButtonColumn();
-            this.pnl_left = new System.Windows.Forms.Panel();
-            this.lbl_files = new System.Windows.Forms.Label();
-            this.dgv_files = new System.Windows.Forms.DataGridView();
-            this.col_file_check = new System.Windows.Forms.DataGridViewCheckBoxColumn();
-            this.col_filename = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_row_count = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.col_account_column = new System.Windows.Forms.DataGridViewComboBoxColumn();
-            this.col_amount_column = new System.Windows.Forms.DataGridViewComboBoxColumn();
-            this.col_total_amount = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.pnl_header = new System.Windows.Forms.Panel();
-            this.btn_create_sessions = new System.Windows.Forms.Button();
-            this.btn_upload_files = new System.Windows.Forms.Button();
-            this.lbl_instruction = new System.Windows.Forms.Label();
-            this.lbl_title = new System.Windows.Forms.Label();
-            this.pnl_main.SuspendLayout();
-            this.pnl_content.SuspendLayout();
-            this.pnl_right.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dgv_sessions)).BeginInit();
-            this.pnl_left.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dgv_files)).BeginInit();
-            this.pnl_header.SuspendLayout();
-            this.SuspendLayout();
-            // 
-            // pnl_main
-            // 
-            this.pnl_main.Controls.Add(this.pnl_content);
-            this.pnl_main.Controls.Add(this.pnl_header);
-            this.pnl_main.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnl_main.Location = new System.Drawing.Point(0, 0);
-            this.pnl_main.Name = "pnl_main";
-            this.pnl_main.Size = new System.Drawing.Size(1904, 1017);
-            this.pnl_main.TabIndex = 0;
-            // 
-            // pnl_content
-            // 
-            this.pnl_content.Controls.Add(this.pnl_right);
-            this.pnl_content.Controls.Add(this.pnl_left);
-            this.pnl_content.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnl_content.Location = new System.Drawing.Point(0, 120);
-            this.pnl_content.Name = "pnl_content";
-            this.pnl_content.Padding = new System.Windows.Forms.Padding(10);
-            this.pnl_content.Size = new System.Drawing.Size(1904, 897);
-            this.pnl_content.TabIndex = 1;
-            // 
-            // pnl_right
-            // 
-            this.pnl_right.Controls.Add(this.lbl_sessions);
-            this.pnl_right.Controls.Add(this.dgv_sessions);
-            this.pnl_right.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnl_right.Location = new System.Drawing.Point(1154, 10);
-            this.pnl_right.Name = "pnl_right";
-            this.pnl_right.Size = new System.Drawing.Size(740, 877);
-            this.pnl_right.TabIndex = 1;
-            // 
-            // lbl_sessions
-            // 
-            this.lbl_sessions.BackColor = System.Drawing.Color.SteelBlue;
-            this.lbl_sessions.Dock = System.Windows.Forms.DockStyle.Top;
-            this.lbl_sessions.Font = new System.Drawing.Font("맑은 고딕", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
-            this.lbl_sessions.ForeColor = System.Drawing.Color.White;
-            this.lbl_sessions.Location = new System.Drawing.Point(0, 0);
-            this.lbl_sessions.Name = "lbl_sessions";
-            this.lbl_sessions.Size = new System.Drawing.Size(740, 40);
-            this.lbl_sessions.TabIndex = 1;
-            this.lbl_sessions.Text = "생성된 세션 목록";
-            this.lbl_sessions.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // dgv_sessions
-            // 
-            this.dgv_sessions.AllowUserToAddRows = false;
-            this.dgv_sessions.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle1.BackColor = System.Drawing.Color.AliceBlue;
-            this.dgv_sessions.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
-            this.dgv_sessions.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.dgv_sessions.BackgroundColor = System.Drawing.Color.White;
-            this.dgv_sessions.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle2.BackColor = System.Drawing.Color.LightSteelBlue;
-            dataGridViewCellStyle2.Font = new System.Drawing.Font("맑은 고딕", 10F, System.Drawing.FontStyle.Bold);
-            dataGridViewCellStyle2.ForeColor = System.Drawing.Color.Black;
-            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-            this.dgv_sessions.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
-            this.dgv_sessions.ColumnHeadersHeight = 35;
-            this.dgv_sessions.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            this.dgv_sessions.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.col_session_name,
-            this.col_file_list,
-            this.col_session_account,
-            this.col_session_rows,
-            this.col_session_amount,
-            this.col_session_status,
-            this.col_download});
-            dataGridViewCellStyle3.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = System.Drawing.SystemColors.Window;
-            dataGridViewCellStyle3.Font = new System.Drawing.Font("맑은 고딕", 9F);
-            dataGridViewCellStyle3.ForeColor = System.Drawing.SystemColors.ControlText;
-            dataGridViewCellStyle3.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle3.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle3.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.dgv_sessions.DefaultCellStyle = dataGridViewCellStyle3;
-            this.dgv_sessions.EnableHeadersVisualStyles = false;
-            this.dgv_sessions.GridColor = System.Drawing.Color.LightGray;
-            this.dgv_sessions.Location = new System.Drawing.Point(0, 40);
-            this.dgv_sessions.Name = "dgv_sessions";
-            this.dgv_sessions.RowHeadersVisible = false;
-            this.dgv_sessions.RowTemplate.Height = 30;
-            this.dgv_sessions.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgv_sessions.Size = new System.Drawing.Size(740, 837);
-            this.dgv_sessions.TabIndex = 0;
-            // 
-            // col_session_name
-            // 
-            this.col_session_name.HeaderText = "세션명";
-            this.col_session_name.Name = "col_session_name";
-            this.col_session_name.Width = 120;
-            // 
-            // col_file_list
-            // 
-            this.col_file_list.HeaderText = "파일목록";
-            this.col_file_list.Name = "col_file_list";
-            this.col_file_list.ReadOnly = true;
-            this.col_file_list.Width = 150;
-            // 
-            // col_session_account
-            // 
-            this.col_session_account.HeaderText = "대계정";
-            this.col_session_account.Name = "col_session_account";
-            this.col_session_account.ReadOnly = true;
-            this.col_session_account.Width = 100;
-            // 
-            // col_session_rows
-            // 
-            this.col_session_rows.HeaderText = "행 수";
-            this.col_session_rows.Name = "col_session_rows";
-            this.col_session_rows.ReadOnly = true;
-            this.col_session_rows.Width = 80;
-            // 
-            // col_session_amount
-            // 
-            this.col_session_amount.HeaderText = "합산금액";
-            this.col_session_amount.Name = "col_session_amount";
-            this.col_session_amount.ReadOnly = true;
-            this.col_session_amount.Width = 120;
-            // 
-            // col_session_status
-            // 
-            this.col_session_status.HeaderText = "작업완료";
-            this.col_session_status.Name = "col_session_status";
-            this.col_session_status.Width = 80;
-            // 
-            // col_download
-            // 
-            this.col_download.HeaderText = "다운로드";
-            this.col_download.Name = "col_download";
-            this.col_download.Text = "다운로드";
-            this.col_download.UseColumnTextForButtonValue = true;
-            this.col_download.Width = 90;
-            // 
-            // pnl_left
-            // 
-            this.pnl_left.Controls.Add(this.lbl_files);
-            this.pnl_left.Controls.Add(this.dgv_files);
-            this.pnl_left.Dock = System.Windows.Forms.DockStyle.Left;
-            this.pnl_left.Location = new System.Drawing.Point(10, 10);
-            this.pnl_left.Name = "pnl_left";
-            this.pnl_left.Size = new System.Drawing.Size(1144, 877);
-            this.pnl_left.TabIndex = 0;
-            // 
-            // lbl_files
-            // 
-            this.lbl_files.BackColor = System.Drawing.Color.SteelBlue;
-            this.lbl_files.Dock = System.Windows.Forms.DockStyle.Top;
-            this.lbl_files.Font = new System.Drawing.Font("맑은 고딕", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(129)));
-            this.lbl_files.ForeColor = System.Drawing.Color.White;
-            this.lbl_files.Location = new System.Drawing.Point(0, 0);
-            this.lbl_files.Name = "lbl_files";
-            this.lbl_files.Size = new System.Drawing.Size(1144, 40);
-            this.lbl_files.TabIndex = 1;
-            this.lbl_files.Text = "업로드된 파일 목록";
-            this.lbl_files.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // dgv_files
-            // 
-            this.dgv_files.AllowUserToAddRows = false;
-            this.dgv_files.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle4.BackColor = System.Drawing.Color.AliceBlue;
-            this.dgv_files.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle4;
-            this.dgv_files.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.dgv_files.BackgroundColor = System.Drawing.Color.White;
-            this.dgv_files.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
-            dataGridViewCellStyle5.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle5.BackColor = System.Drawing.Color.LightSteelBlue;
-            dataGridViewCellStyle5.Font = new System.Drawing.Font("맑은 고딕", 10F, System.Drawing.FontStyle.Bold);
-            dataGridViewCellStyle5.ForeColor = System.Drawing.Color.Black;
-            dataGridViewCellStyle5.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle5.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle5.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-            this.dgv_files.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle5;
-            this.dgv_files.ColumnHeadersHeight = 35;
-            this.dgv_files.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
-            this.dgv_files.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.col_file_check,
-            this.col_filename,
-            this.col_row_count,
-            this.col_account_column,
-            this.col_amount_column,
-            this.col_total_amount});
-            dataGridViewCellStyle6.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle6.BackColor = System.Drawing.SystemColors.Window;
-            dataGridViewCellStyle6.Font = new System.Drawing.Font("맑은 고딕", 9F);
-            dataGridViewCellStyle6.ForeColor = System.Drawing.SystemColors.ControlText;
-            dataGridViewCellStyle6.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle6.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle6.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.dgv_files.DefaultCellStyle = dataGridViewCellStyle6;
-            this.dgv_files.EnableHeadersVisualStyles = false;
-            this.dgv_files.GridColor = System.Drawing.Color.LightGray;
-            this.dgv_files.Location = new System.Drawing.Point(0, 40);
-            this.dgv_files.Name = "dgv_files";
-            this.dgv_files.RowHeadersVisible = false;
-            this.dgv_files.RowTemplate.Height = 30;
-            this.dgv_files.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.dgv_files.Size = new System.Drawing.Size(1144, 837);
-            this.dgv_files.TabIndex = 0;
-            // 
-            // col_file_check
-            // 
-            this.col_file_check.HeaderText = "선택";
-            this.col_file_check.Name = "col_file_check";
-            this.col_file_check.Width = 60;
-            // 
-            // col_filename
-            // 
-            this.col_filename.HeaderText = "파일명";
-            this.col_filename.Name = "col_filename";
-            this.col_filename.ReadOnly = true;
-            this.col_filename.Width = 350;
-            // 
-            // col_row_count
-            // 
-            this.col_row_count.HeaderText = "행 수";
-            this.col_row_count.Name = "col_row_count";
-            this.col_row_count.ReadOnly = true;
-            this.col_row_count.Width = 100;
-            // 
-            // col_account_column
-            // 
-            this.col_account_column.HeaderText = "대계정 컬럼";
-            this.col_account_column.Name = "col_account_column";
-            this.col_account_column.Resizable = System.Windows.Forms.DataGridViewTriState.True;
-            this.col_account_column.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Automatic;
-            this.col_account_column.Width = 200;
-            // 
-            // col_amount_column
-            // 
-            this.col_amount_column.HeaderText = "금액 컬럼";
-            this.col_amount_column.Name = "col_amount_column";
-            this.col_amount_column.Resizable = System.Windows.Forms.DataGridViewTriState.True;
-            this.col_amount_column.SortMode = System.Windows.Forms.DataGridViewColumnSortMode.Automatic;
-            this.col_amount_column.Width = 200;
-            // 
-            // col_total_amount
-            // 
-            this.col_total_amount.HeaderText = "합산금액";
-            this.col_total_amount.Name = "col_total_amount";
-            this.col_total_amount.ReadOnly = true;
-            this.col_total_amount.Width = 170;
+            tableLayoutMain.ColumnCount = 1;
+            tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            tableLayoutMain.Controls.Add(pnl_header, 0, 0);
+            tableLayoutMain.Controls.Add(tableLayoutContent, 0, 1);
+            tableLayoutMain.Dock = DockStyle.Fill;
+            tableLayoutMain.Location = new Point(0, 0);
+            tableLayoutMain.Margin = new Padding(0);
+            tableLayoutMain.Name = "tableLayoutMain";
+            tableLayoutMain.RowCount = 2;
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Absolute, 150F));
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutMain.Size = new Size(1904, 1271);
+            tableLayoutMain.TabIndex = 0;
             // 
             // pnl_header
             // 
-            this.pnl_header.BackColor = System.Drawing.Color.WhiteSmoke;
-            this.pnl_header.Controls.Add(this.btn_create_sessions);
-            this.pnl_header.Controls.Add(this.btn_upload_files);
-            this.pnl_header.Controls.Add(this.lbl_instruction);
-            this.pnl_header.Controls.Add(this.lbl_title);
-            this.pnl_header.Dock = System.Windows.Forms.DockStyle.Top;
-            this.pnl_header.Location = new System.Drawing.Point(0, 0);
-            this.pnl_header.Name = "pnl_header";
-            this.pnl_header.Size = new System.Drawing.Size(1904, 120);
-            this.pnl_header.TabIndex = 0;
+            pnl_header.BackColor = Color.WhiteSmoke;
+            pnl_header.Controls.Add(tableLayoutHeader);
+            pnl_header.Dock = DockStyle.Fill;
+            pnl_header.Location = new Point(0, 0);
+            pnl_header.Margin = new Padding(0);
+            pnl_header.Name = "pnl_header";
+            pnl_header.Size = new Size(1904, 150);
+            pnl_header.TabIndex = 0;
+            // 
+            // tableLayoutHeader
+            // 
+            tableLayoutHeader.ColumnCount = 2;
+            tableLayoutHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 59.9789925F));
+            tableLayoutHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40.0210075F));
+            tableLayoutHeader.Controls.Add(pnl_title_area, 0, 0);
+            tableLayoutHeader.Controls.Add(pnl_button_area, 1, 0);
+            tableLayoutHeader.Dock = DockStyle.Fill;
+            tableLayoutHeader.Location = new Point(0, 0);
+            tableLayoutHeader.Margin = new Padding(0);
+            tableLayoutHeader.Name = "tableLayoutHeader";
+            tableLayoutHeader.RowCount = 1;
+            tableLayoutHeader.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutHeader.Size = new Size(1904, 150);
+            tableLayoutHeader.TabIndex = 0;
+            // 
+            // pnl_title_area
+            // 
+            pnl_title_area.Controls.Add(btn_create_sessions);
+            pnl_title_area.Controls.Add(btn_upload_files);
+            pnl_title_area.Controls.Add(lbl_instruction);
+            pnl_title_area.Controls.Add(lbl_title);
+            pnl_title_area.Dock = DockStyle.Fill;
+            pnl_title_area.Location = new Point(10, 12);
+            pnl_title_area.Margin = new Padding(10, 12, 10, 12);
+            pnl_title_area.Name = "pnl_title_area";
+            pnl_title_area.Size = new Size(1122, 126);
+            pnl_title_area.TabIndex = 0;
             // 
             // btn_create_sessions
             // 
-            this.btn_create_sessions.BackColor = System.Drawing.Color.Orange;
-            this.btn_create_sessions.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btn_create_sessions.Font = new System.Drawing.Font("맑은 고딕", 11F, System.Drawing.FontStyle.Bold);
-            this.btn_create_sessions.ForeColor = System.Drawing.Color.White;
-            this.btn_create_sessions.Location = new System.Drawing.Point(250, 65);
-            this.btn_create_sessions.Name = "btn_create_sessions";
-            this.btn_create_sessions.Size = new System.Drawing.Size(150, 40);
-            this.btn_create_sessions.TabIndex = 3;
-            this.btn_create_sessions.Text = "세션 생성";
-            this.btn_create_sessions.UseVisualStyleBackColor = false;
+            btn_create_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_create_sessions.BackColor = Color.Orange;
+            btn_create_sessions.FlatStyle = FlatStyle.Flat;
+            btn_create_sessions.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            btn_create_sessions.ForeColor = Color.White;
+            btn_create_sessions.Location = new Point(965, 62);
+            btn_create_sessions.Margin = new Padding(3, 4, 3, 4);
+            btn_create_sessions.MinimumSize = new Size(120, 44);
+            btn_create_sessions.Name = "btn_create_sessions";
+            btn_create_sessions.Size = new Size(150, 50);
+            btn_create_sessions.TabIndex = 1;
+            btn_create_sessions.Text = "세션 생성";
+            btn_create_sessions.UseVisualStyleBackColor = false;
             // 
             // btn_upload_files
             // 
-            this.btn_upload_files.BackColor = System.Drawing.Color.DodgerBlue;
-            this.btn_upload_files.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btn_upload_files.Font = new System.Drawing.Font("맑은 고딕", 11F, System.Drawing.FontStyle.Bold);
-            this.btn_upload_files.ForeColor = System.Drawing.Color.White;
-            this.btn_upload_files.Location = new System.Drawing.Point(20, 65);
-            this.btn_upload_files.Name = "btn_upload_files";
-            this.btn_upload_files.Size = new System.Drawing.Size(200, 40);
-            this.btn_upload_files.TabIndex = 2;
-            this.btn_upload_files.Text = "Excel 파일 업로드";
-            this.btn_upload_files.UseVisualStyleBackColor = false;
+            btn_upload_files.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_upload_files.BackColor = Color.DodgerBlue;
+            btn_upload_files.FlatStyle = FlatStyle.Flat;
+            btn_upload_files.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            btn_upload_files.ForeColor = Color.White;
+            btn_upload_files.Location = new Point(686, 62);
+            btn_upload_files.Margin = new Padding(3, 4, 3, 4);
+            btn_upload_files.MinimumSize = new Size(150, 44);
+            btn_upload_files.Name = "btn_upload_files";
+            btn_upload_files.Size = new Size(180, 50);
+            btn_upload_files.TabIndex = 0;
+            btn_upload_files.Text = "Excel 파일 업로드";
+            btn_upload_files.UseVisualStyleBackColor = false;
             // 
             // lbl_instruction
             // 
-            this.lbl_instruction.AutoSize = true;
-            this.lbl_instruction.Font = new System.Drawing.Font("맑은 고딕", 10F);
-            this.lbl_instruction.ForeColor = System.Drawing.Color.Gray;
-            this.lbl_instruction.Location = new System.Drawing.Point(20, 40);
-            this.lbl_instruction.Name = "lbl_instruction";
-            this.lbl_instruction.Size = new System.Drawing.Size(611, 19);
-            this.lbl_instruction.TabIndex = 1;
-            this.lbl_instruction.Text = "여러 Excel 파일을 업로드하고 계정명/금액 컬럼을 선택한 후, 동일한 컬럼명끼리 세션을 생성하세요.";
+            lbl_instruction.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            lbl_instruction.Font = new Font("맑은 고딕", 10F);
+            lbl_instruction.ForeColor = Color.Gray;
+            lbl_instruction.Location = new Point(5, 50);
+            lbl_instruction.Name = "lbl_instruction";
+            lbl_instruction.Size = new Size(1110, 62);
+            lbl_instruction.TabIndex = 1;
+            lbl_instruction.Text = "여러 Excel 파일을 업로드하고 계정명/금액 컬럼을 선택한 후, 동일한 컬럼명끼리 세션을 생성하세요.";
+            lbl_instruction.TextAlign = ContentAlignment.MiddleLeft;
             // 
             // lbl_title
             // 
-            this.lbl_title.AutoSize = true;
-            this.lbl_title.Font = new System.Drawing.Font("맑은 고딕", 16F, System.Drawing.FontStyle.Bold);
-            this.lbl_title.ForeColor = System.Drawing.Color.DarkSlateGray;
-            this.lbl_title.Location = new System.Drawing.Point(15, 10);
-            this.lbl_title.Name = "lbl_title";
-            this.lbl_title.Size = new System.Drawing.Size(204, 30);
-            this.lbl_title.TabIndex = 0;
-            this.lbl_title.Text = "다중 파일 업로드";
+            lbl_title.AutoSize = true;
+            lbl_title.Font = new Font("맑은 고딕", 16F, FontStyle.Bold);
+            lbl_title.ForeColor = Color.DarkSlateGray;
+            lbl_title.Location = new Point(5, 12);
+            lbl_title.Name = "lbl_title";
+            lbl_title.Size = new Size(183, 30);
+            lbl_title.TabIndex = 0;
+            lbl_title.Text = "다중 파일 업로드";
+            // 
+            // pnl_button_area
+            // 
+            pnl_button_area.Dock = DockStyle.Fill;
+            pnl_button_area.Location = new Point(1152, 12);
+            pnl_button_area.Margin = new Padding(10, 12, 10, 12);
+            pnl_button_area.Name = "pnl_button_area";
+            pnl_button_area.Size = new Size(742, 126);
+            pnl_button_area.TabIndex = 1;
+            // 
+            // tableLayoutContent
+            // 
+            tableLayoutContent.ColumnCount = 2;
+            tableLayoutContent.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
+            tableLayoutContent.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
+            tableLayoutContent.Controls.Add(pnl_left, 0, 0);
+            tableLayoutContent.Controls.Add(pnl_right, 1, 0);
+            tableLayoutContent.Dock = DockStyle.Fill;
+            tableLayoutContent.Location = new Point(0, 150);
+            tableLayoutContent.Margin = new Padding(0);
+            tableLayoutContent.Name = "tableLayoutContent";
+            tableLayoutContent.RowCount = 1;
+            tableLayoutContent.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutContent.Size = new Size(1904, 1121);
+            tableLayoutContent.TabIndex = 1;
+            // 
+            // pnl_left
+            // 
+            pnl_left.Controls.Add(dgv_files);
+            pnl_left.Controls.Add(lbl_files);
+            pnl_left.Dock = DockStyle.Fill;
+            pnl_left.Location = new Point(10, 12);
+            pnl_left.Margin = new Padding(10, 12, 5, 12);
+            pnl_left.Name = "pnl_left";
+            pnl_left.Size = new Size(1127, 1097);
+            pnl_left.TabIndex = 0;
+            // 
+            // dgv_files
+            // 
+            dgv_files.AllowUserToAddRows = false;
+            dgv_files.AllowUserToDeleteRows = false;
+            dataGridViewCellStyle1.BackColor = Color.AliceBlue;
+            dgv_files.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dgv_files.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dgv_files.BackgroundColor = Color.White;
+            dgv_files.BorderStyle = BorderStyle.Fixed3D;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle2.BackColor = Color.LightSteelBlue;
+            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle2.ForeColor = Color.Black;
+            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
+            dgv_files.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
+            dgv_files.ColumnHeadersHeight = 35;
+            dgv_files.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dgv_files.Columns.AddRange(new DataGridViewColumn[] { col_file_check, col_filename, col_row_count, col_account_column, col_amount_column, col_total_amount });
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = SystemColors.Window;
+            dataGridViewCellStyle3.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle3.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
+            dgv_files.DefaultCellStyle = dataGridViewCellStyle3;
+            dgv_files.EnableHeadersVisualStyles = false;
+            dgv_files.GridColor = Color.LightGray;
+            dgv_files.Location = new Point(0, 50);
+            dgv_files.Margin = new Padding(3, 4, 3, 4);
+            dgv_files.MinimumSize = new Size(800, 500);
+            dgv_files.Name = "dgv_files";
+            dgv_files.RowHeadersVisible = false;
+            dgv_files.RowTemplate.Height = 30;
+            dgv_files.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv_files.Size = new Size(1127, 1035);
+            dgv_files.TabIndex = 0;
+            // 
+            // col_file_check
+            // 
+            col_file_check.FillWeight = 8F;
+            col_file_check.HeaderText = "선택";
+            col_file_check.MinimumWidth = 50;
+            col_file_check.Name = "col_file_check";
+            col_file_check.Width = 60;
+            // 
+            // col_filename
+            // 
+            col_filename.FillWeight = 35F;
+            col_filename.HeaderText = "파일명";
+            col_filename.MinimumWidth = 200;
+            col_filename.Name = "col_filename";
+            col_filename.ReadOnly = true;
+            col_filename.Width = 350;
+            // 
+            // col_row_count
+            // 
+            col_row_count.FillWeight = 12F;
+            col_row_count.HeaderText = "행 수";
+            col_row_count.MinimumWidth = 80;
+            col_row_count.Name = "col_row_count";
+            col_row_count.ReadOnly = true;
+            // 
+            // col_account_column
+            // 
+            col_account_column.FillWeight = 20F;
+            col_account_column.HeaderText = "대계정 컬럼";
+            col_account_column.MinimumWidth = 120;
+            col_account_column.Name = "col_account_column";
+            col_account_column.Resizable = DataGridViewTriState.True;
+            col_account_column.SortMode = DataGridViewColumnSortMode.Automatic;
+            col_account_column.Width = 200;
+            // 
+            // col_amount_column
+            // 
+            col_amount_column.FillWeight = 20F;
+            col_amount_column.HeaderText = "금액 컬럼";
+            col_amount_column.MinimumWidth = 120;
+            col_amount_column.Name = "col_amount_column";
+            col_amount_column.Resizable = DataGridViewTriState.True;
+            col_amount_column.SortMode = DataGridViewColumnSortMode.Automatic;
+            col_amount_column.Width = 200;
+            // 
+            // col_total_amount
+            // 
+            col_total_amount.FillWeight = 17F;
+            col_total_amount.HeaderText = "합산금액";
+            col_total_amount.MinimumWidth = 100;
+            col_total_amount.Name = "col_total_amount";
+            col_total_amount.ReadOnly = true;
+            col_total_amount.Width = 170;
+            // 
+            // lbl_files
+            // 
+            lbl_files.BackColor = Color.SteelBlue;
+            lbl_files.Dock = DockStyle.Top;
+            lbl_files.Font = new Font("맑은 고딕", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            lbl_files.ForeColor = Color.White;
+            lbl_files.Location = new Point(0, 0);
+            lbl_files.Name = "lbl_files";
+            lbl_files.Size = new Size(1127, 50);
+            lbl_files.TabIndex = 1;
+            lbl_files.Text = "업로드된 파일 목록";
+            lbl_files.TextAlign = ContentAlignment.MiddleCenter;
+            // 
+            // pnl_right
+            // 
+            pnl_right.Controls.Add(dgv_sessions);
+            pnl_right.Controls.Add(lbl_sessions);
+            pnl_right.Dock = DockStyle.Fill;
+            pnl_right.Location = new Point(1147, 12);
+            pnl_right.Margin = new Padding(5, 12, 10, 12);
+            pnl_right.Name = "pnl_right";
+            pnl_right.Size = new Size(747, 1097);
+            pnl_right.TabIndex = 1;
+            // 
+            // dgv_sessions
+            // 
+            dgv_sessions.AllowUserToAddRows = false;
+            dgv_sessions.AllowUserToDeleteRows = false;
+            dataGridViewCellStyle4.BackColor = Color.AliceBlue;
+            dgv_sessions.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle4;
+            dgv_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dgv_sessions.BackgroundColor = Color.White;
+            dgv_sessions.BorderStyle = BorderStyle.Fixed3D;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle5.BackColor = Color.LightSteelBlue;
+            dataGridViewCellStyle5.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle5.ForeColor = Color.Black;
+            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.True;
+            dgv_sessions.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle5;
+            dgv_sessions.ColumnHeadersHeight = 35;
+            dgv_sessions.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dgv_sessions.Columns.AddRange(new DataGridViewColumn[] { col_session_name, col_file_list, col_session_account, col_session_rows, col_session_amount, col_session_status, col_download });
+            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle6.BackColor = SystemColors.Window;
+            dataGridViewCellStyle6.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle6.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle6.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle6.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.False;
+            dgv_sessions.DefaultCellStyle = dataGridViewCellStyle6;
+            dgv_sessions.EnableHeadersVisualStyles = false;
+            dgv_sessions.GridColor = Color.LightGray;
+            dgv_sessions.Location = new Point(0, 50);
+            dgv_sessions.Margin = new Padding(3, 4, 3, 4);
+            dgv_sessions.MinimumSize = new Size(500, 500);
+            dgv_sessions.Name = "dgv_sessions";
+            dgv_sessions.RowHeadersVisible = false;
+            dgv_sessions.RowTemplate.Height = 30;
+            dgv_sessions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dgv_sessions.Size = new Size(747, 1035);
+            dgv_sessions.TabIndex = 0;
+            // 
+            // col_session_name
+            // 
+            col_session_name.FillWeight = 18F;
+            col_session_name.HeaderText = "세션명";
+            col_session_name.MinimumWidth = 80;
+            col_session_name.Name = "col_session_name";
+            col_session_name.Width = 120;
+            // 
+            // col_file_list
+            // 
+            col_file_list.FillWeight = 25F;
+            col_file_list.HeaderText = "파일목록";
+            col_file_list.MinimumWidth = 100;
+            col_file_list.Name = "col_file_list";
+            col_file_list.ReadOnly = true;
+            col_file_list.Width = 150;
+            // 
+            // col_session_account
+            // 
+            col_session_account.FillWeight = 15F;
+            col_session_account.HeaderText = "대계정";
+            col_session_account.MinimumWidth = 70;
+            col_session_account.Name = "col_session_account";
+            col_session_account.ReadOnly = true;
+            // 
+            // col_session_rows
+            // 
+            col_session_rows.FillWeight = 12F;
+            col_session_rows.HeaderText = "행 수";
+            col_session_rows.MinimumWidth = 60;
+            col_session_rows.Name = "col_session_rows";
+            col_session_rows.ReadOnly = true;
+            col_session_rows.Width = 80;
+            // 
+            // col_session_amount
+            // 
+            col_session_amount.FillWeight = 18F;
+            col_session_amount.HeaderText = "합산금액";
+            col_session_amount.MinimumWidth = 80;
+            col_session_amount.Name = "col_session_amount";
+            col_session_amount.ReadOnly = true;
+            col_session_amount.Width = 120;
+            // 
+            // col_session_status
+            // 
+            col_session_status.FillWeight = 12F;
+            col_session_status.HeaderText = "작업완료";
+            col_session_status.MinimumWidth = 60;
+            col_session_status.Name = "col_session_status";
+            col_session_status.Width = 80;
+            // 
+            // col_download
+            // 
+            col_download.FillWeight = 13F;
+            col_download.HeaderText = "다운로드";
+            col_download.MinimumWidth = 70;
+            col_download.Name = "col_download";
+            col_download.Text = "다운로드";
+            col_download.UseColumnTextForButtonValue = true;
+            col_download.Width = 90;
+            // 
+            // lbl_sessions
+            // 
+            lbl_sessions.BackColor = Color.SteelBlue;
+            lbl_sessions.Dock = DockStyle.Top;
+            lbl_sessions.Font = new Font("맑은 고딕", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            lbl_sessions.ForeColor = Color.White;
+            lbl_sessions.Location = new Point(0, 0);
+            lbl_sessions.Name = "lbl_sessions";
+            lbl_sessions.Size = new Size(747, 50);
+            lbl_sessions.TabIndex = 1;
+            lbl_sessions.Text = "생성된 세션 목록";
+            lbl_sessions.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // uc_MultiFileUpload
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.White;
-            this.Controls.Add(this.pnl_main);
-            this.Name = "uc_MultiFileUpload";
-            this.Size = new System.Drawing.Size(1904, 1017);
-            this.pnl_main.ResumeLayout(false);
-            this.pnl_content.ResumeLayout(false);
-            this.pnl_right.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.dgv_sessions)).EndInit();
-            this.pnl_left.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.dgv_files)).EndInit();
-            this.pnl_header.ResumeLayout(false);
-            this.pnl_header.PerformLayout();
-            this.ResumeLayout(false);
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = Color.White;
+            Controls.Add(tableLayoutMain);
+            Margin = new Padding(3, 4, 3, 4);
+            MinimumSize = new Size(1280, 1000);
+            Name = "uc_MultiFileUpload";
+            Size = new Size(1904, 1271);
+            tableLayoutMain.ResumeLayout(false);
+            pnl_header.ResumeLayout(false);
+            tableLayoutHeader.ResumeLayout(false);
+            pnl_title_area.ResumeLayout(false);
+            pnl_title_area.PerformLayout();
+            tableLayoutContent.ResumeLayout(false);
+            pnl_left.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)dgv_files).EndInit();
+            pnl_right.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)dgv_sessions).EndInit();
+            ResumeLayout(false);
         }
 
         #endregion
 
-        private System.Windows.Forms.Panel pnl_main;
-        private System.Windows.Forms.Panel pnl_content;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutMain;
+        private System.Windows.Forms.Panel pnl_header;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutHeader;
+        private System.Windows.Forms.Panel pnl_title_area;
+        private System.Windows.Forms.Label lbl_instruction;
+        private System.Windows.Forms.Label lbl_title;
+        private System.Windows.Forms.Panel pnl_button_area;
+        private System.Windows.Forms.Button btn_create_sessions;
+        private System.Windows.Forms.Button btn_upload_files;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutContent;
+        private System.Windows.Forms.Panel pnl_left;
+        private System.Windows.Forms.DataGridView dgv_files;
+        private System.Windows.Forms.DataGridViewCheckBoxColumn col_file_check;
+        private System.Windows.Forms.DataGridViewTextBoxColumn col_filename;
+        private System.Windows.Forms.DataGridViewTextBoxColumn col_row_count;
+        private System.Windows.Forms.DataGridViewComboBoxColumn col_account_column;
+        private System.Windows.Forms.DataGridViewComboBoxColumn col_amount_column;
+        private System.Windows.Forms.DataGridViewTextBoxColumn col_total_amount;
+        private System.Windows.Forms.Label lbl_files;
         private System.Windows.Forms.Panel pnl_right;
-        private System.Windows.Forms.Label lbl_sessions;
         private System.Windows.Forms.DataGridView dgv_sessions;
         private System.Windows.Forms.DataGridViewTextBoxColumn col_session_name;
         private System.Windows.Forms.DataGridViewTextBoxColumn col_file_list;
@@ -424,19 +506,6 @@
         private System.Windows.Forms.DataGridViewTextBoxColumn col_session_amount;
         private System.Windows.Forms.DataGridViewCheckBoxColumn col_session_status;
         private System.Windows.Forms.DataGridViewButtonColumn col_download;
-        private System.Windows.Forms.Panel pnl_left;
-        private System.Windows.Forms.Label lbl_files;
-        private System.Windows.Forms.DataGridView dgv_files;
-        private System.Windows.Forms.DataGridViewCheckBoxColumn col_file_check;
-        private System.Windows.Forms.DataGridViewTextBoxColumn col_filename;
-        private System.Windows.Forms.DataGridViewTextBoxColumn col_row_count;
-        private System.Windows.Forms.DataGridViewComboBoxColumn col_account_column;
-        private System.Windows.Forms.DataGridViewComboBoxColumn col_amount_column;
-        private System.Windows.Forms.DataGridViewTextBoxColumn col_total_amount;
-        private System.Windows.Forms.Panel pnl_header;
-        private System.Windows.Forms.Button btn_create_sessions;
-        private System.Windows.Forms.Button btn_upload_files;
-        private System.Windows.Forms.Label lbl_instruction;
-        private System.Windows.Forms.Label lbl_title;
+        private System.Windows.Forms.Label lbl_sessions;
     }
 }

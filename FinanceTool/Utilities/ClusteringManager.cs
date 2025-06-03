@@ -1,9 +1,10 @@
 ﻿// =====================================
 // 1계층: 데이터 관리자 (ClusterDataManager)
 // =====================================
-using FinanceTool.Data;
+namespace FinanceTool;
 using System.Data;
 using System.Diagnostics;
+
 
 public class ClusterDataManager
 {
