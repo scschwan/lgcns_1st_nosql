@@ -12,6 +12,10 @@ namespace FinanceTool.Repositories
         {
         }
 
+
+        // Collection에 직접 접근할 수 있도록 속성 추가
+        public IMongoCollection<UploadedFileDocument> Collection => _collection;
+
         /// <summary>
         /// 파일명으로 파일 조회
         /// </summary>
@@ -47,6 +51,33 @@ namespace FinanceTool.Repositories
         }
 
         /// <summary>
+        /// 파일의 상세 컬럼 정보 업데이트 (계정명 내용, 검증 정보 포함)
+        /// </summary>
+        public async Task<bool> UpdateDetailedColumnInfoAsync(ObjectId fileId, string accountColumnName,
+            string amountColumnName, decimal totalAmount, List<string> accountContents,
+            List<string> nonNumericAmountValues, string validationStatus, string validationMessage = "")
+        {
+            try
+            {
+                var filter = Builders<UploadedFileDocument>.Filter.Eq(d => d.Id, fileId);
+                var update = Builders<UploadedFileDocument>.Update
+                    .Set(d => d.AccountColumnName, accountColumnName)
+                    .Set(d => d.AmountColumnName, amountColumnName)
+                    .Set(d => d.TotalAmount, totalAmount)
+                    .Set(d => d.AccountContents, accountContents);
+                    
+
+                var result = await _collection.UpdateOneAsync(filter, update);
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"상세 컬럼 정보 업데이트 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 컬럼 정보 업데이트 (계정명, 금액 컬럼)
         /// </summary>
         public async Task<bool> UpdateColumnInfoAsync(ObjectId fileId, string accountColumnName, string amountColumnName, decimal totalAmount)
@@ -70,6 +101,31 @@ namespace FinanceTool.Repositories
         }
 
         /// <summary>
+        /// 파일의 컬럼 정보 업데이트 (간소화 버전)
+        /// </summary>
+        public async Task<bool> UpdateColumnInfoWithAccountContentsAsync(ObjectId fileId,
+            string accountColumnName, string amountColumnName, decimal totalAmount, List<string> accountContents)
+        {
+            try
+            {
+                var filter = Builders<UploadedFileDocument>.Filter.Eq(d => d.Id, fileId);
+                var update = Builders<UploadedFileDocument>.Update
+                    .Set(d => d.AccountColumnName, accountColumnName)
+                    .Set(d => d.AmountColumnName, amountColumnName)
+                    .Set(d => d.TotalAmount, totalAmount)
+                    .Set(d => d.AccountContents, accountContents);
+
+                var result = await _collection.UpdateOneAsync(filter, update);
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 정보 업데이트 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 파일의 세션 ID 업데이트
         /// </summary>
         public async Task<bool> UpdateSessionIdAsync(ObjectId fileId, ObjectId sessionId)
@@ -77,7 +133,18 @@ namespace FinanceTool.Repositories
             try
             {
                 var filter = Builders<UploadedFileDocument>.Filter.Eq(d => d.Id, fileId);
-                var update = Builders<UploadedFileDocument>.Update.Set(d => d.SessionId, sessionId);
+
+                UpdateDefinition<UploadedFileDocument> update;
+
+                // sessionId가 null이거나 Empty인 경우 필드를 제거 (null로 설정)
+                if (sessionId == null || sessionId == ObjectId.Empty)
+                {
+                    update = Builders<UploadedFileDocument>.Update.Unset(d => d.SessionId);
+                }
+                else
+                {
+                    update = Builders<UploadedFileDocument>.Update.Set(d => d.SessionId, sessionId);
+                }
 
                 var result = await _collection.UpdateOneAsync(filter, update);
                 return result.ModifiedCount > 0;

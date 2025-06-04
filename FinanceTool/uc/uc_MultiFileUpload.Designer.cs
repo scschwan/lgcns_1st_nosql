@@ -28,22 +28,24 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle8 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle9 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle10 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle11 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle12 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_header = new Panel();
             tableLayoutHeader = new TableLayoutPanel();
             pnl_title_area = new Panel();
+            btn_add_to_session = new Button();
             btn_create_sessions = new Button();
             btn_upload_files = new Button();
             lbl_instruction = new Label();
             lbl_title = new Label();
             pnl_button_area = new Panel();
-            button1 = new Button();
+            btn_merge_sessions = new Button();
+            btn_complete = new Button();
             tableLayoutContent = new TableLayoutPanel();
             pnl_left = new Panel();
             dgv_files = new DataGridView();
@@ -121,6 +123,7 @@
             // 
             // pnl_title_area
             // 
+            pnl_title_area.Controls.Add(btn_add_to_session);
             pnl_title_area.Controls.Add(btn_create_sessions);
             pnl_title_area.Controls.Add(btn_upload_files);
             pnl_title_area.Controls.Add(lbl_instruction);
@@ -132,6 +135,23 @@
             pnl_title_area.Size = new Size(1122, 126);
             pnl_title_area.TabIndex = 0;
             // 
+            // btn_add_to_session
+            // 
+            btn_add_to_session.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_add_to_session.BackColor = Color.IndianRed;
+            btn_add_to_session.FlatStyle = FlatStyle.Flat;
+            btn_add_to_session.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_add_to_session.ForeColor = Color.White;
+            btn_add_to_session.Location = new Point(936, 62);
+            btn_add_to_session.Margin = new Padding(3, 4, 3, 4);
+            btn_add_to_session.MinimumSize = new Size(120, 44);
+            btn_add_to_session.Name = "btn_add_to_session";
+            btn_add_to_session.Size = new Size(150, 50);
+            btn_add_to_session.TabIndex = 2;
+            btn_add_to_session.Text = "기존 세션 추가";
+            btn_add_to_session.UseVisualStyleBackColor = false;
+            btn_add_to_session.Click += btn_add_to_session_Click;
+            // 
             // btn_create_sessions
             // 
             btn_create_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
@@ -139,7 +159,7 @@
             btn_create_sessions.FlatStyle = FlatStyle.Flat;
             btn_create_sessions.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_create_sessions.ForeColor = Color.White;
-            btn_create_sessions.Location = new Point(965, 62);
+            btn_create_sessions.Location = new Point(762, 62);
             btn_create_sessions.Margin = new Padding(3, 4, 3, 4);
             btn_create_sessions.MinimumSize = new Size(120, 44);
             btn_create_sessions.Name = "btn_create_sessions";
@@ -147,6 +167,7 @@
             btn_create_sessions.TabIndex = 1;
             btn_create_sessions.Text = "세션 생성";
             btn_create_sessions.UseVisualStyleBackColor = false;
+            btn_create_sessions.Click += btn_create_sessions_Click;
             // 
             // btn_upload_files
             // 
@@ -155,7 +176,7 @@
             btn_upload_files.FlatStyle = FlatStyle.Flat;
             btn_upload_files.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_upload_files.ForeColor = Color.White;
-            btn_upload_files.Location = new Point(768, 62);
+            btn_upload_files.Location = new Point(8, 62);
             btn_upload_files.Margin = new Padding(3, 4, 3, 4);
             btn_upload_files.MinimumSize = new Size(150, 44);
             btn_upload_files.Name = "btn_upload_files";
@@ -170,9 +191,9 @@
             lbl_instruction.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             lbl_instruction.Font = new Font("맑은 고딕", 10F);
             lbl_instruction.ForeColor = Color.Gray;
-            lbl_instruction.Location = new Point(5, 50);
+            lbl_instruction.Location = new Point(194, 12);
             lbl_instruction.Name = "lbl_instruction";
-            lbl_instruction.Size = new Size(1110, 62);
+            lbl_instruction.Size = new Size(670, 30);
             lbl_instruction.TabIndex = 1;
             lbl_instruction.Text = "여러 Excel 파일을 업로드하고 계정명/금액 컬럼을 선택한 후, 동일한 컬럼명끼리 세션을 생성하세요.";
             lbl_instruction.TextAlign = ContentAlignment.MiddleLeft;
@@ -190,7 +211,8 @@
             // 
             // pnl_button_area
             // 
-            pnl_button_area.Controls.Add(button1);
+            pnl_button_area.Controls.Add(btn_merge_sessions);
+            pnl_button_area.Controls.Add(btn_complete);
             pnl_button_area.Dock = DockStyle.Fill;
             pnl_button_area.Location = new Point(1152, 12);
             pnl_button_area.Margin = new Padding(10, 12, 10, 12);
@@ -198,21 +220,38 @@
             pnl_button_area.Size = new Size(742, 126);
             pnl_button_area.TabIndex = 1;
             // 
-            // button1
+            // btn_merge_sessions
             // 
-            button1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            button1.BackColor = Color.LimeGreen;
-            button1.FlatStyle = FlatStyle.Flat;
-            button1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            button1.ForeColor = Color.White;
-            button1.Location = new Point(589, 62);
-            button1.Margin = new Padding(3, 4, 3, 4);
-            button1.MinimumSize = new Size(120, 44);
-            button1.Name = "button1";
-            button1.Size = new Size(150, 50);
-            button1.TabIndex = 2;
-            button1.Text = "계정 분석 시작";
-            button1.UseVisualStyleBackColor = false;
+            btn_merge_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_merge_sessions.BackColor = Color.IndianRed;
+            btn_merge_sessions.FlatStyle = FlatStyle.Flat;
+            btn_merge_sessions.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_merge_sessions.ForeColor = Color.White;
+            btn_merge_sessions.Location = new Point(407, 62);
+            btn_merge_sessions.Margin = new Padding(3, 4, 3, 4);
+            btn_merge_sessions.MinimumSize = new Size(120, 44);
+            btn_merge_sessions.Name = "btn_merge_sessions";
+            btn_merge_sessions.Size = new Size(150, 50);
+            btn_merge_sessions.TabIndex = 3;
+            btn_merge_sessions.Text = "세션 병합";
+            btn_merge_sessions.UseVisualStyleBackColor = false;
+            btn_merge_sessions.Click += btn_merge_sessions_Click;
+            // 
+            // btn_complete
+            // 
+            btn_complete.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_complete.BackColor = Color.LimeGreen;
+            btn_complete.FlatStyle = FlatStyle.Flat;
+            btn_complete.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_complete.ForeColor = Color.White;
+            btn_complete.Location = new Point(589, 62);
+            btn_complete.Margin = new Padding(3, 4, 3, 4);
+            btn_complete.MinimumSize = new Size(120, 44);
+            btn_complete.Name = "btn_complete";
+            btn_complete.Size = new Size(150, 50);
+            btn_complete.TabIndex = 2;
+            btn_complete.Text = "계정 분석 시작";
+            btn_complete.UseVisualStyleBackColor = false;
             // 
             // tableLayoutContent
             // 
@@ -245,30 +284,30 @@
             // 
             dgv_files.AllowUserToAddRows = false;
             dgv_files.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle1.BackColor = Color.AliceBlue;
-            dgv_files.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle7.BackColor = Color.AliceBlue;
+            dgv_files.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle7;
             dgv_files.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgv_files.BackgroundColor = Color.White;
             dgv_files.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle2.BackColor = Color.LightSteelBlue;
-            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
-            dataGridViewCellStyle2.ForeColor = Color.Black;
-            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.True;
-            dgv_files.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle8.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle8.BackColor = Color.LightSteelBlue;
+            dataGridViewCellStyle8.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle8.ForeColor = Color.Black;
+            dataGridViewCellStyle8.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle8.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle8.WrapMode = DataGridViewTriState.True;
+            dgv_files.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle8;
             dgv_files.ColumnHeadersHeight = 35;
             dgv_files.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dgv_files.Columns.AddRange(new DataGridViewColumn[] { col_file_check, col_filename, col_row_count, col_account_column, col_amount_column, col_total_amount });
-            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = SystemColors.Window;
-            dataGridViewCellStyle3.Font = new Font("맑은 고딕", 9F);
-            dataGridViewCellStyle3.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
-            dgv_files.DefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle9.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle9.BackColor = SystemColors.Window;
+            dataGridViewCellStyle9.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle9.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle9.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle9.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle9.WrapMode = DataGridViewTriState.False;
+            dgv_files.DefaultCellStyle = dataGridViewCellStyle9;
             dgv_files.EnableHeadersVisualStyles = false;
             dgv_files.GridColor = Color.LightGray;
             dgv_files.Location = new Point(0, 50);
@@ -363,30 +402,30 @@
             // 
             dgv_sessions.AllowUserToAddRows = false;
             dgv_sessions.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle4.BackColor = Color.AliceBlue;
-            dgv_sessions.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle4;
+            dataGridViewCellStyle10.BackColor = Color.AliceBlue;
+            dgv_sessions.AlternatingRowsDefaultCellStyle = dataGridViewCellStyle10;
             dgv_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dgv_sessions.BackgroundColor = Color.White;
             dgv_sessions.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle5.BackColor = Color.LightSteelBlue;
-            dataGridViewCellStyle5.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
-            dataGridViewCellStyle5.ForeColor = Color.Black;
-            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.True;
-            dgv_sessions.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle5;
+            dataGridViewCellStyle11.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle11.BackColor = Color.LightSteelBlue;
+            dataGridViewCellStyle11.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle11.ForeColor = Color.Black;
+            dataGridViewCellStyle11.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle11.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle11.WrapMode = DataGridViewTriState.True;
+            dgv_sessions.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle11;
             dgv_sessions.ColumnHeadersHeight = 35;
             dgv_sessions.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             dgv_sessions.Columns.AddRange(new DataGridViewColumn[] { col_session_name, col_file_list, col_session_account, col_session_rows, col_session_amount, col_session_status, col_download });
-            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle6.BackColor = SystemColors.Window;
-            dataGridViewCellStyle6.Font = new Font("맑은 고딕", 9F);
-            dataGridViewCellStyle6.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle6.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle6.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.False;
-            dgv_sessions.DefaultCellStyle = dataGridViewCellStyle6;
+            dataGridViewCellStyle12.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle12.BackColor = SystemColors.Window;
+            dataGridViewCellStyle12.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle12.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle12.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle12.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle12.WrapMode = DataGridViewTriState.False;
+            dgv_sessions.DefaultCellStyle = dataGridViewCellStyle12;
             dgv_sessions.EnableHeadersVisualStyles = false;
             dgv_sessions.GridColor = Color.LightGray;
             dgv_sessions.Location = new Point(0, 50);
@@ -528,6 +567,8 @@
         private System.Windows.Forms.DataGridViewCheckBoxColumn col_session_status;
         private System.Windows.Forms.DataGridViewButtonColumn col_download;
         private System.Windows.Forms.Label lbl_sessions;
-        private Button button1;
+        private Button btn_complete;
+        private Button btn_add_to_session;
+        private Button btn_merge_sessions;
     }
 }

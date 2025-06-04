@@ -73,7 +73,7 @@ namespace FinanceTool.Repositories
         /// <summary>
         /// 세션의 총합 금액과 행수 업데이트
         /// </summary>
-        public async Task<bool> UpdateSessionTotalsAsync(ObjectId sessionId, decimal totalAmount, int totalRows)
+        public async Task<bool> UpdateSessionTotalsAsync(ObjectId sessionId, decimal totalAmount, decimal totalRows)
         {
             try
             {

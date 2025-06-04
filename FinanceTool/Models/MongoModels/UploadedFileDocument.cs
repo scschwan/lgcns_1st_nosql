@@ -33,7 +33,7 @@ namespace FinanceTool.MongoModels
         public List<string> DetectedColumns { get; set; } = new List<string>();
 
         [BsonElement("total_rows")]
-        public int TotalRows { get; set; }
+        public decimal TotalRows { get; set; }
 
         [BsonElement("total_amount")]
         public decimal TotalAmount { get; set; }
@@ -43,5 +43,11 @@ namespace FinanceTool.MongoModels
 
         [BsonElement("processing_status")]
         public string ProcessingStatus { get; set; } // uploaded, processed, error
+
+        // *** 새로 추가된 필드들 ***
+        [BsonElement("account_contents")]
+        public List<string> AccountContents { get; set; } = new List<string>(); // 계정명 컬럼의 고유값들
+
+
     }
 }

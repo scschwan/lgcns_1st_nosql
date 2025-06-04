@@ -21,7 +21,7 @@ namespace FinanceTool.MongoModels
         public decimal TotalAmount { get; set; }
 
         [BsonElement("total_rows")]
-        public int TotalRows { get; set; }
+        public decimal TotalRows { get; set; }
 
         [BsonElement("status")]
         public string Status { get; set; } // processing, completed, failed
