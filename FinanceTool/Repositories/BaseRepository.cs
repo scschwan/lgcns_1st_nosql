@@ -1,4 +1,5 @@
-﻿using MongoDB.Bson;
+﻿using FinanceTool.MongoModels;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
@@ -66,11 +67,14 @@ namespace FinanceTool.Repositories
         /// <summary>
         /// ID로 문서 조회
         /// </summary>
+        ///
+        
         public virtual async Task<T> GetByIdAsync(string id)
         {
             var filter = Builders<T>.Filter.Eq("_id", id);
             return await _collection.Find(filter).FirstOrDefaultAsync();
         }
+        
 
         /// <summary>
         /// 조건에 맞는 모든 문서 조회

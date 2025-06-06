@@ -810,7 +810,7 @@
         private System.Windows.Forms.GroupBox groupBox3;
         private System.Windows.Forms.Button restore_col_btn;
         private System.Windows.Forms.CheckBox del_col_list_allcheck;
-        private System.Windows.Forms.DataGridView dataGridView_delete_col;
+        public System.Windows.Forms.DataGridView dataGridView_delete_col;
         private System.Windows.Forms.Label label7;
         private System.Windows.Forms.GroupBox groupBox2;
         private System.Windows.Forms.Button delete_data_btn;

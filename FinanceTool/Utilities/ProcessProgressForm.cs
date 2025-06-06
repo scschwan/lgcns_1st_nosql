@@ -66,8 +66,11 @@ namespace FinanceTool
             this.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         }
 
-       
 
+        public static implicit operator UpdateProgressDelegate(ProcessProgressForm form)
+        {
+            return form.UpdateProgressHandler;
+        }
         public async Task UpdateProgressValue(int percentage, string status = null)
         {
             if (InvokeRequired)

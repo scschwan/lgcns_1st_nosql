@@ -50,32 +50,69 @@ namespace FinanceTool.Repositories
             }
         }
 
+
         /// <summary>
-        /// 파일의 상세 컬럼 정보 업데이트 (계정명 내용, 검증 정보 포함)
+        /// 계정명 컬럼 정보만 업데이트
         /// </summary>
-        public async Task<bool> UpdateDetailedColumnInfoAsync(ObjectId fileId, string accountColumnName,
-            string amountColumnName, decimal totalAmount, List<string> accountContents,
-            List<string> nonNumericAmountValues, string validationStatus, string validationMessage = "")
+        public async Task<bool> UpdateAccountColumnInfoAsync(ObjectId fileId, string accountColumnName, List<string> accountContents)
         {
             try
             {
-                var filter = Builders<UploadedFileDocument>.Filter.Eq(d => d.Id, fileId);
+                var filter = Builders<UploadedFileDocument>.Filter.Eq("_id", fileId);
                 var update = Builders<UploadedFileDocument>.Update
-                    .Set(d => d.AccountColumnName, accountColumnName)
-                    .Set(d => d.AmountColumnName, amountColumnName)
-                    .Set(d => d.TotalAmount, totalAmount)
-                    .Set(d => d.AccountContents, accountContents);
-                    
+                    .Set("account_column_name", accountColumnName)
+                    .Set("account_contents", accountContents);
 
-                var result = await _collection.UpdateOneAsync(filter, update);
+                var result = await Collection.UpdateOneAsync(filter, update);
                 return result.ModifiedCount > 0;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"상세 컬럼 정보 업데이트 오류: {ex.Message}");
+                Debug.WriteLine($"계정명 컬럼 정보 업데이트 오류: {ex.Message}");
                 return false;
             }
         }
+
+        /// <summary>
+        /// 금액 컬럼 정보만 업데이트
+        /// </summary>
+        public async Task<bool> UpdateAmountColumnInfoAsync(ObjectId fileId, string amountColumnName, decimal totalAmount)
+        {
+            try
+            {
+                var filter = Builders<UploadedFileDocument>.Filter.Eq("_id", fileId);
+                var update = Builders<UploadedFileDocument>.Update
+                    .Set("amount_column_name", amountColumnName)
+                    .Set("total_amount", totalAmount);
+
+                var result = await Collection.UpdateOneAsync(filter, update);
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"금액 컬럼 정보 업데이트 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// ObjectId로 직접 조회
+        /// </summary>
+        public async Task<UploadedFileDocument> GetByIdAsync(ObjectId id)
+        {
+            try
+            {
+                var filter = Builders<UploadedFileDocument>.Filter.Eq("_id", id);
+                var cursor = await _collection.FindAsync(filter);
+                return await cursor.FirstOrDefaultAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 조회 오류: {ex.Message}");
+                return null;
+            }
+        }
+
 
         /// <summary>
         /// 컬럼 정보 업데이트 (계정명, 금액 컬럼)

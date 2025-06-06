@@ -1,5 +1,6 @@
 ﻿using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using DocumentFormat.OpenXml.Wordprocessing;
 using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
 using MongoDB.Bson;
@@ -15,6 +16,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static FinanceTool.uc_MultiFileUpload;
 
 namespace FinanceTool
 {
@@ -106,6 +108,9 @@ namespace FinanceTool
 
                 // 기존 세션들 로드
                 LoadExistingSessions();
+
+                DataHandler.RegisterDataGridView(dgv_files);
+                DataHandler.RegisterDataGridView(dgv_sessions);
             }
             catch (Exception ex)
             {
@@ -122,6 +127,15 @@ namespace FinanceTool
             dgv_files.AllowUserToAddRows = false;
             dgv_files.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv_files.MultiSelect = true;
+
+            // *** 행 높이 고정 설정 추가 ***
+            dgv_files.AllowUserToResizeRows = false;  // 사용자가 행 높이 조절 못하게
+            dgv_files.RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.DisableResizing; // 행 헤더 크기 조절 방지
+            dgv_files.RowTemplate.Height = 25; // 기본 행 높이 설정 (픽셀)
+            dgv_files.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None; // 자동 높이 조절 방지
+
+            // *** 툴팁 기능 활성화 ***
+            dgv_files.ShowCellToolTips = true;
 
             // 컬럼 정의
             dgv_files.Columns.Clear();
@@ -176,13 +190,13 @@ namespace FinanceTool
             };
             dgv_files.Columns.Add(accountColumnCombo);
 
-            // *** 새로 추가: 계정명 내용 컬럼 ***
+            // 계정명 내용 컬럼 설정 개선
             var accountContentColumn = new DataGridViewTextBoxColumn
             {
                 Name = "AccountContent",
                 HeaderText = "계정명 내용",
                 DataPropertyName = "AccountContentFormatted",
-                Width = 150,
+                Width = 200, // 폭 증가
                 ReadOnly = true
             };
             dgv_files.Columns.Add(accountContentColumn);
@@ -274,6 +288,53 @@ namespace FinanceTool
 
             // *** 이 줄 추가 ***
             dgv_files.DataError += Dgv_files_DataError;
+
+            // *** 새로 추가: 셀 툴팁 이벤트 ***
+            dgv_files.CellToolTipTextNeeded += Dgv_files_CellToolTipTextNeeded;
+        }
+
+        /// <summary>
+        /// 셀 툴팁 텍스트 제공 이벤트
+        /// </summary>
+        private void Dgv_files_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+        {
+            try
+            {
+                if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+                {
+                    var columnName = dgv_files.Columns[e.ColumnIndex].Name;
+                    var fileData = dgv_files.Rows[e.RowIndex].DataBoundItem as FileDisplayData;
+
+                    if (fileData != null)
+                    {
+                        // 계정명 내용 컬럼의 툴팁
+                        if (columnName == "AccountContent" && fileData.AccountContents?.Count > 0)
+                        {
+                            if (fileData.AccountContents.Count <= 5)
+                            {
+                                e.ToolTipText = $"전체 계정명 ({fileData.AccountContents.Count}개):\\n" +
+                                              string.Join("\\n", fileData.AccountContents.Select((v, i) => $"{i + 1}. {v}"));
+                            }
+                            else
+                            {
+                                e.ToolTipText = $"전체 계정명 ({fileData.AccountContents.Count}개):\\n" +
+                                              string.Join("\\n", fileData.AccountContents.Take(10).Select((v, i) => $"{i + 1}. {v}")) +
+                                              $"\\n... 외 {fileData.AccountContents.Count - 10}개 더\\n\\n※ 마우스를 올려두면 전체 목록을 확인할 수 있습니다.";
+                            }
+                        }
+                        // 감지된 컬럼 목록의 툴팁
+                        else if (columnName == "DetectedColumns" && fileData.DetectedColumns?.Count > 0)
+                        {
+                            e.ToolTipText = $"전체 컬럼 ({fileData.DetectedColumns.Count}개):\\n" +
+                                          string.Join("\\n", fileData.DetectedColumns.Select((v, i) => $"{i + 1}. {v}"));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"툴팁 생성 오류: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -321,6 +382,9 @@ namespace FinanceTool
         /// <summary>
         /// 세션 생성 버튼 클릭
         /// </summary>
+        /// <summary>
+        /// 세션 생성 버튼 클릭 (병렬 처리 적용)
+        /// </summary>
         private async void btn_create_sessions_Click(object sender, EventArgs e)
         {
             try
@@ -343,51 +407,405 @@ namespace FinanceTool
                     return;
                 }
 
-                // 3단계: 다중 파일일 경우 추가 검증
-                if (selectedFiles.Count > 1)
-                {
-                    var multiValidationResult = ValidateMultipleFiles(selectedFiles);
-                    if (!multiValidationResult.IsValid)
-                    {
-                        MessageBox.Show(multiValidationResult.ErrorMessage, "검증 오류",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        return;
-                    }
-                }
+                // 3단계: 계정명별 파티션 분석 (병렬 처리)
+                var partitionResult = new PartitionAnalysisResult();
 
-                // 4단계: 세션 생성 처리
+                // 진행 상황 표시
                 using (var progressForm = new ProcessProgressForm())
                 {
                     progressForm.Show();
-                    await progressForm.UpdateProgressHandler(10, "세션 생성 중...");
 
-                    var sessionData = await CreateSessionData(selectedFiles, progressForm.UpdateProgressHandler);
-
-                    if (sessionData != null)
+                    // 3단계: 계정명별 파티션 분석 (병렬 처리)
+                    partitionResult = await AnalyzeAccountPartitionsAsync(selectedFiles, progressForm.UpdateProgressHandler);
+                    if (!partitionResult.IsValid)
                     {
-                        await progressForm.UpdateProgressHandler(90, "세션 목록 업데이트...");
+                        MessageBox.Show(partitionResult.ErrorMessage, "파티션 분석 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
 
-                        // dgv_sessions에 추가
-                        AddSessionToGrid(sessionData);
+                    await progressForm.UpdateProgressHandler(95, "미리보기 준비 중...");
+                    await Task.Delay(200); // UI 업데이트 시간 확보
+                }
+                if (partitionResult == null)
+                {
+                    MessageBox.Show(partitionResult.ErrorMessage, "파티션 분석 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
-                        // 선택된 파일들의 체크 해제
-                        ClearFileSelections(selectedFiles);
+                // 4단계: 파티션 결과 미리보기 및 사용자 확인
+                using (var previewDialog = new SessionPartitionPreviewDialog(partitionResult.Partitions))
+                {
+                    if (previewDialog.ShowDialog() != DialogResult.OK)
+                    {
+                        return; // 사용자 취소
+                    }
 
-                        await progressForm.UpdateProgressHandler(100, "완료");
-                        await Task.Delay(500);
+                    var approvedPartitions = previewDialog.GetApprovedPartitions();
 
-                        MessageBox.Show("세션이 성공적으로 생성되었습니다.", "완료",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    // 5단계: 승인된 파티션들로 세션 생성 (병렬 처리)
+                    using (var progressForm = new ProcessProgressForm())
+                    {
+                        progressForm.Show();
+                        await progressForm.UpdateProgressHandler(10, "다중 세션 생성 시작...");
+
+                        var createdSessions = await CreatePartitionedSessionsAsync(approvedPartitions, selectedFiles, progressForm.UpdateProgressHandler);
+
+                        if (createdSessions.Count > 0)
+                        {
+                            await progressForm.UpdateProgressHandler(90, "세션 목록 업데이트...");
+
+                            // dgv_sessions에 생성된 세션들 추가
+                            foreach (var session in createdSessions)
+                            {
+                                AddSessionToGrid(session);
+                            }
+
+                            // 선택된 파일들의 체크 해제
+                            ClearFileSelections(selectedFiles);
+
+                            await progressForm.UpdateProgressHandler(100, "완료");
+                            await Task.Delay(500);
+
+                            MessageBox.Show($"{createdSessions.Count}개의 세션이 성공적으로 생성되었습니다.", "완료",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"세션 생성 오류: {ex.Message}");
+                Debug.WriteLine($"파티션 세션 생성 오류: {ex.Message}");
                 MessageBox.Show($"세션 생성 중 오류가 발생했습니다.\n{ex.Message}",
                     "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+
+        /// <summary>
+        /// 계정명별 파티션 분석 (병렬 처리 적용)
+        /// </summary>
+        private async Task<PartitionAnalysisResult> AnalyzeAccountPartitionsAsync(List<FileDisplayData> selectedFiles, ProcessProgressForm.UpdateProgressDelegate progressCallback)
+        {
+            try
+            {
+                await progressCallback(5, "파일 그룹화 분석 중...");
+
+                var partitions = new List<AccountPartition>();
+                var accountGroups = new Dictionary<string, List<FileDisplayData>>();
+
+                // 파일들을 계정명별로 그룹화
+                foreach (var file in selectedFiles)
+                {
+                    foreach (var accountName in file.AccountContents)
+                    {
+                        if (!accountGroups.ContainsKey(accountName))
+                        {
+                            accountGroups[accountName] = new List<FileDisplayData>();
+                        }
+                        accountGroups[accountName].Add(file);
+                    }
+                }
+
+                await progressCallback(15, "계정별 데이터 계산 중...");
+
+                // 병렬 처리로 각 계정명별 파티션 생성
+                var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2); // CPU 코어수의 2배로 제한
+                var partitionTasks = new List<Task<AccountPartition>>();
+
+                int totalGroups = accountGroups.Count;
+                int completedGroups = 0;
+
+                foreach (var accountGroup in accountGroups)
+                {
+                    var task = ProcessAccountGroupAsync(accountGroup.Key, accountGroup.Value, semaphore, async (progress) =>
+                    {
+                        Interlocked.Increment(ref completedGroups);
+                        int overallProgress = 15 + (completedGroups * 60 / totalGroups);
+                        await progressCallback(overallProgress, $"계정별 데이터 계산 중... ({completedGroups}/{totalGroups}) - {accountGroup.Key}");
+                    });
+
+                    partitionTasks.Add(task);
+                }
+
+                // 모든 파티션 처리 완료 대기
+                var results = await Task.WhenAll(partitionTasks);
+                partitions.AddRange(results.Where(r => r != null));
+
+                await progressCallback(80, "파티션 검증 중...");
+
+                // 파티션 검증
+                if (partitions.Count == 0)
+                {
+                    return new PartitionAnalysisResult
+                    {
+                        IsValid = false,
+                        ErrorMessage = "계정명을 기준으로 파티션을 생성할 수 없습니다.\n선택된 파일들의 계정명 정보를 확인해주세요."
+                    };
+                }
+
+                await progressCallback(90, "파티션 분석 완료");
+
+                return new PartitionAnalysisResult
+                {
+                    IsValid = true,
+                    Partitions = partitions
+                };
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"파티션 분석 오류: {ex.Message}");
+                return new PartitionAnalysisResult
+                {
+                    IsValid = false,
+                    ErrorMessage = $"파티션 분석 중 오류가 발생했습니다: {ex.Message}"
+                };
+            }
+        }
+
+        /// <summary>
+        /// 개별 계정 그룹 처리 (병렬 처리용)
+        /// </summary>
+        private async Task<AccountPartition> ProcessAccountGroupAsync(
+            string accountName,
+            List<FileDisplayData> files,
+            SemaphoreSlim semaphore,
+            Func<int, Task> progressCallback)
+        {
+            await semaphore.WaitAsync();
+
+            try
+            {
+                var distinctFiles = files.Distinct().ToList();
+
+                var partition = new AccountPartition
+                {
+                    AccountName = accountName,
+                    Files = distinctFiles,
+                    FileCount = distinctFiles.Count,
+                    SessionName = GeneratePartitionSessionName(accountName, distinctFiles),
+                    TotalRows = 0,
+                    TotalAmount = 0
+                };
+
+                // 병렬로 각 파일의 데이터 계산
+                var fileTasks = distinctFiles.Select(async file =>
+                {
+                    return await Task.Run(() => CalculateAccountSpecificData(file, accountName));
+                });
+
+                var fileResults = await Task.WhenAll(fileTasks);
+
+                // 결과 합산
+                foreach (var result in fileResults)
+                {
+                    partition.TotalRows += result.RowCount;
+                    partition.TotalAmount += result.Amount;
+                }
+
+                await progressCallback(0); // 진행률 업데이트 호출
+
+                return partition;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"계정 그룹 처리 오류 [{accountName}]: {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// 파티션된 세션들 생성 (병렬 처리 적용)
+        /// </summary>
+        private async Task<List<SessionDisplayData>> CreatePartitionedSessionsAsync(
+            List<AccountPartition> partitions,
+            List<FileDisplayData> originalFiles,
+            ProcessProgressForm.UpdateProgressDelegate progressCallback)
+        {
+            var createdSessions = new List<SessionDisplayData>();
+            var semaphore = new SemaphoreSlim(Math.Min(5, partitions.Count)); // 최대 5개 동시 처리
+
+            try
+            {
+                int completedSessions = 0;
+                var sessionTasks = partitions.Select(async (partition, index) =>
+                {
+                    await semaphore.WaitAsync();
+
+                    try
+                    {
+                        // MongoDB에 세션 저장
+                        var fileIds = partition.Files.Select(f => f.Id).ToList();
+                        var sessionDocument = new FileSessionDocument
+                        {
+                            SessionName = partition.SessionName,
+                            AccountColumnName = partition.Files.First().AccountColumnName,
+                            AmountColumnName = partition.Files.First().AmountColumnName,
+                            TotalAmount = partition.TotalAmount,
+                            TotalRows = partition.TotalRows,
+                            Status = "processing",
+                            CreatedDate = DateTime.UtcNow,
+                            FileIds = fileIds,
+                            AccountName = partition.AccountName
+                        };
+
+                        await _fileSessionRepository.CreateAsync(sessionDocument);
+
+                        // 파일들의 session_id 업데이트 (병렬 처리)
+                        var updateTasks = partition.Files.Select(async file =>
+                        {
+                            await _uploadedFileRepository.UpdateSessionIdAsync(file.Id, sessionDocument.Id);
+                            file.SessionId = sessionDocument.Id;
+                        });
+
+                        await Task.WhenAll(updateTasks);
+
+                        // 진행률 업데이트
+                        Interlocked.Increment(ref completedSessions);
+                        int progress = 20 + (completedSessions * 60 / partitions.Count);
+                        await progressCallback(progress, $"세션 생성 중... ({completedSessions}/{partitions.Count}) - {partition.AccountName}");
+
+                        // 화면 표시용 데이터 생성
+                        return new SessionDisplayData
+                        {
+                            Id = sessionDocument.Id,
+                            SessionName = partition.SessionName,
+                            AccountColumnName = partition.Files.First().AccountColumnName,
+                            AmountColumnName = partition.Files.First().AmountColumnName,
+                            AccountName = partition.AccountName, // *** AccountName 정보 포함 ***
+                            TotalAmount = partition.TotalAmount,
+                            TotalAmountFormatted = partition.TotalAmount.ToString("N0") + " 원",
+                            TotalRows = partition.TotalRows,
+                            TotalRowsFormatted = partition.TotalRows.ToString("N0"),
+                            FileCount = partition.FileCount,
+                            Status = "processing",
+                            StatusDisplay = "처리중",
+                            CreatedDate = DateTime.UtcNow,
+                            CreatedDateFormatted = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"),
+                            ResultFilePath = null
+                        };
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                });
+
+                var results = await Task.WhenAll(sessionTasks);
+                createdSessions.AddRange(results);
+
+                return createdSessions;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"파티션 세션 생성 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 파티션별 세션명 생성 (새로운 규칙 적용)
+        /// </summary>
+        private string GeneratePartitionSessionName(string accountName, List<FileDisplayData> files)
+        {
+            string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
+
+            if (files.Count == 1)
+            {
+                // 단일 파일: {계정명}_{파일명}_{생성일}
+                string fileName = Path.GetFileNameWithoutExtension(files[0].OriginalFilename);
+                return $"{accountName}_{fileName}_{dateStr}";
+            }
+            else
+            {
+                // 다중 파일: {계정명}_{파일수}개파일_{생성일}
+                return $"{accountName}_{files.Count}개파일_{dateStr}";
+            }
+        }
+
+        /// <summary>
+        /// 특정 계정명에 대한 파일 데이터 계산
+        /// </summary>
+        private (int RowCount, decimal Amount) CalculateAccountSpecificData(FileDisplayData file, string targetAccountName)
+        {
+            try
+            {
+                string filePath = Path.Combine(UPLOAD_FOLDER, file.StoredFilename);
+                int rowCount = 0;
+                decimal totalAmount = 0;
+
+                using (var document = SpreadsheetDocument.Open(filePath, false))
+                {
+                    var workbookPart = document.WorkbookPart;
+                    var worksheet = workbookPart.WorksheetParts.First().Worksheet;
+                    var sheetData = worksheet.GetFirstChild<SheetData>();
+
+                    var allRows = sheetData.Elements<Row>().ToList();
+                    if (allRows.Count <= 1) return (0, 0);
+
+                    // 헤더에서 컬럼 인덱스 찾기
+                    var headerRow = allRows.First();
+                    var headerCells = headerRow.Elements<Cell>().ToList();
+
+                    int accountColumnIndex = FindColumnIndex(headerCells, file.AccountColumnName, workbookPart);
+                    int amountColumnIndex = FindColumnIndex(headerCells, file.AmountColumnName, workbookPart);
+
+                    if (accountColumnIndex == -1 || amountColumnIndex == -1) return (0, 0);
+
+                    // 해당 계정명에 해당하는 행들만 처리
+                    for (int rowIndex = 1; rowIndex < allRows.Count; rowIndex++)
+                    {
+                        var row = allRows[rowIndex];
+                        var cells = row.Elements<Cell>().ToList();
+
+                        if (accountColumnIndex < cells.Count && amountColumnIndex < cells.Count)
+                        {
+                            string accountValue = GetCellValue(cells[accountColumnIndex], workbookPart);
+
+                            // 해당 계정명과 일치하는 행만 계산
+                            if (accountValue.Trim().Equals(targetAccountName.Trim(), StringComparison.OrdinalIgnoreCase))
+                            {
+                                string amountValue = GetCellValue(cells[amountColumnIndex], workbookPart);
+                                if (decimal.TryParse(amountValue.Replace(",", ""), out decimal amount))
+                                {
+                                    totalAmount += amount;
+                                }
+                                rowCount++;
+                            }
+                        }
+                    }
+                }
+
+                return (rowCount, totalAmount);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"계정별 데이터 계산 오류: {ex.Message}");
+                return (0, 0);
+            }
+        }
+
+        /// <summary>
+        /// 컬럼 인덱스 찾기 헬퍼 메서드
+        /// </summary>
+        private int FindColumnIndex(List<Cell> headerCells, string columnName, WorkbookPart workbookPart)
+        {
+            for (int i = 0; i < headerCells.Count; i++)
+            {
+                string cellValue = GetCellValue(headerCells[i], workbookPart);
+                if (cellValue.Trim().Equals(columnName.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
 
 
         /// <summary>
@@ -420,7 +838,17 @@ namespace FinanceTool
         {
             try
             {
-                // 삭제 확인
+                // 1단계: 연관된 세션 확인
+                var relatedSessions = await CheckFileSessionDependency(fileData.Id);
+
+                if (relatedSessions.Count > 0)
+                {
+                    // 연관된 세션이 있는 경우 삭제 차단
+                    ShowSessionDependencyWarning(fileData.OriginalFilename, relatedSessions);
+                    return;
+                }
+
+                // 2단계: 기존 삭제 확인 로직
                 var result = MessageBox.Show(
                     $"'{fileData.OriginalFilename}' 파일을 삭제하시겠습니까?\n\n" +
                     "※ 서버의 실제 파일과 데이터베이스 정보가 모두 삭제됩니다.",
@@ -436,7 +864,7 @@ namespace FinanceTool
                     progressForm.Show();
                     await progressForm.UpdateProgressHandler(20, "파일 삭제 중...");
 
-                    // 1. 서버 파일 삭제
+                    // 서버 파일 삭제
                     string filePath = Path.Combine(UPLOAD_FOLDER, fileData.StoredFilename);
                     if (File.Exists(filePath))
                     {
@@ -446,7 +874,7 @@ namespace FinanceTool
 
                     await progressForm.UpdateProgressHandler(60, "데이터베이스 정보 삭제 중...");
 
-                    // 2. MongoDB 데이터 삭제
+                    // MongoDB 데이터 삭제
                     bool mongoDeleted = await _uploadedFileRepository.DeleteAsync(fileData.Id);
                     if (!mongoDeleted)
                     {
@@ -455,10 +883,8 @@ namespace FinanceTool
 
                     await progressForm.UpdateProgressHandler(90, "목록 업데이트 중...");
 
-                    // 3. DataGridView에서 제거
-                    var currentList = (dgv_files.DataSource as List<FileDisplayData>) ?? new List<FileDisplayData>();
-                    currentList.RemoveAt(rowIndex);
-                    dgv_files.DataSource = currentList.ToList();
+                    // *** 개선: 다른 파일들의 콤보박스 상태 보존하면서 삭제 ***
+                    await UpdateFileGridAfterDeletion(rowIndex);
 
                     await progressForm.UpdateProgressHandler(100, "삭제 완료");
                     await Task.Delay(500);
@@ -474,6 +900,148 @@ namespace FinanceTool
                     "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        /// <summary>
+        /// 파일과 연관된 세션 의존성 확인
+        /// </summary>
+        private async Task<List<SessionDisplayData>> CheckFileSessionDependency(ObjectId fileId)
+        {
+            var relatedSessions = new List<SessionDisplayData>();
+
+            try
+            {
+                var sessionList = dgv_sessions.DataSource as List<SessionDisplayData>;
+                if (sessionList == null) return relatedSessions;
+
+                foreach (var sessionDisplay in sessionList)
+                {
+                    // MongoDB에서 실제 세션 정보 조회
+                    var sessionDoc = await _fileSessionRepository.GetByIdAsync(sessionDisplay.Id);
+                    if (sessionDoc?.FileIds != null && sessionDoc.FileIds.Contains(fileId))
+                    {
+                        relatedSessions.Add(sessionDisplay);
+                    }
+                }
+
+                return relatedSessions;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 의존성 확인 오류: {ex.Message}");
+                return relatedSessions;
+            }
+        }
+
+        /// <summary>
+        /// 세션 의존성 경고 다이얼로그 표시
+        /// </summary>
+        private void ShowSessionDependencyWarning(string fileName, List<SessionDisplayData> relatedSessions)
+        {
+            string sessionList = string.Join("\n", relatedSessions.Select((s, i) => $"{i + 1}. {s.SessionName}"));
+
+            string message = $"'{fileName}' 파일을 삭제할 수 없습니다.\n\n" +
+                            "해당 파일이 다음 세션에서 사용 중입니다:\n\n" +
+                            sessionList + "\n\n" +
+                            "파일을 삭제하려면 먼저 연관된 세션들을 삭제해주세요.";
+
+            MessageBox.Show(message, "파일 삭제 불가",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        /// <summary>
+        /// 파일 삭제 후 그리드 업데이트 (콤보박스 상태 보존)
+        /// </summary>
+        private async Task UpdateFileGridAfterDeletion(int deletedRowIndex)
+        {
+            try
+            {
+                // 삭제 전 다른 파일들의 콤보박스 상태 백업
+                var currentList = (dgv_files.DataSource as List<FileDisplayData>) ?? new List<FileDisplayData>();
+                var comboBoxStates = new Dictionary<ObjectId, (string AccountColumn, string AmountColumn)>();
+
+                for (int i = 0; i < currentList.Count; i++)
+                {
+                    if (i != deletedRowIndex) // 삭제될 행 제외
+                    {
+                        var fileData = currentList[i];
+                        comboBoxStates[fileData.Id] = (
+                            fileData.AccountColumnName ?? "",
+                            fileData.AmountColumnName ?? ""
+                        );
+                    }
+                }
+
+                // 삭제된 항목 제거
+                currentList.RemoveAt(deletedRowIndex);
+
+                // DataSource 재설정
+                dgv_files.DataSource = currentList.ToList();
+
+                // 콤보박스 아이템 재설정
+                UpdateComboBoxItems();
+
+                // 백업된 상태 복원
+                await Task.Delay(100); // UI 업데이트 대기
+
+                foreach (DataGridViewRow row in dgv_files.Rows)
+                {
+                    var fileData = row.DataBoundItem as FileDisplayData;
+                    if (fileData != null && comboBoxStates.ContainsKey(fileData.Id))
+                    {
+                        var (accountColumn, amountColumn) = comboBoxStates[fileData.Id];
+
+                        // 콤보박스 값 복원
+                        if (!string.IsNullOrEmpty(accountColumn))
+                        {
+                            SetComboBoxValueSafe(row, "AccountColumn", accountColumn);
+                        }
+                        if (!string.IsNullOrEmpty(amountColumn))
+                        {
+                            SetComboBoxValueSafe(row, "AmountColumn", amountColumn);
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"파일 삭제 후 그리드 업데이트 완료. 남은 파일: {currentList.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"파일 삭제 후 그리드 업데이트 오류: {ex.Message}");
+                // 오류 발생 시 전체 새로고침
+                var currentList = (dgv_files.DataSource as List<FileDisplayData>) ?? new List<FileDisplayData>();
+                dgv_files.DataSource = currentList.ToList();
+                UpdateComboBoxItems();
+            }
+        }
+
+        /// <summary>
+        /// 안전한 콤보박스 값 설정 (오류 방지)
+        /// </summary>
+        private void SetComboBoxValueSafe(DataGridViewRow row, string columnName, string value)
+        {
+            try
+            {
+                var cell = row.Cells[columnName];
+                if (cell is DataGridViewComboBoxCell comboCell && !string.IsNullOrEmpty(value))
+                {
+                    // 콤보박스에 해당 값이 있는지 확인 후 설정
+                    if (comboCell.Items.Contains(value))
+                    {
+                        cell.Value = value;
+                        Debug.WriteLine($"콤보박스 값 복원: {columnName} = {value}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"콤보박스에 값 없음: {columnName} = {value}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"콤보박스 값 설정 오류 [{columnName}]: {ex.Message}");
+            }
+        }
+
 
         /// <summary>
         /// 선택된 파일 목록 반환
@@ -516,11 +1084,15 @@ namespace FinanceTool
 
                 if (fileData == null) return;
 
-                // 계정명 또는 금액 컬럼 선택이 변경된 경우
-                if (dgv_files.Columns[e.ColumnIndex].Name == "AccountColumn" ||
-                    dgv_files.Columns[e.ColumnIndex].Name == "AmountColumn")
+                // 계정명 컬럼 선택이 변경된 경우만 계정명 검증
+                if (dgv_files.Columns[e.ColumnIndex].Name == "AccountColumn")
                 {
-                    await UpdateFileColumnInfo(fileData);
+                    await UpdateAccountColumnInfo(fileData);
+                }
+                // 금액 컬럼 선택이 변경된 경우만 금액 검증
+                else if (dgv_files.Columns[e.ColumnIndex].Name == "AmountColumn")
+                {
+                    await UpdateAmountColumnInfo(fileData);
                 }
             }
             catch (Exception ex)
@@ -530,23 +1102,20 @@ namespace FinanceTool
         }
 
         /// <summary>
-        /// 파일의 컬럼 정보 업데이트 (콤보박스 값 유지)
+        /// 계정명 컬럼 정보만 업데이트
         /// </summary>
-        private async Task UpdateFileColumnInfo(FileDisplayData fileData)
+        private async Task UpdateAccountColumnInfo(FileDisplayData fileData)
         {
             try
             {
-                // 현재 선택된 값들 백업
                 string currentAccountColumn = fileData.AccountColumnName;
-                string currentAmountColumn = fileData.AmountColumnName;
 
-                // 계정명 컬럼이 선택된 경우
+                // 계정명 컬럼이 선택된 경우만 검증
                 if (!string.IsNullOrEmpty(currentAccountColumn))
                 {
                     var accountValidation = await ValidateAndExtractAccountContent(fileData);
                     if (!accountValidation.IsValid)
                     {
-                        // 검증 실패 시 사용자에게 알림 후 해당 컬럼만 초기화
                         MessageBox.Show(accountValidation.ErrorMessage, "계정명 컬럼 오류",
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
@@ -556,15 +1125,58 @@ namespace FinanceTool
                         fileData.AccountContentFormatted = "";
                         currentAccountColumn = "";
                     }
+
+                    // MongoDB에 계정명 정보만 저장
+                    if (!string.IsNullOrEmpty(currentAccountColumn))
+                    {
+                        bool updated = await _uploadedFileRepository.UpdateAccountColumnInfoAsync(
+                            fileData.Id,
+                            currentAccountColumn,
+                            fileData.AccountContents
+                        );
+
+                        if (!updated)
+                        {
+                            Debug.WriteLine($"MongoDB 계정명 정보 업데이트 실패: {fileData.OriginalFilename}");
+                        }
+                    }
+                }
+                else
+                {
+                    // 계정명 컬럼 선택 해제
+                    fileData.AccountContents.Clear();
+                    fileData.AccountContentFormatted = "";
                 }
 
-                // 금액 컬럼이 선택된 경우
+                // 콤보박스 값 설정 및 UI 새로고침
+                SetComboBoxValue(fileData, "AccountColumn", currentAccountColumn);
+                RefreshFileGridRowSpecific(fileData);
+
+                Debug.WriteLine($"계정명 컬럼 정보 업데이트 완료: {fileData.OriginalFilename}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"계정명 컬럼 정보 업데이트 오류: {ex.Message}");
+                MessageBox.Show($"계정명 컬럼 정보 업데이트 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 금액 컬럼 정보만 업데이트
+        /// </summary>
+        private async Task UpdateAmountColumnInfo(FileDisplayData fileData)
+        {
+            try
+            {
+                string currentAmountColumn = fileData.AmountColumnName;
+
+                // 금액 컬럼이 선택된 경우만 검증
                 if (!string.IsNullOrEmpty(currentAmountColumn))
                 {
                     var amountValidation = await ValidateAndCalculateAmount(fileData);
                     if (!amountValidation.IsValid)
                     {
-                        // 검증 실패 시 사용자에게 알림 후 해당 컬럼만 초기화
                         MessageBox.Show(amountValidation.ErrorMessage, "금액 컬럼 오류",
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
@@ -574,41 +1186,43 @@ namespace FinanceTool
                         fileData.TotalAmountFormatted = "";
                         currentAmountColumn = "";
                     }
-                }
 
-                // MongoDB에 저장 (계정명 컬럼이 선택된 경우에만)
-                if (!string.IsNullOrEmpty(currentAccountColumn))
-                {
-                    bool updated = await _uploadedFileRepository.UpdateColumnInfoWithAccountContentsAsync(
-                        fileData.Id,
-                        currentAccountColumn,
-                        currentAmountColumn ?? "",
-                        fileData.TotalAmount,
-                        fileData.AccountContents
-                    );
-
-                    if (!updated)
+                    // MongoDB에 금액 정보만 저장
+                    if (!string.IsNullOrEmpty(currentAmountColumn))
                     {
-                        Debug.WriteLine($"MongoDB 업데이트 실패: {fileData.OriginalFilename}");
+                        bool updated = await _uploadedFileRepository.UpdateAmountColumnInfoAsync(
+                            fileData.Id,
+                            currentAmountColumn,
+                            fileData.TotalAmount
+                        );
+
+                        if (!updated)
+                        {
+                            Debug.WriteLine($"MongoDB 금액 정보 업데이트 실패: {fileData.OriginalFilename}");
+                        }
                     }
                 }
+                else
+                {
+                    // 금액 컬럼 선택 해제
+                    fileData.TotalAmount = 0;
+                    fileData.TotalAmountFormatted = "";
+                }
 
-                // *** 핵심: 콤보박스 값을 다시 설정하여 유지 ***
-                SetComboBoxValue(fileData, "AccountColumn", currentAccountColumn);
+                // 콤보박스 값 설정 및 UI 새로고침
                 SetComboBoxValue(fileData, "AmountColumn", currentAmountColumn);
-
-                // UI 새로고침
                 RefreshFileGridRowSpecific(fileData);
 
-                Debug.WriteLine($"파일 {fileData.OriginalFilename} 컬럼 정보 업데이트 완료");
+                Debug.WriteLine($"금액 컬럼 정보 업데이트 완료: {fileData.OriginalFilename}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"파일 컬럼 정보 업데이트 오류: {ex.Message}");
-                MessageBox.Show($"파일 정보 업데이트 중 오류가 발생했습니다.\n{ex.Message}",
+                Debug.WriteLine($"금액 컬럼 정보 업데이트 오류: {ex.Message}");
+                MessageBox.Show($"금액 컬럼 정보 업데이트 중 오류가 발생했습니다.\n{ex.Message}",
                     "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
 
         /// <summary>
         /// 특정 셀의 콤보박스 값 설정
@@ -719,7 +1333,7 @@ namespace FinanceTool
                         var allRows = sheetData.Elements<Row>().ToList();
                         if (allRows.Count <= 1)
                         {
-                            // *** 빈 데이터도 UI에 반영 ***
+                            // 빈 데이터도 UI에 반영
                             Application.OpenForms[0].Invoke((MethodInvoker)delegate
                             {
                                 fileData.AccountContents = new List<string>();
@@ -771,33 +1385,67 @@ namespace FinanceTool
 
                     var uniqueContents = accountContents.ToList();
 
-                    // *** UI 스레드에서 데이터 업데이트 ***
+                    // UI 스레드에서 데이터 업데이트
                     Application.OpenForms[0].Invoke((MethodInvoker)delegate
                     {
                         fileData.AccountContents = uniqueContents;
-                        fileData.AccountContentFormatted = uniqueContents.Count > 0 ?
-                            (uniqueContents.Count == 1 ? uniqueContents[0] :
-                             string.Join(", ", uniqueContents.Take(3)) + (uniqueContents.Count > 3 ? "..." : "")) : "";
+                        // 계정명 내용 포맷팅 개선 (최대 3개 표시 + 개수 정보)
+                        if (uniqueContents.Count == 0)
+                        {
+                            fileData.AccountContentFormatted = "";
+                        }
+                        else if (uniqueContents.Count == 1)
+                        {
+                            fileData.AccountContentFormatted = uniqueContents[0];
+                        }
+                        else if (uniqueContents.Count <= 3)
+                        {
+                            fileData.AccountContentFormatted = string.Join(", ", uniqueContents) + $" ({uniqueContents.Count}개)";
+                        }
+                        else
+                        {
+                            fileData.AccountContentFormatted = string.Join(", ", uniqueContents.Take(3)) + $"... ({uniqueContents.Count}개)";
+                        }
                     });
 
-                    // 중복되지 않은 값이 2개 이상인 경우 오류
-                    if (uniqueContents.Count > 1)
+                    // *** 핵심 변경: 40개 초과 시 경고하되 처리는 허용 ***
+                    if (uniqueContents.Count > 40)
                     {
-                        var displayContents = uniqueContents.Take(5).ToList();
-                        string errorMessage = "계정명 컬럼은 1가지 값만 존재해야 합니다.\n\n" +
-                                            $"발견된 값들 ({uniqueContents.Count}개):\n" +
-                                            string.Join("\n", displayContents.Select((v, i) => $"{i + 1}. {v}"));
+                        string warningMessage = $"계정명 종류가 40개를 초과했습니다. ({uniqueContents.Count}개)\n" +
+                                              "성능상 권장하지 않지만 처리를 계속합니다.\n" +
+                                              "처음 5개 계정명:\n" +
+                                              string.Join("\n", uniqueContents.Take(5).Select((v, i) => $"{i + 1}. {v}"));
 
-                        if (uniqueContents.Count > 5)
+                        // 비동기로 경고 표시 (처리는 계속)
+                        Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
                         {
-                            errorMessage += $"\n... 외 {uniqueContents.Count - 5}개 더";
-                        }
+                            MessageBox.Show(warningMessage, "계정명 개수 경고",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        });
+                    }
+                    // 1~40개는 정상 처리
+                    else if (uniqueContents.Count > 1)
+                    {
+                        string infoMessage = $"계정명이 {uniqueContents.Count}개 감지되었습니다.\n" +
+                                           "세션 생성 시 계정명별로 분리됩니다.\n" +
+                                           "감지된 계정명:\n" +
+                                           string.Join("\n", uniqueContents.Take(10).Select((v, i) => $"{i + 1}. {v}")) +
+                                           (uniqueContents.Count > 10 ? $"\n... 외 {uniqueContents.Count - 10}개 더" : "");
 
-                        return new ValidationResult
+                        // 정보성 메시지 (선택사항)
+                        Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
                         {
-                            IsValid = false,
-                            ErrorMessage = errorMessage
-                        };
+                            var result = MessageBox.Show(infoMessage + "\n계속 진행하시겠습니까?",
+                                "계정명 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                            if (result != DialogResult.Yes)
+                            {
+                                // 사용자가 취소한 경우 계정명 컬럼 선택 해제
+                                fileData.AccountColumnName = "";
+                                fileData.AccountContents.Clear();
+                                fileData.AccountContentFormatted = "";
+                            }
+                        });
                     }
 
                     return new ValidationResult { IsValid = true };
@@ -1332,7 +1980,15 @@ namespace FinanceTool
             dgv_sessions.AutoGenerateColumns = false;
             dgv_sessions.AllowUserToAddRows = false;
             dgv_sessions.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dgv_sessions.MultiSelect = false;
+            //dgv_sessions.MultiSelect = false;
+            dgv_sessions.MultiSelect = true;
+
+            // *** 행 높이 고정 설정 추가 ***
+            dgv_sessions.AllowUserToResizeRows = false;  // 사용자가 행 높이 조절 못하게
+            dgv_sessions.RowHeadersWidthSizeMode = DataGridViewRowHeadersWidthSizeMode.DisableResizing; // 행 헤더 크기 조절 방지
+            dgv_sessions.RowTemplate.Height = 25; // 기본 행 높이 설정 (픽셀)
+            dgv_sessions.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None; // 자동 높이 조절 방지
+
 
             // 컬럼 정의
             dgv_sessions.Columns.Clear();
@@ -1350,13 +2006,19 @@ namespace FinanceTool
             dgv_sessions.Columns.Add(checkBoxColumn);
 
             // 세션명 컬럼
+            // *** 세션명 컬럼 (편집 가능) ***
             var sessionNameColumn = new DataGridViewTextBoxColumn
             {
                 Name = "SessionName",
-                HeaderText = "세션명",
+                HeaderText = "세션명 (편집가능)",
                 DataPropertyName = "SessionName",
-                Width = 200,
-                ReadOnly = true
+                Width = 250,
+                DefaultCellStyle = {
+                    BackColor =System.Drawing.Color.LightYellow
+                },
+                Frozen = true, // 스크롤 시에도 고정
+                ReadOnly = false // 편집 가능하도록 설정
+
             };
             dgv_sessions.Columns.Add(sessionNameColumn);
 
@@ -1370,6 +2032,17 @@ namespace FinanceTool
                 ReadOnly = true
             };
             dgv_sessions.Columns.Add(accountColumnColumn);
+
+            // *** 새로 추가: 계정명 내용 컬럼 ***
+            var accountNameColumn = new DataGridViewTextBoxColumn
+            {
+                Name = "AccountName",
+                HeaderText = "계정명 내용",
+                DataPropertyName = "AccountNameFormatted", // 새 속성 필요
+                Width = 250,
+                ReadOnly = true
+            };
+            dgv_sessions.Columns.Add(accountNameColumn);
 
             // 금액 컬럼
             var amountColumnColumn = new DataGridViewTextBoxColumn
@@ -1481,6 +2154,164 @@ namespace FinanceTool
             dgv_sessions.CellContentClick += Dgv_sessions_CellContentClick;
             //dgv_sessions.CellValueChanged += Dgv_sessions_CellValueChanged;
             dgv_sessions.CellFormatting += Dgv_sessions_CellFormatting;
+            dgv_sessions.CellValueChanged += Dgv_sessions_CellValueChanged; // 세션명 편집용
+            dgv_sessions.CellValidating += Dgv_sessions_CellValidating; // 유효성 검사용
+            dgv_sessions.CellToolTipTextNeeded += Dgv_sessions_CellToolTipTextNeeded; // *** 새로 추가 ***
+        }
+
+        /// <summary>
+        /// 세션 그리드 셀 값 변경 이벤트 (세션명 편집 처리)
+        /// </summary>
+        private async void Dgv_sessions_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                if (e.RowIndex < 0) return;
+
+                var columnName = dgv_sessions.Columns[e.ColumnIndex].Name;
+                var sessionData = dgv_sessions.Rows[e.RowIndex].DataBoundItem as SessionDisplayData;
+
+                if (sessionData == null) return;
+
+                // 세션명 편집 처리
+                if (columnName == "SessionName")
+                {
+                    var newSessionName = dgv_sessions.Rows[e.RowIndex].Cells["SessionName"].Value?.ToString()?.Trim();
+
+                    //Debug.WriteLine($"세션 정보 업데이트 로직 진입 columnName : {columnName}  ,sessionData.SessionName : {sessionData.SessionName}  newSessionName  : {newSessionName}");
+                    //Debug.WriteLine($"string.IsNullOrEmpty(newSessionName) : {string.IsNullOrEmpty(newSessionName)}    newSessionName != sessionData.SessionName  : {newSessionName != sessionData.SessionName}");
+
+                    //if (!string.IsNullOrEmpty(newSessionName) && newSessionName != sessionData.SessionName)
+                    if (!string.IsNullOrEmpty(newSessionName))
+                    {
+                        //Debug.WriteLine($"세션 정보 업데이트 start");
+                        await UpdateSessionName(sessionData, newSessionName, e.RowIndex);
+                    }
+                }
+                else
+                {
+                    //Debug.WriteLine($"세션 정보 업데이트 아님 columnName : {columnName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 정보 업데이트 오류: {ex.Message}");
+                MessageBox.Show($"세션 정보 업데이트 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 세션명 유효성 검사
+        /// </summary>
+        private void Dgv_sessions_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
+        {
+            try
+            {
+                if (dgv_sessions.Columns[e.ColumnIndex].Name == "SessionName")
+                {
+                    var newSessionName = e.FormattedValue?.ToString()?.Trim();
+
+                    if (string.IsNullOrEmpty(newSessionName))
+                    {
+                        e.Cancel = true;
+                        MessageBox.Show("세션명은 비어있을 수 없습니다.", "입력 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // 세션명 길이 제한 (20자)
+                    if (newSessionName.Length > 50)
+                    {
+                        e.Cancel = true;
+                        MessageBox.Show("세션명은 50자를 초과할 수 없습니다.", "입력 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // 중복 세션명 검사
+                    var currentSessions = dgv_sessions.DataSource as List<SessionDisplayData>;
+                    var currentSessionData = dgv_sessions.Rows[e.RowIndex].DataBoundItem as SessionDisplayData;
+
+                    if (currentSessions != null && currentSessionData != null)
+                    {
+                        var duplicateSession = currentSessions.FirstOrDefault(s =>
+                            s.Id != currentSessionData.Id &&
+                            s.SessionName.Equals(newSessionName, StringComparison.OrdinalIgnoreCase));
+
+                        if (duplicateSession != null)
+                        {
+                            e.Cancel = true;
+                            MessageBox.Show($"'{newSessionName}' 세션명이 이미 존재합니다.\n다른 이름을 사용해주세요.", "중복 오류",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션명 유효성 검사 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 세션명 업데이트 처리
+        /// </summary>
+        private async Task UpdateSessionName(SessionDisplayData sessionData, string newSessionName, int rowIndex)
+        {
+            string originalSessionName = sessionData.SessionName;
+
+            try
+            {
+                // UI에서 먼저 업데이트 (즉시 반응)
+                sessionData.SessionName = newSessionName;
+                dgv_sessions.Rows[rowIndex].Cells["SessionName"].Value = newSessionName;
+
+                // MongoDB 업데이트
+                bool updated = await _fileSessionRepository.UpdateSessionNameAsync(sessionData.Id, newSessionName);
+
+                if (updated)
+                {
+                    Debug.WriteLine($"세션명 업데이트 성공: {originalSessionName} → {newSessionName}");
+
+                    // 성공 표시 (옵션: 조용한 알림)
+                    dgv_sessions.Rows[rowIndex].Cells["SessionName"].Style.BackColor = System.Drawing.Color.LightGreen;
+
+                    // 3초 후 배경색 원래대로
+                    var timer = new System.Windows.Forms.Timer();
+                    timer.Interval = 3000;
+                    timer.Tick += (s, e) =>
+                    {
+                        if (rowIndex < dgv_sessions.Rows.Count)
+                        {
+                            dgv_sessions.Rows[rowIndex].Cells["SessionName"].Style.BackColor = System.Drawing.Color.White;
+                        }
+                        timer.Stop();
+                        timer.Dispose();
+                    };
+                    timer.Start();
+                }
+                else
+                {
+                    // 실패 시 원래 값으로 복원
+                    sessionData.SessionName = originalSessionName;
+                    dgv_sessions.Rows[rowIndex].Cells["SessionName"].Value = originalSessionName;
+
+                    MessageBox.Show("세션명 업데이트에 실패했습니다.\n잠시 후 다시 시도해주세요.", "업데이트 실패",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 오류 시 원래 값으로 복원
+                sessionData.SessionName = originalSessionName;
+                dgv_sessions.Rows[rowIndex].Cells["SessionName"].Value = originalSessionName;
+
+                Debug.WriteLine($"세션명 업데이트 오류: {ex.Message}");
+                MessageBox.Show($"세션명 업데이트 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         /// <summary>
@@ -1490,7 +2321,16 @@ namespace FinanceTool
         {
             try
             {
-                if (dgv_sessions.Columns[e.ColumnIndex].Name == "DownloadButton")
+                var columnName = dgv_sessions.Columns[e.ColumnIndex].Name;
+
+                // SessionName 컬럼만 LightYellow로 강제 설정
+                if (columnName == "SessionName")
+                {
+                    e.CellStyle.BackColor = System.Drawing.Color.LightYellow;
+                    e.CellStyle.SelectionBackColor = System.Drawing.Color.Orange; // 선택 시 색상
+                }
+
+                if (columnName == "DownloadButton")
                 {
                     var sessionData = dgv_sessions.Rows[e.RowIndex].DataBoundItem as SessionDisplayData;
                     if (sessionData != null)
@@ -1582,7 +2422,8 @@ namespace FinanceTool
                     Debug.WriteLine($"세션 ID 타입: {sessionData.Id.GetType()}");
 
                     // MongoDB에서 세션 정보 조회
-                    var session = await _fileSessionRepository.GetByIdAsync(sessionData.Id.ToString());
+                    //var session = await _fileSessionRepository.GetByIdAsync(sessionData.Id.ToString());
+                    var session = await _fileSessionRepository.GetByIdAsync(sessionData.Id);
 
                     if (session == null)
                     {
@@ -1774,6 +2615,7 @@ namespace FinanceTool
                         SessionName = session.SessionName,
                         AccountColumnName = session.AccountColumnName,
                         AmountColumnName = session.AmountColumnName,
+                        AccountName = session.AccountName ?? session.AccountColumnName ?? "", // *** AccountName 정보 추가 (fallback 포함) ***
                         TotalAmount = session.TotalAmount,
                         TotalAmountFormatted = session.TotalAmount.ToString("N0") + " 원",
                         TotalRows = session.TotalRows,
@@ -1791,6 +2633,10 @@ namespace FinanceTool
                 }
 
                 dgv_sessions.DataSource = sessionDisplayList;
+
+                // 데이터 바인딩 후 색상 새로고침
+                await Task.Delay(100);
+                //RefreshSessionGridColors();
             }
             catch (Exception ex)
             {
@@ -1832,6 +2678,9 @@ namespace FinanceTool
         /// <summary>
         /// 다중 파일 선택 시 추가 검증
         /// </summary>
+        /// <summary>
+        /// 다중 파일 선택 시 추가 검증 (계정명 내용 검증 완화)
+        /// </summary>
         private ValidationResult ValidateMultipleFiles(List<FileDisplayData> selectedFiles)
         {
             if (selectedFiles.Count < 2)
@@ -1841,7 +2690,6 @@ namespace FinanceTool
             var referenceFile = selectedFiles[0];
             string refAccountColumn = referenceFile.AccountColumnName.Trim().ToUpper();
             string refAmountColumn = referenceFile.AmountColumnName.Trim().ToUpper();
-            string refAccountContent = referenceFile.AccountContents.FirstOrDefault()?.Trim().ToUpper() ?? "";
             var refColumns = referenceFile.DetectedColumns.Select(c => c.Trim().ToUpper()).OrderBy(c => c).ToList();
 
             // 나머지 파일들과 비교
@@ -1850,7 +2698,6 @@ namespace FinanceTool
                 var currentFile = selectedFiles[i];
                 string currAccountColumn = currentFile.AccountColumnName.Trim().ToUpper();
                 string currAmountColumn = currentFile.AmountColumnName.Trim().ToUpper();
-                string currAccountContent = currentFile.AccountContents.FirstOrDefault()?.Trim().ToUpper() ?? "";
 
                 // 계정명 컬럼 일치 확인
                 if (refAccountColumn != currAccountColumn)
@@ -1858,8 +2705,8 @@ namespace FinanceTool
                     return new ValidationResult
                     {
                         IsValid = false,
-                        ErrorMessage = $"계정명 컬럼이 일치하지 않습니다.\n\n" +
-                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AccountColumnName}'\n" +
+                        ErrorMessage = $"계정명 컬럼이 일치하지 않습니다.\\n\\n" +
+                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AccountColumnName}'\\n" +
                                      $"• {currentFile.OriginalFilename}: '{currentFile.AccountColumnName}'"
                     };
                 }
@@ -1870,26 +2717,26 @@ namespace FinanceTool
                     return new ValidationResult
                     {
                         IsValid = false,
-                        ErrorMessage = $"금액 컬럼이 일치하지 않습니다.\n\n" +
-                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AmountColumnName}'\n" +
+                        ErrorMessage = $"금액 컬럼이 일치하지 않습니다.\\n\\n" +
+                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AmountColumnName}'\\n" +
                                      $"• {currentFile.OriginalFilename}: '{currentFile.AmountColumnName}'"
                     };
                 }
 
-                // *** 새로 추가: 계정명 내용 일치 확인 ***
+                // *** 변경: 계정명 내용 일치 확인 제거 (다중 계정명 허용) ***
+                // 기존 계정명 내용 일치 검증 로직 주석 처리
+                /*
                 if (refAccountContent != currAccountContent)
                 {
                     return new ValidationResult
                     {
                         IsValid = false,
-                        ErrorMessage = $"계정명 내용이 일치하지 않습니다.\n\n" +
-                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AccountContents.FirstOrDefault()}'\n" +
-                                     $"• {currentFile.OriginalFilename}: '{currentFile.AccountContents.FirstOrDefault()}'\n\n" +
-                                     "동일한 세션으로 묶으려면 계정명 내용이 같아야 합니다."
+                        ErrorMessage = $"계정명 내용이 일치하지 않습니다..."
                     };
                 }
+                */
 
-                // 전체 컬럼 구조 일치 확인
+                // 전체 컬럼 구조 일치 확인 (헤더 구조 검증 강화)
                 var currColumns = currentFile.DetectedColumns.Select(c => c.Trim().ToUpper()).OrderBy(c => c).ToList();
 
                 if (refColumns.Count != currColumns.Count || !refColumns.SequenceEqual(currColumns))
@@ -1897,9 +2744,33 @@ namespace FinanceTool
                     return new ValidationResult
                     {
                         IsValid = false,
-                        ErrorMessage = $"컬럼 구조가 일치하지 않습니다.\n\n" +
-                                     $"• {referenceFile.OriginalFilename}: {refColumns.Count}개 컬럼\n" +
-                                     $"• {currentFile.OriginalFilename}: {currColumns.Count}개 컬럼"
+                        ErrorMessage = $"컬럼 구조가 일치하지 않습니다.\\n\\n" +
+                                     $"• {referenceFile.OriginalFilename}: {refColumns.Count}개 컬럼\\n" +
+                                     $"• {currentFile.OriginalFilename}: {currColumns.Count}개 컬럼\\n\\n" +
+                                     "파일들의 헤더 구조가 정확히 일치해야 합니다."
+                    };
+                }
+            }
+
+            // *** 새로 추가: 다중 계정명 확인 메시지 ***
+            var allAccountContents = selectedFiles.SelectMany(f => f.AccountContents ?? new List<string>()).Distinct().ToList();
+            if (allAccountContents.Count > 1)
+            {
+                string message = $"선택된 파일들에서 {allAccountContents.Count}개의 서로 다른 계정명이 발견되었습니다.\\n\\n" +
+                                "발견된 계정명:\\n" +
+                                string.Join("\\n", allAccountContents.Take(10).Select((v, i) => $"{i + 1}. {v}")) +
+                                (allAccountContents.Count > 10 ? $"\\n... 외 {allAccountContents.Count - 10}개 더" : "") +
+                                "\\n\\n세션 생성 시 계정명별로 자동 분리됩니다.\\n계속 진행하시겠습니까?";
+
+                var result = MessageBox.Show(message, "다중 계정명 확인",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                {
+                    return new ValidationResult
+                    {
+                        IsValid = false,
+                        ErrorMessage = "사용자가 다중 계정명 처리를 취소했습니다."
                     };
                 }
             }
@@ -2081,7 +2952,7 @@ namespace FinanceTool
         }
 
         /// <summary>
-        /// 세션을 dgv_sessions에 추가
+        /// 세션 생성 시에도 AccountName 정보 포함하도록 수정
         /// </summary>
         private void AddSessionToGrid(SessionDisplayData sessionData)
         {
@@ -2089,15 +2960,23 @@ namespace FinanceTool
             {
                 var currentSessions = (dgv_sessions.DataSource as List<SessionDisplayData>) ?? new List<SessionDisplayData>();
                 currentSessions.Add(sessionData);
-                dgv_sessions.DataSource = currentSessions.ToList();
+                //dgv_sessions.DataSource = currentSessions.ToList();
 
-                Debug.WriteLine($"세션 추가: {sessionData.SessionName}");
+                // *** DataSource 재설정으로 강제 새로고침 ***
+                dgv_sessions.DataSource = null; // 기존 바인딩 해제
+                dgv_sessions.DataSource = currentSessions.ToList(); // 새 데이터로 바인딩
+
+                // *** 추가: AccountName 컬럼 새로고침 강제 실행 ***
+                dgv_sessions.Refresh();
+
+                Debug.WriteLine($"세션 추가: {sessionData.SessionName}, AccountName: {sessionData.AccountName}");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"세션 그리드 추가 오류: {ex.Message}");
             }
         }
+
 
 
         /// <summary>
@@ -2164,6 +3043,38 @@ namespace FinanceTool
             public DateTime? CompletedDate { get; set; }
             public string CompletedDateFormatted { get; set; }
             public string ResultFilePath { get; set; }
+            // *** 새로 추가: 계정명 내용 표시용 ***
+            public string AccountName { get; set; } // MongoDB에서 가져온 실제 계정명
+            public string AccountNameFormatted
+            {
+                get
+                {
+                    if (string.IsNullOrEmpty(AccountName))
+                        return "";
+
+                    // 병합된 계정명인 경우 (쉼표 포함)
+                    if (AccountName.Contains(","))
+                    {
+                        var accountNames = AccountName.Split(',')
+                            .Select(name => name.Trim())
+                            .Where(name => !string.IsNullOrEmpty(name))
+                            .ToArray();
+
+                        if (accountNames.Length <= 2)
+                        {
+                            return string.Join(", ", accountNames);
+                        }
+                        else
+                        {
+                            return $"{accountNames[0]}, {accountNames[1]}... ({accountNames.Length}개)";
+                        }
+                    }
+                    else
+                    {
+                        return AccountName;
+                    }
+                }
+            }
         }
 
         private async void btn_add_to_session_Click(object sender, EventArgs e)
@@ -2430,28 +3341,14 @@ namespace FinanceTool
         private ValidationResult ValidateSessionsCompatibility(List<SessionDisplayData> sessions)
         {
             var referenceSession = sessions[0];
-            string refAccountColumn = referenceSession.AccountColumnName.Trim().ToUpper();
             string refAmountColumn = referenceSession.AmountColumnName.Trim().ToUpper();
 
             for (int i = 1; i < sessions.Count; i++)
             {
                 var currentSession = sessions[i];
-                string currAccountColumn = currentSession.AccountColumnName.Trim().ToUpper();
                 string currAmountColumn = currentSession.AmountColumnName.Trim().ToUpper();
 
-                // 계정명 컬럼 일치 확인
-                if (refAccountColumn != currAccountColumn)
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = $"계정명 컬럼이 일치하지 않습니다.\n\n" +
-                                     $"• {referenceSession.SessionName}: '{referenceSession.AccountColumnName}'\n" +
-                                     $"• {currentSession.SessionName}: '{currentSession.AccountColumnName}'"
-                    };
-                }
-
-                // 금액 컬럼 일치 확인
+                // 금액 컬럼 일치 확인만 수행 (계정명 컬럼 검증 제거)
                 if (refAmountColumn != currAmountColumn)
                 {
                     return new ValidationResult
@@ -2460,6 +3357,30 @@ namespace FinanceTool
                         ErrorMessage = $"금액 컬럼이 일치하지 않습니다.\n\n" +
                                      $"• {referenceSession.SessionName}: '{referenceSession.AmountColumnName}'\n" +
                                      $"• {currentSession.SessionName}: '{currentSession.AmountColumnName}'"
+                    };
+                }
+
+                // TODO: 헤더 구조 검증 강화 (필요시 추가)
+                // 각 세션의 파일들이 동일한 헤더 구조를 가지는지 확인
+            }
+
+            // 병합될 계정명들 표시
+            var allAccountNames = sessions.Select(s => s.AccountColumnName).Distinct().ToList();
+            if (allAccountNames.Count > 1)
+            {
+                string message = $"서로 다른 계정명 컬럼을 가진 세션들이 병합됩니다:\n\n" +
+                                string.Join("\n", allAccountNames.Select((name, i) => $"• {name}")) +
+                                "\n\n계속 진행하시겠습니까?";
+
+                var result = MessageBox.Show(message, "계정명 컬럼 차이 확인",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                {
+                    return new ValidationResult
+                    {
+                        IsValid = false,
+                        ErrorMessage = "사용자가 서로 다른 계정명 컬럼 병합을 취소했습니다."
                     };
                 }
             }
@@ -2471,7 +3392,7 @@ namespace FinanceTool
         /// 세션들 병합 처리
         /// </summary>
         private async Task<(bool Success, SessionDisplayData MergedSession, List<SessionDisplayData> DeletedSessions)>
-            MergeSessions(List<SessionDisplayData> sessions, ProcessProgressForm.UpdateProgressDelegate progressCallback)
+    MergeSessions(List<SessionDisplayData> sessions, ProcessProgressForm.UpdateProgressDelegate progressCallback)
         {
             try
             {
@@ -2479,85 +3400,154 @@ namespace FinanceTool
                 var targetSession = sessions[0];
                 var sessionsToDelete = sessions.Skip(1).ToList();
 
-                await progressCallback(20, "세션 데이터 수집 중...");
+                await progressCallback(20, "세션 정보 수집 중...");
 
-                // 병합할 세션들의 파일 ID 수집
+                // 모든 세션의 계정명 수집
+                var allAccountNames = new List<string>();
                 var allFileIds = new List<ObjectId>();
-                decimal totalAmount = targetSession.TotalAmount;
-                decimal totalRows = targetSession.TotalRows;
-                int totalFileCount = targetSession.FileCount;
+                decimal totalAmount = 0;
+                decimal totalRows = 0;
 
-                for (int i = 0; i < sessionsToDelete.Count; i++)
+                foreach (var session in sessions)
                 {
-                    var session = sessionsToDelete[i];
-
-                    // MongoDB에서 세션 정보 조회하여 파일 ID 수집
-                    var sessionDoc = await _fileSessionRepository.GetByIdAsync(session.Id.ToString());
-                    if (sessionDoc?.FileIds != null)
+                    // MongoDB에서 실제 세션 정보 조회
+                    var sessionDoc = await _fileSessionRepository.GetByIdAsync(session.Id);
+                    if (sessionDoc != null)
                     {
-                        allFileIds.AddRange(sessionDoc.FileIds);
+                        // 계정명 수집 (중복 제거)
+                        if (!string.IsNullOrEmpty(sessionDoc.AccountName))
+                        {
+                            // 이미 병합된 세션인 경우 쉼표로 분할된 계정명들 처리
+                            var accountNames = sessionDoc.AccountName.Split(',')
+                                .Select(name => name.Trim())
+                                .Where(name => !string.IsNullOrEmpty(name));
+
+                            foreach (var accountName in accountNames)
+                            {
+                                if (!allAccountNames.Contains(accountName, StringComparer.OrdinalIgnoreCase))
+                                {
+                                    allAccountNames.Add(accountName);
+                                }
+                            }
+                        }
+
+                        // 파일 ID 수집
+                        if (sessionDoc.FileIds != null)
+                        {
+                            allFileIds.AddRange(sessionDoc.FileIds);
+                        }
+
+                        // 금액 및 행수 합산
+                        totalAmount += sessionDoc.TotalAmount;
+                        totalRows += sessionDoc.TotalRows;
                     }
-
-                    totalAmount += session.TotalAmount;
-                    totalRows += session.TotalRows;
-                    totalFileCount += session.FileCount;
-
-                    int progress = 20 + ((i + 1) * 30 / sessionsToDelete.Count);
-                    await progressCallback(progress, $"세션 데이터 수집 중... ({i + 1}/{sessionsToDelete.Count})");
                 }
 
-                await progressCallback(60, "파일들의 세션 재할당 중...");
+                await progressCallback(50, "MongoDB 업데이트 중...");
 
-                // 수집된 파일들을 대상 세션으로 재할당
-                foreach (var fileId in allFileIds)
+                // 통합된 계정명 문자열 생성
+                string mergedAccountName = string.Join(",", allAccountNames);
+
+                // 통합된 계정명 컬럼 생성 (첫 번째 세션의 컬럼명 사용, 필요시 변경)
+                string mergedAccountColumnName = targetSession.AccountColumnName;
+
+                // 세션명 업데이트 (병합 정보 반영)
+                string mergedSessionName = $"{targetSession.SessionName}_병합_{sessions.Count}개세션";
+
+                // 대상 세션 업데이트
+                await _fileSessionRepository.UpdateMergedSessionAsync(
+                    targetSession.Id,
+                    mergedSessionName,
+                    mergedAccountName,
+                    mergedAccountColumnName,
+                    allFileIds.Distinct().ToList(),
+                    totalAmount,
+                    totalRows
+                );
+
+                await progressCallback(70, "기존 세션들 삭제 중...");
+
+                // 삭제할 세션들 처리
+                foreach (var sessionToDelete in sessionsToDelete)
                 {
-                    await _uploadedFileRepository.UpdateSessionIdAsync(fileId, targetSession.Id);
-                    await _fileSessionRepository.AddFileToSessionAsync(targetSession.Id, fileId);
+                    await _fileSessionRepository.DeleteAsync(sessionToDelete.Id);
                 }
 
-                await progressCallback(75, "대상 세션 업데이트 중...");
+                await progressCallback(90, "UI 데이터 업데이트 중...");
 
-                // 대상 세션의 총합 업데이트
-                await _fileSessionRepository.UpdateSessionTotalsAsync(targetSession.Id, totalAmount, totalRows);
-
-                await progressCallback(85, "병합된 세션들 삭제 중...");
-
-                // 병합된 세션들 삭제
-                foreach (var session in sessionsToDelete)
-                {
-                    await _fileSessionRepository.DeleteAsync(session.Id);
-                }
-
-                // 메모리의 대상 세션 데이터 업데이트
+                // 업데이트된 세션 정보로 UI 데이터 갱신
+                targetSession.SessionName = mergedSessionName;
+                targetSession.AccountColumnName = mergedAccountColumnName;
                 targetSession.TotalAmount = totalAmount;
                 targetSession.TotalAmountFormatted = totalAmount.ToString("N0") + " 원";
                 targetSession.TotalRows = totalRows;
                 targetSession.TotalRowsFormatted = totalRows.ToString("N0");
-                targetSession.FileCount = totalFileCount;
+                targetSession.FileCount = allFileIds.Distinct().Count();
 
                 return (true, targetSession, sessionsToDelete);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"세션 병합 처리 오류: {ex.Message}");
+                Debug.WriteLine($"세션 병합 오류: {ex.Message}");
                 throw;
             }
         }
 
+
+
         /// <summary>
-        /// 선택된 세션 목록 반환
+        /// 세션 툴팁에 AccountName 정보도 포함
         /// </summary>
-        private List<SessionDisplayData> GetSelectedSessions()
+        private void Dgv_sessions_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
         {
-            var selectedSessions = new List<SessionDisplayData>();
-            var sessionList = dgv_sessions.DataSource as List<SessionDisplayData>;
-
-            if (sessionList != null)
+            try
             {
-                selectedSessions.AddRange(sessionList.Where(s => s.IsSelected));
-            }
+                if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
+                {
+                    var columnName = dgv_sessions.Columns[e.ColumnIndex].Name;
+                    var sessionData = dgv_sessions.Rows[e.RowIndex].DataBoundItem as SessionDisplayData;
 
-            return selectedSessions;
+                    if (sessionData != null)
+                    {
+                        // AccountName 컬럼의 툴팁
+                        if (columnName == "AccountName" && !string.IsNullOrEmpty(sessionData.AccountName))
+                        {
+                            if (sessionData.AccountName.Contains(","))
+                            {
+                                var accountNames = sessionData.AccountName.Split(',')
+                                    .Select(name => name.Trim())
+                                    .Where(name => !string.IsNullOrEmpty(name))
+                                    .ToArray();
+
+                                e.ToolTipText = $"병합된 계정명 ({accountNames.Length}개):\n" +
+                                              string.Join("\n", accountNames.Select((name, i) => $"{i + 1}. {name}"));
+                            }
+                            else
+                            {
+                                e.ToolTipText = $"계정명: {sessionData.AccountName}";
+                            }
+                        }
+                        // AccountColumnName 컬럼의 툴팁 (기존)
+                        else if (columnName == "AccountColumnName")
+                        {
+                            if (sessionData.AccountColumnName.Contains(","))
+                            {
+                                var accountColumns = sessionData.AccountColumnName.Split(',')
+                                    .Select(name => name.Trim())
+                                    .Where(name => !string.IsNullOrEmpty(name))
+                                    .ToArray();
+
+                                e.ToolTipText = $"병합된 계정명 컬럼 ({accountColumns.Length}개):\n" +
+                                              string.Join("\n", accountColumns.Select((name, i) => $"{i + 1}. {name}"));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"툴팁 생성 오류: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -2606,7 +3596,390 @@ namespace FinanceTool
                 Debug.WriteLine($"세션 그리드에서 제거 오류: {ex.Message}");
             }
         }
+
+        private async void btn_complete_Click(object sender, EventArgs e)
+        {
+            try
+                {
+                    // 1단계: 선택된 세션들 확인
+                    var selectedSessions = GetSelectedSessions();
+                    if (selectedSessions.Count == 0)
+                    {
+                        MessageBox.Show("처리할 세션을 선택해주세요.", "알림",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    // 2단계: 사용자 확인
+                    var confirmResult = MessageBox.Show(
+                        $"선택된 {selectedSessions.Count}개의 세션을 처리하시겠습니까?\n\n" +
+                        "처리 내용:\n" +
+                        "• 기존 raw_data, process_data 컬렉션 초기화\n" +
+                        "• 세션별 계정명 데이터 추출 및 raw_data 저장\n" +
+                        "• 자동으로 파일 로드 화면으로 이동\n\n" +
+                        "※ 이 작업은 취소할 수 없습니다.",
+                        "계정분석 시작 확인",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question
+                    );
+
+                    if (confirmResult != DialogResult.Yes) return;
+
+                    // 3단계: 진행 상황 표시 및 처리 실행
+                    using (var progressForm = new ProcessProgressForm())
+                    {
+                        progressForm.Show();
+                        progressForm.SetTitle("계정분석 처리 중...");
+
+                        // SessionDataProcessor 생성 및 실행
+                        var processor = new SessionDataProcessor();
+            
+                        try
+                        {
+                            var result = await processor.ProcessFullWorkflowAsync(
+                                selectedSessions,
+                                 async (percentage, message) => await progressForm.UpdateProgressHandler(percentage, message)
+                            );
+
+                            await progressForm.UpdateProgressHandler(95, "결과 처리 중...");
+
+                            if (result.Success)
+                            {
+                                await progressForm.UpdateProgressHandler(100, "처리 완료");
+                                await Task.Delay(500);
+
+                                // 4단계: 성공 시 결과 표시
+                                string successMessage = $"계정분석 처리가 완료되었습니다.\n\n" +
+                                                      $"• 처리된 세션: {selectedSessions.Count}개\n" +
+                                                      $"• 처리된 파일: {result.ProcessedFileCount}개\n" +
+                                                      $"• 처리된 데이터: {result.ProcessedRowCount:N0}건\n\n" +
+                                                      "파일 로드 화면으로 이동합니다.";
+
+                                MessageBox.Show(successMessage, "처리 완료",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                                // 5단계: 자동으로 fileLoad.cs 화면으로 전환
+                                NavigateToFileLoadScreen();
+
+                               
+                            }
+                            else
+                            {
+                                // 실패 시 오류 메시지 표시
+                                string errorMessage = $"계정분석 처리 중 오류가 발생했습니다.\n\n" +
+                                                     $"오류 내용: {result.ErrorMessage}\n\n" +
+                                                     "로그를 확인하시거나 다시 시도해주세요.";
+
+                                MessageBox.Show(errorMessage, "처리 실패",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        finally
+                        {
+                            // 리소스 정리
+                            processor.Dispose();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"계정분석 시작 오류: {ex.Message}");
+                    MessageBox.Show($"계정분석 시작 중 오류가 발생했습니다.\n{ex.Message}",
+                        "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+        }
+
+        /// <summary>
+        /// 선택된 세션 목록 반환
+        /// </summary>
+        private List<SessionDisplayData> GetSelectedSessions()
+        {
+            var selectedSessions = new List<SessionDisplayData>();
+            var sessionList = dgv_sessions.DataSource as List<SessionDisplayData>;
+
+            if (sessionList != null)
+            {
+                selectedSessions.AddRange(sessionList.Where(s => s.IsSelected));
+            }
+
+            return selectedSessions;
+        }
+
+        /// <summary>
+        /// 파일 로드 화면으로 전환
+        /// </summary>
+        private async void NavigateToFileLoadScreen()
+        {
+            try
+            {
+                // 1. 먼저 화면 전환 (Handle 생성)
+                if (this.ParentForm is Form1 form)
+                {
+                    form.LoadUserControl(userControlHandler.uc_fileLoad);
+                }
+
+                // 2. UI가 로드된 후 약간의 딜레이
+                await Task.Delay(200);
+
+                // 3. 페이징 컨트롤 초기화
+                userControlHandler.uc_fileLoad.InitializePagingControls(true);
+
+                // 4. Handle 생성 확인 후 fileload.cs의 함수들 호출
+                if (userControlHandler.uc_fileLoad.IsHandleCreated)
+                {
+                    // *** fileload.cs의 함수들 직접 호출 ***
+                    await userControlHandler.uc_fileLoad.LoadMongoPagedDataAsync();
+
+                    // DataHandler.excelData가 설정되어 있는지 확인 후 호출
+                    if (DataHandler.excelData != null && DataHandler.excelData.Columns.Count > 0)
+                    {
+                        //Debug.WriteLine($"DataColumnCollection: [{string.Join(", ", DataHandler.excelData.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}]");
+
+                        await userControlHandler.uc_fileLoad.AddMongoColumnsToGrid(
+                            userControlHandler.uc_fileLoad.dataGridView_delete_col,
+                            DataHandler.excelData.Columns
+                        );
+
+                        //Debug.WriteLine($"DataColumnCollection after: [{string.Join(", ", DataHandler.excelData.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}]");
+
+                        userControlHandler.uc_fileLoad.GetMongoColumnList(DataHandler.excelData.Columns);
+                        userControlHandler.uc_fileLoad.SetupColumnLists();
+                    }
+                    else
+                    {
+                        Debug.WriteLine("DataHandler.excelData가 설정되지 않았습니다.");
+                    }
+                }
+                else
+                {
+                    // Handle이 없으면 동기적으로 생성 후 호출
+                    userControlHandler.uc_fileLoad.CreateControl();
+                    await Task.Delay(100);
+
+                    await userControlHandler.uc_fileLoad.LoadMongoPagedDataAsync();
+
+                    if (DataHandler.excelData != null && DataHandler.excelData.Columns.Count > 0)
+                    {
+                        await userControlHandler.uc_fileLoad.AddMongoColumnsToGrid(
+                            userControlHandler.uc_fileLoad.dataGridView_delete_col,
+                            DataHandler.excelData.Columns
+                        );
+
+                        userControlHandler.uc_fileLoad.GetMongoColumnList(DataHandler.excelData.Columns);
+                        userControlHandler.uc_fileLoad.SetupColumnLists();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"화면 전환 오류: {ex.Message}");
+                MessageBox.Show($"화면 전환 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        
+
+       
     }
 
+    /// <summary>
+    /// ProcessProgressForm 제목 설정을 위한 확장 (필요시)
+    /// </summary>
+    public static class ProcessProgressFormExtensions
+    {
+        public static void SetTitle(this ProcessProgressForm form, string title)
+        {
+            if (form != null)
+            {
+                form.Text = title;
+            }
+        }
+    }
+
+    public partial class SessionPartitionPreviewDialog : Form
+    {
+        private List<AccountPartition> _partitions;
+        private DataGridView dgvPreview;
+        private Button btnOK;
+        private Button btnCancel;
+
+        public SessionPartitionPreviewDialog(List<AccountPartition> partitions)
+        {
+            _partitions = partitions;
+            InitializeComponent();
+            LoadPartitionData();
+        }
+
+        private void InitializeComponent()
+        {
+            this.Text = "세션 생성 미리보기";
+            this.Size = new Size(850, 520);
+            this.StartPosition = FormStartPosition.CenterParent;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
+
+            // 상단 안내 레이블
+            var lblInfo = new Label
+            {
+                Text = "계정명별로 분리된 세션들입니다. 세션명을 클릭하여 편집할 수 있습니다.",
+                Location = new Point(10, 10),
+                Size = new Size(800, 40),
+                Font = new System.Drawing.Font("Malgun Gothic", 9),
+                ForeColor = System.Drawing.Color.DarkBlue
+            };
+            this.Controls.Add(lblInfo);
+
+            // DataGridView
+            dgvPreview = new DataGridView
+            {
+                Location = new Point(10, 50),
+                Size = new Size(800, 350),
+                AutoGenerateColumns = false,
+                AllowUserToAddRows = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                MultiSelect = false
+            };
+
+            // 컬럼 정의
+            dgvPreview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "AccountName",
+                HeaderText = "계정명",
+                DataPropertyName = "AccountName",
+                Width = 120,
+                ReadOnly = true
+            });
+
+            dgvPreview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "SessionName",
+                HeaderText = "세션명 (편집가능)",
+                DataPropertyName = "SessionName",
+                Width = 300,
+                ReadOnly = false
+            });
+
+            dgvPreview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "FileCount",
+                HeaderText = "파일 수",
+                DataPropertyName = "FileCount",
+                Width = 80,
+                ReadOnly = true
+            });
+
+            dgvPreview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "TotalRows",
+                HeaderText = "총 행수",
+                DataPropertyName = "TotalRowsFormatted",
+                Width = 100,
+                ReadOnly = true
+            });
+
+            dgvPreview.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                Name = "TotalAmount",
+                HeaderText = "합산 금액",
+                DataPropertyName = "TotalAmountFormatted",
+                Width = 120,
+                ReadOnly = true
+            });
+
+            this.Controls.Add(dgvPreview);
+
+            // 버튼들
+            btnCancel = new Button
+            {
+                Text = "취소",
+                Location = new Point(630, 420),
+                Size = new Size(70, 30),
+                DialogResult = DialogResult.Cancel
+            };
+            this.Controls.Add(btnCancel);
+
+            btnOK = new Button
+            {
+                Text = "세션 생성",
+                Location = new Point(710, 420),
+                Size = new Size(80, 30),
+                DialogResult = DialogResult.OK
+            };
+            this.Controls.Add(btnOK);
+
+            this.CancelButton = btnCancel;
+            this.AcceptButton = btnOK;
+        }
+
+        private void LoadPartitionData()
+        {
+            // 표시용 데이터 준비
+            var displayData = _partitions.Select(p => new
+            {
+                AccountName = p.AccountName,
+                SessionName = p.SessionName,
+                FileCount = p.FileCount,
+                TotalRowsFormatted = p.TotalRows.ToString("N0"),
+                TotalAmountFormatted = p.TotalAmount.ToString("N0") + " 원"
+            }).ToList();
+
+            dgvPreview.DataSource = displayData;
+        }
+
+        /// <summary>
+        /// 사용자가 승인한 파티션들 반환 (편집된 세션명 포함)
+        /// </summary>
+        public List<AccountPartition> GetApprovedPartitions()
+        {
+            var approvedPartitions = new List<AccountPartition>();
+
+            for (int i = 0; i < dgvPreview.Rows.Count; i++)
+            {
+                var row = dgvPreview.Rows[i];
+                if (i < _partitions.Count)
+                {
+                    var partition = _partitions[i];
+
+                    // 사용자가 편집한 세션명 적용
+                    var editedSessionName = row.Cells["SessionName"].Value?.ToString();
+                    if (!string.IsNullOrEmpty(editedSessionName))
+                    {
+                        partition.SessionName = editedSessionName.Trim();
+                    }
+
+                    approvedPartitions.Add(partition);
+                }
+            }
+
+            return approvedPartitions;
+        }
+
+    }
+
+
+    /// <summary>
+    /// 계정명 파티션 정보
+    /// </summary>
+    public class AccountPartition
+    {
+        public string AccountName { get; set; }
+        public string SessionName { get; set; }
+        public List<FileDisplayData> Files { get; set; } = new List<FileDisplayData>();
+        public int FileCount { get; set; }
+        public decimal TotalRows { get; set; }
+        public decimal TotalAmount { get; set; }
+    }
+
+    /// <summary>
+    /// 파티션 분석 결과
+    /// </summary>
+    public class PartitionAnalysisResult
+    {
+        public bool IsValid { get; set; }
+        public string ErrorMessage { get; set; }
+        public List<AccountPartition> Partitions { get; set; } = new List<AccountPartition>();
+    }
 
 }

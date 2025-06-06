@@ -34,8 +34,24 @@ namespace FinanceTool.MongoModels
 
         [BsonElement("result_file_path")]
         public string ResultFilePath { get; set; }
+        [BsonElement("account_name")]
+        public string AccountName { get; set; }
 
         [BsonElement("file_ids")]
         public List<ObjectId> FileIds { get; set; } = new List<ObjectId>();
+
+        /// <summary>
+        /// 파일 개수 (계산된 값)
+        /// </summary>
+        [BsonElement("file_count")]
+        [BsonIgnoreIfNull]
+        public int? FileCount { get; set; }
+
+        /// <summary>
+        /// 업데이트 날짜 (병합 시 등)
+        /// </summary>
+        [BsonElement("updated_date")]
+        [BsonIgnoreIfNull]
+        public DateTime? UpdatedDate { get; set; }
     }
 }

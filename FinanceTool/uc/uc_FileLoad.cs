@@ -22,6 +22,7 @@ using System.Collections.Concurrent;
 using System.Runtime;
 
 using ExcelDataReader;
+using DocumentFormat.OpenXml.Presentation;
 
 
 namespace FinanceTool
@@ -43,7 +44,8 @@ namespace FinanceTool
         private bool excelLoadinitFlag = true;
 
         // uc_FileLoad 클래스에서 멤버 변수 추가
-        private bool _fileLoaded = false;
+        //private bool _fileLoaded = false;
+        private bool _fileLoaded = true;
 
         // MongoDB Repository 객체
         private RawDataRepository rawDataRepo = new RawDataRepository();
@@ -82,7 +84,7 @@ namespace FinanceTool
             this.PerformLayout();
         }
 
-        private void InitializePagingControls(bool attachEvents)
+        public void InitializePagingControls(bool attachEvents)
         {
             // 콤보박스 초기화
             cmb_pageSize.Items.Clear();
@@ -97,7 +99,7 @@ namespace FinanceTool
 
 
             // 컨트롤 비활성화 (파일 로드 전)
-            EnablePagingControls(false);
+            EnablePagingControls(true);
 
             // 이벤트 등록은 옵션에 따라 결정
             if (attachEvents)
@@ -344,63 +346,8 @@ namespace FinanceTool
         }
 
 
-        // 셀 값 변환 헬퍼 메서드
-        private object ConvertCellValue(IXLCell cell)
-        {
-            try
-            {
-                if (cell.IsEmpty())
-                    return null;
-
-                // 셀 타입에 따른 값 변환
-                switch (cell.DataType)
-                {
-                    case XLDataType.Number:
-                        double numValue = cell.GetValue<double>();
-                        // 정수형으로 변환 가능한지 확인
-                        if (Math.Abs(numValue - Math.Round(numValue)) < double.Epsilon)
-                        {
-                            if (numValue >= long.MinValue && numValue <= long.MaxValue)
-                                return (long)numValue;
-                            else
-                                return numValue;
-                        }
-                        return numValue;
-
-                    case XLDataType.DateTime:
-                        return cell.GetValue<DateTime>();
-
-                    case XLDataType.Boolean:
-                        return cell.GetValue<bool>();
-
-                    case XLDataType.Text:
-                    default:
-                        return cell.GetValue<string>();
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"셀 값 변환 오류: {ex.Message}");
-                return cell.Value.ToString();
-            }
-        }
-
-        // 최적의 청크 크기 계산
-        private int CalculateOptimalChunkSize(long fileSizeMB)
-        {
-            // 파일 크기에 따른 청크 크기 최적화
-            if (fileSizeMB > 200)
-                return 2000; // 매우 큰 파일
-            else if (fileSizeMB > 100)
-                return 5000; // 큰 파일
-            else if (fileSizeMB > 50)
-                return 10000; // 중간 크기 파일
-            else
-                return 20000; // 작은 파일
-        }
-
         // MongoDB 기반으로 페이징 데이터 로드
-        private async Task LoadMongoPagedDataAsync(bool progressYN = false)
+        public async Task LoadMongoPagedDataAsync(bool progressYN = false)
         {
             // 파일이 로드되지 않았으면 아무 작업도 수행하지 않음
             if (!_fileLoaded)
@@ -553,7 +500,7 @@ namespace FinanceTool
 
 
         // MongoDB 컬럼 목록을 그리드에 추가
-        private async Task AddMongoColumnsToGrid(DataGridView targetDgv, DataColumnCollection columns)
+        public async Task AddMongoColumnsToGrid(DataGridView targetDgv, DataColumnCollection columns)
         {
             // 대상 DataGridView 초기화
             targetDgv.DataSource = null;
@@ -597,6 +544,8 @@ namespace FinanceTool
             foreach (DataColumn column in columns)
             {
                 if (!column.ColumnName.Equals("id") &&
+                    !column.ColumnName.Equals("_id") &&
+                    !column.ColumnName.Equals("is_hidden") &&
                     !column.ColumnName.Equals("import_date") &&
                     !column.ColumnName.Equals("hiddenYN"))
                 {
@@ -608,14 +557,21 @@ namespace FinanceTool
         }
 
         // MongoDB 컬럼 목록 가져오기
-        private void GetMongoColumnList(DataColumnCollection columns)
+        public void GetMongoColumnList(DataColumnCollection columns)
         {
             process_col_list = new List<string>();
 
+
+            //Debug.WriteLine($"MongoDB DataColumnCollection : {columns.to}");
+            //Debug.WriteLine($"DataColumnCollection: [{string.Join(", ", excelData.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}]");
+
             foreach (DataColumn column in columns)
             {
+                //Debug.WriteLine($"column.ColumnName : {column.ColumnName}");
                 if (column.ColumnName != "id" &&
+                    column.ColumnName != "_id" &&
                     column.ColumnName != "import_date" &&
+                    column.ColumnName != "is_hidden" &&
                     column.ColumnName != "hiddenYN")
                 {
                     // 선택된 열(visibleColumns)이 있는 경우 그 열만 포함
@@ -629,10 +585,11 @@ namespace FinanceTool
             }
 
             Debug.WriteLine($"MongoDB process_col_list count: {process_col_list.Count}");
+            //Debug.WriteLine($"MongoDB process_col_list: [{string.Join(", ", process_col_list)}]");
         }
 
         // 컬럼 목록 설정
-        private void SetupColumnLists()
+        public void SetupColumnLists()
         {
             try
             {
