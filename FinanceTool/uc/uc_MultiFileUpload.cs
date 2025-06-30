@@ -1192,49 +1192,71 @@ namespace FinanceTool
         {
             try
             {
-                string currentAmountColumn = fileData.AmountColumnName;
-
-                // 금액 컬럼이 선택된 경우만 검증
-                if (!string.IsNullOrEmpty(currentAmountColumn))
+                using (var progressForm = new ProcessProgressForm())
                 {
-                    var amountValidation = await ValidateAndCalculateAmount(fileData);
-                    if (!amountValidation.IsValid)
-                    {
-                        MessageBox.Show(amountValidation.ErrorMessage, "금액 컬럼 오류",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "금액 컬럼 데이터 분석 시작...");
+                    await Task.Delay(10);
 
-                        // 금액 관련 데이터만 초기화
-                        fileData.AmountColumnName = "";
-                        fileData.TotalAmount = 0;
-                        fileData.TotalAmountFormatted = "";
-                        currentAmountColumn = "";
-                    }
+                    string currentAmountColumn = fileData.AmountColumnName;
 
-                    // MongoDB에 금액 정보만 저장
+                    // 금액 컬럼이 선택된 경우만 검증
                     if (!string.IsNullOrEmpty(currentAmountColumn))
                     {
-                        bool updated = await _uploadedFileRepository.UpdateAmountColumnInfoAsync(
-                            fileData.Id,
-                            currentAmountColumn,
-                            fileData.TotalAmount
-                        );
+                        await progressForm.UpdateProgressHandler(40, "금액 컬럼 데이터 분석 중...");
+                        await Task.Delay(10);
 
-                        if (!updated)
+                        var amountValidation = await ValidateAndCalculateAmount(fileData);
+
+
+                        
+                        if (!amountValidation.IsValid)
                         {
-                            Debug.WriteLine($"MongoDB 금액 정보 업데이트 실패: {fileData.OriginalFilename}");
+                            progressForm.Hide();
+                            MessageBox.Show(amountValidation.ErrorMessage, "금액 컬럼 오류",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                            // 금액 관련 데이터만 초기화
+                            fileData.AmountColumnName = "";
+                            fileData.TotalAmount = 0;
+                            fileData.TotalAmountFormatted = "";
+                            currentAmountColumn = "";
+                        }
+
+                        await progressForm.UpdateProgressHandler(80, "금액 컬럼 데이터 저장 중...");
+                        await Task.Delay(10);
+
+                        // MongoDB에 금액 정보만 저장
+                        if (!string.IsNullOrEmpty(currentAmountColumn))
+                        {
+                            bool updated = await _uploadedFileRepository.UpdateAmountColumnInfoAsync(
+                                fileData.Id,
+                                currentAmountColumn,
+                                fileData.TotalAmount
+                            );
+
+                            if (!updated)
+                            {
+                                Debug.WriteLine($"MongoDB 금액 정보 업데이트 실패: {fileData.OriginalFilename}");
+                            }
                         }
                     }
-                }
-                else
-                {
-                    // 금액 컬럼 선택 해제
-                    fileData.TotalAmount = 0;
-                    fileData.TotalAmountFormatted = "";
+                    else
+                    {
+                        // 금액 컬럼 선택 해제
+                        fileData.TotalAmount = 0;
+                        fileData.TotalAmountFormatted = "";
+                    }
+
+                    // 콤보박스 값 설정 및 UI 새로고침
+                    SetComboBoxValue(fileData, "AmountColumn", currentAmountColumn);
+                    RefreshFileGridRowSpecific(fileData);
+
+                    await progressForm.UpdateProgressHandler(100, "금액 컬럼 데이터 저장 완료");
+                    await Task.Delay(10);
                 }
 
-                // 콤보박스 값 설정 및 UI 새로고침
-                SetComboBoxValue(fileData, "AmountColumn", currentAmountColumn);
-                RefreshFileGridRowSpecific(fileData);
+                    
 
                 Debug.WriteLine($"금액 컬럼 정보 업데이트 완료: {fileData.OriginalFilename}");
             }
