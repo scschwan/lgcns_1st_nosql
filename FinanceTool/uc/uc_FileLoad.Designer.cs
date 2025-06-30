@@ -139,6 +139,7 @@
             btn_selectFile.TabIndex = 1;
             btn_selectFile.Text = "파일 선택";
             btn_selectFile.UseVisualStyleBackColor = false;
+            btn_selectFile.Visible = false;
             btn_selectFile.Click += btn_selectFile_Click;
             // 
             // lbl_filename
@@ -152,6 +153,7 @@
             lbl_filename.TabIndex = 0;
             lbl_filename.Text = "Excel 파일을 Upload 해주세요(.xls,xlsx) : ";
             lbl_filename.TextAlign = ContentAlignment.MiddleLeft;
+            lbl_filename.Visible = false;
             // 
             // tableLayoutContent
             // 

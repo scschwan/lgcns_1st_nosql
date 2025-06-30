@@ -76,6 +76,7 @@ namespace FinanceTool.Repositories
 
         public async Task<long> CountDocumentsAsync(FilterDefinition<ProcessViewDocument> filter = null)
         {
+            await InitializeAsync(); // 초기화 확인 추가
             filter = filter ?? Builders<ProcessViewDocument>.Filter.Empty;
             return await _collection.CountDocumentsAsync(filter);
         }
@@ -89,6 +90,7 @@ namespace FinanceTool.Repositories
         {
             try
             {
+                await InitializeAsync(); // 초기화 확인 추가
                 await _collection.InsertOneAsync(document);
                 return true;
             }
