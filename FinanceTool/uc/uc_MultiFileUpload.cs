@@ -1108,51 +1108,74 @@ namespace FinanceTool
         {
             try
             {
-                string currentAccountColumn = fileData.AccountColumnName;
-
-                // 계정명 컬럼이 선택된 경우만 검증
-                if (!string.IsNullOrEmpty(currentAccountColumn))
+                using(var progressForm = new ProcessProgressForm())
                 {
-                    var accountValidation = await ValidateAndExtractAccountContent(fileData);
-                    if (!accountValidation.IsValid)
-                    {
-                        MessageBox.Show(accountValidation.ErrorMessage, "계정명 컬럼 오류",
-                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    string currentAccountColumn = fileData.AccountColumnName;
 
-                        // 계정명 관련 데이터만 초기화
-                        fileData.AccountColumnName = "";
-                        fileData.AccountContents.Clear();
-                        fileData.AccountContentFormatted = "";
-                        currentAccountColumn = "";
-                    }
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "계정명 컬럼 데이터 분석 시작...");
+                    await Task.Delay(10);
 
-                    // MongoDB에 계정명 정보만 저장
+                    // 계정명 컬럼이 선택된 경우만 검증
                     if (!string.IsNullOrEmpty(currentAccountColumn))
                     {
-                        bool updated = await _uploadedFileRepository.UpdateAccountColumnInfoAsync(
-                            fileData.Id,
-                            currentAccountColumn,
-                            fileData.AccountContents
-                        );
+                        await progressForm.UpdateProgressHandler(40, "데이터 분석 중...");
+                        await Task.Delay(10);
 
-                        if (!updated)
+
+                        var accountValidation = await ValidateAndExtractAccountContent(fileData);
+                    
+                        if (!accountValidation.IsValid)
                         {
-                            Debug.WriteLine($"MongoDB 계정명 정보 업데이트 실패: {fileData.OriginalFilename}");
+                            MessageBox.Show(accountValidation.ErrorMessage, "계정명 컬럼 오류",
+                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                            // 계정명 관련 데이터만 초기화
+                            fileData.AccountColumnName = "";
+                            fileData.AccountContents.Clear();
+                            fileData.AccountContentFormatted = "";
+                            currentAccountColumn = "";
+                        }
+
+                        // MongoDB에 계정명 정보만 저장
+                        if (!string.IsNullOrEmpty(currentAccountColumn))
+                        {
+                            //await progressForm.UpdateProgressHandler(60, "데이터 처리 중...");
+                            //await Task.Delay(10);
+
+
+                            bool updated = await _uploadedFileRepository.UpdateAccountColumnInfoAsync(
+                                fileData.Id,
+                                currentAccountColumn,
+                                fileData.AccountContents
+                            );
+
+                            if (!updated)
+                            {
+                                Debug.WriteLine($"MongoDB 계정명 정보 업데이트 실패: {fileData.OriginalFilename}");
+                            }
                         }
                     }
-                }
-                else
-                {
-                    // 계정명 컬럼 선택 해제
-                    fileData.AccountContents.Clear();
-                    fileData.AccountContentFormatted = "";
-                }
+                    else
+                    {
+                        // 계정명 컬럼 선택 해제
+                        fileData.AccountContents.Clear();
+                        fileData.AccountContentFormatted = "";
+                    }
 
-                // 콤보박스 값 설정 및 UI 새로고침
-                SetComboBoxValue(fileData, "AccountColumn", currentAccountColumn);
-                RefreshFileGridRowSpecific(fileData);
+                    //await progressForm.UpdateProgressHandler(80, "데이터 갱신 중...");
+                    //await Task.Delay(10);
 
-                Debug.WriteLine($"계정명 컬럼 정보 업데이트 완료: {fileData.OriginalFilename}");
+                    // 콤보박스 값 설정 및 UI 새로고침
+                    SetComboBoxValue(fileData, "AccountColumn", currentAccountColumn);
+                    RefreshFileGridRowSpecific(fileData);
+
+                    await progressForm.UpdateProgressHandler(100, "계정명 컬럼 분석 완료");
+                    await Task.Delay(10);
+
+                    Debug.WriteLine($"계정명 컬럼 정보 업데이트 완료: {fileData.OriginalFilename}");
+                }
+                
             }
             catch (Exception ex)
             {
@@ -1419,8 +1442,22 @@ namespace FinanceTool
                         // 비동기로 경고 표시 (처리는 계속)
                         Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
                         {
-                            MessageBox.Show(warningMessage, "계정명 개수 경고",
-                                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            //MessageBox.Show(warningMessage, "계정명 개수 경고",  MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                            Form progressForm = Application.OpenForms.Cast<Form>()
+                            .FirstOrDefault(f => f.GetType().Name == "ProcessProgressForm");
+
+                            if (progressForm != null)
+                            {
+                                progressForm.Hide();
+                            }
+
+                            MessageBox.Show(warningMessage, "계정명 개수 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
+                            if (progressForm != null)
+                            {
+                                progressForm.Show();
+                            }
                         });
                     }
                     // 1~40개는 정상 처리
@@ -1435,6 +1472,7 @@ namespace FinanceTool
                         // 정보성 메시지 (선택사항)
                         Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
                         {
+                            /*
                             var result = MessageBox.Show(infoMessage + "\n계속 진행하시겠습니까?",
                                 "계정명 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
 
@@ -1444,6 +1482,39 @@ namespace FinanceTool
                                 fileData.AccountColumnName = "";
                                 fileData.AccountContents.Clear();
                                 fileData.AccountContentFormatted = "";
+                            }
+                            */
+
+                            // progressForm이 있다면 일시적으로 숨기기
+                            Form progressForm = Application.OpenForms.Cast<Form>()
+                                .FirstOrDefault(f => f.GetType().Name == "ProcessProgressForm");
+
+                            if (progressForm != null)
+                            {
+                                progressForm.Hide();
+                            }
+
+                            try
+                            {
+                                var result = MessageBox.Show(infoMessage + "\n계속 진행하시겠습니까?",
+                                    "계정명 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                                if (result != DialogResult.Yes)
+                                {
+                                    fileData.AccountColumnName = "";
+                                    fileData.AccountContents.Clear();
+                                    fileData.AccountContentFormatted = "";
+                                }
+                            }
+                            finally
+                            {
+                                // progressForm 다시 표시
+                                /*
+                                if (progressForm != null)
+                                {
+                                    progressForm.Show();
+                                }
+                                */
                             }
                         });
                     }
@@ -1724,7 +1795,7 @@ namespace FinanceTool
                             UpdateComboBoxItems();
 
                             await progressForm.UpdateProgressHandler(100, "완료");
-                            await Task.Delay(500);
+                            await Task.Delay(100);
 
                             MessageBox.Show($"{newFiles.Count}개의 파일이 성공적으로 업로드되었습니다.",
                             "업로드 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1782,6 +1853,14 @@ namespace FinanceTool
                 var fileInfo = new FileInfo(originalFilePath);
                 var (detectedColumns, totalRows) = await ExtractExcelInfo(originalFilePath);
 
+                //2025.06.30
+                //에러 로직 추가
+                if (totalRows < 0)
+                {
+                    MessageBox.Show(detectedColumns[0],
+                                               "업로드 실패", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+
                 // MongoDB에 저장
                 var uploadedFile = new UploadedFileDocument
                 {
@@ -1828,7 +1907,25 @@ namespace FinanceTool
                         var sheetData = worksheet.GetFirstChild<SheetData>();
 
                         var allRows = sheetData.Elements<Row>().ToList();
-                        rows = allRows.Count;
+                        //rows = allRows.Count;
+                        int actualDataRows = 0;
+
+                        foreach (var row in allRows)
+                        {
+                            bool hasData = false;
+                            foreach (var cell in row.Elements<Cell>())
+                            {
+                                string cellValue = GetCellValue(cell, workbookPart);
+                                if (!string.IsNullOrWhiteSpace(cellValue))
+                                {
+                                    hasData = true;
+                                    break;
+                                }
+                            }
+                            if (hasData) actualDataRows++;
+                        }
+
+                        rows = actualDataRows;
 
                         // 첫 번째 행에서 컬럼명 추출
                         if (allRows.Count > 0)
@@ -1848,6 +1945,9 @@ namespace FinanceTool
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"엑셀 정보 추출 오류: {ex.Message}");
+                    //string exMsg = $"엑셀 정보 추출 오류: {ex.Message}";
+                    columns.Add($"엑셀 정보 추출 오류: {ex.Message}");
+                    return (columns, -1); // 헤더 제외한 데이터 행 수
                 }
 
                 return (columns, Math.Max(0, rows - 1)); // 헤더 제외한 데이터 행 수
