@@ -120,16 +120,34 @@ namespace FinanceTool
         {
             try
             {
-                // raw_data 컬렉션 초기화
-                await _rawDataRepository.DeleteManyAsync(FilterDefinition<RawDataDocument>.Empty);
-                Debug.WriteLine("raw_data 컬렉션 초기화 완료");
+                // 필요한 Repository 인스턴스들 생성
+                var clusteringRepository = new ClusteringRepository();
+                var columnMappingRepository = new ColumnMappingRepository();
+                var processViewRepository = new ProcessViewRepository();
 
-                // process_data 컬렉션 초기화
+                Debug.WriteLine("5개 컬렉션 초기화 시작...");
+
+                // 1. clustering_results 컬렉션 초기화
+                await clusteringRepository.DeleteManyAsync(FilterDefinition<ClusteringResultDocument>.Empty);
+                Debug.WriteLine("clustering_results 컬렉션 초기화 완료");
+
+                // 2. column_mapping 컬렉션 초기화
+                await columnMappingRepository.DeleteManyAsync(FilterDefinition<ColumnMappingDocument>.Empty);
+                Debug.WriteLine("column_mapping 컬렉션 초기화 완료");
+
+                // 3. process_data 컬렉션 초기화
                 await _processDataRepository.DeleteManyAsync(FilterDefinition<ProcessDataDocument>.Empty);
                 Debug.WriteLine("process_data 컬렉션 초기화 완료");
 
-                // 기타 필요한 컬렉션 초기화
-                // TODO: 추가 컬렉션 초기화 로직
+                // 4. process_view_data 컬렉션 초기화
+                await processViewRepository.DeleteManyAsync(FilterDefinition<ProcessViewDocument>.Empty);
+                Debug.WriteLine("process_view_data 컬렉션 초기화 완료");
+
+                // 5. raw_data 컬렉션 초기화
+                await _rawDataRepository.DeleteManyAsync(FilterDefinition<RawDataDocument>.Empty);
+                Debug.WriteLine("raw_data 컬렉션 초기화 완료");
+
+                Debug.WriteLine("모든 컬렉션 초기화 완료 (5개)");
             }
             catch (Exception ex)
             {

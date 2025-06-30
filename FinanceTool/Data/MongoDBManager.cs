@@ -135,12 +135,12 @@ namespace FinanceTool.Data
             {
                 var targetCollections = new[]
                 {
-            "clustering_results",
-            "column_mapping",
-            "process_data",
-            "process_view_data",
-            "raw_data"
-        };
+                    "clustering_results",
+                    "column_mapping",
+                    "process_data",
+                    "process_view_data",
+                    "raw_data"
+                };
 
                 await progressCallback?.Invoke(10, "컬렉션 초기화 시작...");
 
@@ -149,6 +149,7 @@ namespace FinanceTool.Data
 
                 foreach (var collName in targetCollections)
                 {
+                    Debug.WriteLine($"컬렉션 초기화 : {collName}");
                     var collectionList = await _database.ListCollectionNames().ToListAsync();
                     bool exists = collectionList.Contains(collName);
 
