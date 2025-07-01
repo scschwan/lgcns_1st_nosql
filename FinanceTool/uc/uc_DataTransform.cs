@@ -223,6 +223,15 @@ namespace FinanceTool
                 if (dataGridView_2nd.Columns["raw_data_id"] != null)
                     dataGridView_2nd.Columns["raw_data_id"].Visible = false;
 
+                if (dataGridView_2nd.Columns["_id"] != null)
+                    dataGridView_2nd.Columns["_id"].Visible = false;
+
+                if (dataGridView_2nd.Columns["import_date"] != null)
+                    dataGridView_2nd.Columns["import_date"].Visible = false;
+
+                if (dataGridView_2nd.Columns["is_hidden"] != null)
+                    dataGridView_2nd.Columns["is_hidden"].Visible = false;
+
                 Debug.WriteLine($"dataGridView_2nd 페이지 {_currentPage2nd} 표시: {pageData.Rows.Count}개 행");
             }
             catch (Exception ex)
@@ -258,6 +267,15 @@ namespace FinanceTool
 
                 if (dataGridView_transform.Columns["raw_data_id"] != null)
                     dataGridView_transform.Columns["raw_data_id"].Visible = false;
+
+                if (dataGridView_transform.Columns["_id"] != null)
+                    dataGridView_transform.Columns["_id"].Visible = false;
+
+                if (dataGridView_transform.Columns["import_date"] != null)
+                    dataGridView_transform.Columns["import_date"].Visible = false;
+
+                if (dataGridView_transform.Columns["is_hidden"] != null)
+                    dataGridView_transform.Columns["is_hidden"].Visible = false;
 
                 Debug.WriteLine($"dataGridView_transform 페이지 {_currentPageTransform} 표시: {pageData.Rows.Count}개 행");
             }
@@ -456,7 +474,7 @@ namespace FinanceTool
                     //await SetupMoneyDataTable();
 
                     // 원본 데이터로 뷰 데이터 보강 (극한 성능 적용)
-                    await progressForm.UpdateProgressHandler(60, "극한 속도 원본 데이터 보강 중...");
+                    await progressForm.UpdateProgressHandler(60, "원본 데이터 보강 중...");
                     viewTransformDataTable = await EnrichTransformDataWithMongoData(transformDataTable);
 
                     Debug.WriteLine("data Transform initUI -> DataGridView 바인딩 설정 완료");
@@ -1103,7 +1121,7 @@ namespace FinanceTool
                     return;
                 }
 
-                await UpdateProgress(20, "극한 속도 키워드 추출 중...");
+                await UpdateProgress(20, "키워드 추출 중...");
 
                 // 3. 극한 속도 키워드 처리 (기존 Parallel.ForEach 대체)
                 var (keywordFrequency, keywordToRawDataIds) = await ProcessKeywordsUltraSpeed(transformDataTable, keywordColumns);
@@ -1284,6 +1302,12 @@ namespace FinanceTool
                             sum_keyword_table.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                             sum_keyword_table.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                             sum_keyword_table.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+
+                            // Count 컬럼(1번 인덱스)에 천 단위 콤마 포맷팅 적용
+                            if (sum_keyword_table.Columns.Count > 1)
+                            {
+                                sum_keyword_table.Columns[1].DefaultCellStyle.Format = "N0";
+                            }
 
                             // 나머지 컬럼들은 읽기 전용으로 설정
                             for (int i = 1; i < sum_keyword_table.Columns.Count; i++)
@@ -1634,11 +1658,19 @@ namespace FinanceTool
             dgv.ReadOnly = false;
             dgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
             dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+
+
             //dgv.Columns[2].DefaultCellStyle.Format = "N0";
             //dgv.Columns[3].DefaultCellStyle.Format = "N0";
 
             //Debug.WriteLine($"dgv.Columns[1] : {dgv.Columns[1].Name}");
             //Debug.WriteLine($"dgv.Columns[2] : {dgv.Columns[2].Name}");
+
+            // Count 컬럼(1번 인덱스)에 천 단위 콤마 포맷팅 적용
+            if (dgv.Columns.Count > 2)
+            {
+                dgv.Columns[2].DefaultCellStyle.Format = "N0";
+            }
 
             // 나머지 컬럼들은 읽기 전용으로 설정
             for (int i = 1; i < dgv.Columns.Count; i++)
@@ -2034,6 +2066,16 @@ namespace FinanceTool
                 else
                 {
                     DataHandler.finalClusteringData = null;
+
+                    //db 초기화
+                     // 필요한 Repository 인스턴스들 생성
+                    var clusteringRepository = new ClusteringRepository();
+                    Debug.WriteLine(" 컬렉션 초기화 시작...");
+
+                    // 1. clustering_results 컬렉션 초기화
+                    await clusteringRepository.DeleteManyAsync(FilterDefinition<ClusteringResultDocument>.Empty);
+                    Debug.WriteLine("clustering_results 컬렉션 초기화 완료");
+
                 }
             }
 

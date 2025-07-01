@@ -684,7 +684,8 @@ public class ClusterDisplayManager
         if (_pageSizeControl != null)
         {
             _pageSizeControl.Items.Clear();
-            _pageSizeControl.Items.AddRange(new object[] { 100, 200, 500, 1000, 2000 });
+            //_pageSizeControl.Items.AddRange(new object[] { 100, 200, 500, 1000, 2000 });
+            _pageSizeControl.Items.AddRange(new object[] { 1000, 2000, 5000, 10000 });
             _pageSizeControl.SelectedItem = _pageSize;
             _pageSizeControl.DropDownStyle = ComboBoxStyle.DropDownList;
         }
@@ -702,8 +703,10 @@ public class ClusterDisplayManager
         if (_targetGrid == null) return;
 
         // 컬럼 숨김 처리
-        if (_targetGrid.Columns["ID"] != null) _targetGrid.Columns["ID"].Visible = false;
-        if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = false;
+        if (_targetGrid.Columns["ID"] != null) _targetGrid.Columns["ID"].Visible = true;
+        if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = true;
+        if (_targetGrid.Columns["_id"] != null) _targetGrid.Columns["_id"].Visible = false;
+        if (_targetGrid.Columns["is_hidden"] != null) _targetGrid.Columns["is_hidden"].Visible = false;
         if (_targetGrid.Columns["dataIndex"] != null) _targetGrid.Columns["dataIndex"].Visible = false;
         if (_targetGrid.Columns["import_date"] != null) _targetGrid.Columns["import_date"].Visible = false;
 

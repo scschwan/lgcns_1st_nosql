@@ -1964,7 +1964,7 @@ namespace FinanceTool
                         }
                     }
 
-                    // 새 클러스터가 생성된 경우, 기존 DataTable에서 상위 클러스터 행 찾아서 업데이트
+                    // 기존 클러스터에 update
                     if (!isNewCluster)
                     {
                         var existingRow = dataTable.AsEnumerable()
@@ -1984,8 +1984,31 @@ namespace FinanceTool
                                 existingRow["키워드목록"] = string.Join(",", updatedCluster.Keywords);
                                 existingRow["dataIndex"] = string.Join(",", updatedCluster.DataIndices);
                             }
+
+                            // 병합되는 클러스터들의 ClusterID를 기존 클러스터 번호로 변경
+                            foreach (int targetId in targetIds)
+                            {
+                                var updatedElement = clusteringRepo.UpdateClusterIdAsync(targetId, newClusterNumber);
+
+                                if (updatedElement != null)
+                                {
+                                    //Debug.WriteLine($"MongoDB에서 클러스터 {targetId}의 cluster_id를 {newClusterNumber}로 변경");
+
+                                    var targetRow = dataTable.AsEnumerable()
+                                        .FirstOrDefault(row => Convert.ToInt32(row["ID"]) == targetId);
+
+                                    if (targetRow != null)
+                                    {
+                                        targetRow["ClusterID"] = newClusterNumber;
+                                        //Debug.WriteLine($"클러스터 {targetId}의 ClusterID를 {newClusterNumber}로 변경");
+                                    }
+                                }
+                                
+                            }
                         }
+                        
                     }
+                    // 새 클러스터가 생성된 경우, 기존 DataTable에서 상위 클러스터 행 찾아서 업데이트
                     else
                     {
                         // *** 핵심 수정: 새 클러스터 행을 DataTable에 추가 ***
@@ -2006,6 +2029,19 @@ namespace FinanceTool
                             dataTable.Rows.Add(newRow); // ← 새 행 추가
 
                             Debug.WriteLine($"새 클러스터 행 추가: ID={newCluster.ClusterNumber}");
+
+                            // 병합되는 클러스터들의 ClusterID를 기존 클러스터 번호로 변경
+                            foreach (int targetId in targetIds)
+                            {
+                               var targetRow = dataTable.AsEnumerable()
+                                        .FirstOrDefault(row => Convert.ToInt32(row["ID"]) == targetId);
+
+                               if (targetRow != null)
+                               {
+                                   targetRow["ClusterID"] = newClusterNumber;
+                                   //Debug.WriteLine($"클러스터 {targetId}의 ClusterID를 {newClusterNumber}로 변경");
+                               }
+                            }
                         }
                     }
 
@@ -2176,18 +2212,32 @@ namespace FinanceTool
 
                 if (result == DialogResult.Yes)
                 {
-                    // 기존 병합 로직 호출 (cluster_number 리스트 전달)
-                    List<int> clusterNumbersToMerge = selectedClusterIds.ToList();
+                    using (var progressForm = new ProcessProgressForm())
+                    {
+                        progressForm.Show();
+                        await progressForm.UpdateProgressHandler(10, "클러스터 병합 시작");
+                        await Task.Delay(10);
 
-                    await MergeAndCreateNewCluster(DataHandler.finalClusteringData, clusterNumbersToMerge);
 
-                    // 병합 후 선택 상태 초기화
-                    //_selectedClusterNumbers.Clear();
-                    merge_all_check.Checked = false;
+                        // 기존 병합 로직 호출 (cluster_number 리스트 전달)
+                        List<int> clusterNumbersToMerge = selectedClusterIds.ToList();
 
-                    // 데이터 다시 로드
-                    await create_merge_keyword_list(true);
-                    
+                        await MergeAndCreateNewCluster(DataHandler.finalClusteringData, clusterNumbersToMerge);
+
+                        await progressForm.UpdateProgressHandler(50, "클러스터 병합 중...");
+                        await Task.Delay(10);
+
+                        // 병합 후 선택 상태 초기화
+                        //_selectedClusterNumbers.Clear();
+                        merge_all_check.Checked = false;
+
+                        // 데이터 다시 로드
+                        await create_merge_keyword_list(true);
+
+                        await progressForm.UpdateProgressHandler(100, "클러스터 병합 완료");
+                        await Task.Delay(10);
+
+                    }
 
                     MessageBox.Show("클러스터 병합이 완료되었습니다.", "완료",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -2404,23 +2454,74 @@ namespace FinanceTool
             {
                 using (var progressForm = new ProcessProgressForm())
                 {
-                    progressForm.Show();
-                    await progressForm.UpdateProgressHandler(10, "초고속 클러스터 완료 처리 시작...");
-
+                    
                     int clusterCount = GetCountOfNegativeOneClusterIDs(DataHandler.finalClusteringData);
 
                     if (clusterCount > 0)
                     {
-                        await progressForm.UpdateProgressHandler(20, "최대 속도 클러스터 통합 시작...");
+                        //await progressForm.UpdateProgressHandler(20, "병합 클러스터링 통합 시작...");
+
+                        // 최대 속도 처리를 위한 극한 병렬 클러스터 통합
+                        //await ProcessMaxSpeedClusterMergeAsync(clusterCount, progressForm.UpdateProgressHandler);
+
+                        DialogResult result = MessageBox.Show(
+                                   $"{clusterCount}개의 클러스터가 남아있습니다.\n 자동으로 병합하시겠습니까?",
+                                   "클러스터 병합 확인",
+                                   MessageBoxButtons.YesNo,
+                                   MessageBoxIcon.Question
+                               );
+
+                        if (result == DialogResult.No)
+                        {
+                            return;
+                        }
+
+                    }
+
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "병합 클러스터링 완료 처리 시작...");
+
+                    if (clusterCount > 0)
+                    {
+                        await progressForm.UpdateProgressHandler(20, "병합 클러스터링 통합 시작...");
 
                         // 최대 속도 처리를 위한 극한 병렬 클러스터 통합
                         await ProcessMaxSpeedClusterMergeAsync(clusterCount, progressForm.UpdateProgressHandler);
                     }
 
-                    await progressForm.UpdateProgressHandler(80, "최종 데이터 검증...");
+
+                    await progressForm.UpdateProgressHandler(60, "최종 데이터 검증...");
 
                     // 최대 속도 최종 처리
-                    await MaxSpeedFinalizeAsync(progressForm.UpdateProgressHandler);
+                    //await MaxSpeedFinalizeAsync(progressForm.UpdateProgressHandler);
+
+
+                    // *** 6단계: DataTable 업데이트 (기존 행 업데이트 + 병합된 클러스터들의 ClusterID 변경) ***
+                    //await UpdateDataTableAfterMerge(DataHandler.finalClusteringData, targetIds, newClusterNumber, isNewCluster);
+
+                    // *** 7단계: 데이터 보강 (동기적 처리로 일관성 보장) ***
+                    //mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
+
+                    // *** 8단계: ClusteringManager 데이터 새로고침 ***
+                    if (_clusteringManager != null)
+                    {
+                        await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
+                    }
+
+                    //Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병합 완료: {newClusterNumber}");
+
+                    await progressForm.UpdateProgressHandler(80, "데이터 정렬 중...");
+
+                    // 병합 클러스터 리스트 생성
+                    create_check_keyword_list();
+
+                    // 병합 작업 후 업데이트
+                    UpdateModifiedDataGridView();
+
+                    //merge_cluster_table.Rows.Clear();
+
+                    //dataGridView_modified.Rows.Clear();
+
 
                     await progressForm.UpdateProgressHandler(100, "클러스터링 완료");
 
@@ -2449,95 +2550,168 @@ namespace FinanceTool
         {
             try
             {
-                await progress(25, $"극한 병렬 처리 시작... ({clusterCount}개 클러스터)");
+                await progress(10, $"클러스터링 처리 시작... ({clusterCount}개 클러스터)");
 
-                // 최대 속도 설정 - CPU 코어 수의 4배까지 병렬 처리
-                int maxParallelism = Environment.ProcessorCount * 4; // 과다 스레드 생성
-                const int aggressiveBatchSize = 2000; // 작은 배치로 더 많은 병렬 처리
+                var currentTargetIds = new ConcurrentBag<int>();
+                var unmergedClusters = new ConcurrentBag<ClusteringResultDocument>();
+                int processedCount = 0;
+                int errorCount = 0;
+                int mergedCount = 0;
 
-                Debug.WriteLine($"극한 병렬 설정: {maxParallelism}개 스레드 사용");
+                Debug.WriteLine($"DataTable 총 행 수: {DataHandler.finalClusteringData.Rows.Count}");
 
-                // 미병합 클러스터 ID를 메모리에 한번에 로드 (메모리 과다 사용)
-                var unmergedClusterIds = new List<int>();
-                var allRowData = new ConcurrentDictionary<int, DataRow>();
-
-                // 모든 데이터를 메모리에 캐싱 (메모리 대량 사용)
                 await Task.Run(() =>
                 {
                     Parallel.ForEach(DataHandler.finalClusteringData.AsEnumerable(),
-                        new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+                        new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 4 },
                         row =>
                         {
-                            int id = Convert.ToInt32(row["ID"]);
-                            int clusterId = Convert.ToInt32(row["ClusterID"]);
-
-                            // 메모리에 모든 행 캐싱
-                            allRowData.TryAdd(id, row);
-
-                            if (clusterId < 0)
+                            try
                             {
-                                lock (unmergedClusterIds)
+                                // 안전한 데이터 추출
+                                if (row["ID"] == null || row["ID"] == DBNull.Value ||
+                                    row["ClusterID"] == null || row["ClusterID"] == DBNull.Value)
                                 {
-                                    unmergedClusterIds.Add(id);
+                                    Debug.WriteLine("null 값이 포함된 행 발견");
+                                    Interlocked.Increment(ref errorCount);
+                                    return;
                                 }
+
+                                if (!int.TryParse(row["ID"].ToString(), out int id) ||
+                                    !int.TryParse(row["ClusterID"].ToString(), out int clusterId))
+                                {
+                                    Debug.WriteLine($"변환 실패: ID={row["ID"]}, ClusterID={row["ClusterID"]}");
+                                    Interlocked.Increment(ref errorCount);
+                                    return;
+                                }
+
+                                if (clusterId < 0) // 미병합 클러스터
+                                {
+                                    var clusterDoc = new ClusteringResultDocument
+                                    {
+                                        ClusterNumber = id,
+                                        ClusterName = row["클러스터명"]?.ToString() ?? "",
+                                        Keywords = row["키워드목록"]?.ToString()?.Split(',')
+                                            .Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).ToList() ?? new List<string>(),
+                                        Count = Convert.ToInt32(row["Count"]),
+                                        TotalAmount = Convert.ToDecimal(row["합산금액"]),
+                                        DataIndices = row["dataIndex"]?.ToString()?.Split(',')
+                                            .Select(i => i.Trim()).Where(i => !string.IsNullOrEmpty(i)).ToList() ?? new List<string>()
+                                    };
+                                    unmergedClusters.Add(clusterDoc);
+                                    currentTargetIds.Add(id);
+                                }
+                                else
+                                {
+                                    Interlocked.Increment(ref mergedCount);
+                                    Debug.WriteLine($"병합된 클러스터: id {id}, clusterId: {clusterId}");
+                                }
+
+                                Interlocked.Increment(ref processedCount);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"행 처리 오류: {ex.Message}");
+                                Interlocked.Increment(ref errorCount);
                             }
                         }
                     );
                 });
 
-                Debug.WriteLine($"메모리 캐싱 완료: {allRowData.Count}개 행, 미병합: {unmergedClusterIds.Count}개");
+                var targetIdsList = currentTargetIds.ToList();
 
-                if (unmergedClusterIds.Count == 0) return;
+                Debug.WriteLine($"=== 처리 결과 통계 ===");
+                Debug.WriteLine($"DataTable 총 행 수: {DataHandler.finalClusteringData.Rows.Count}");
+                Debug.WriteLine($"처리된 행 수: {processedCount}");
+                Debug.WriteLine($"오류 행 수: {errorCount}");
+                Debug.WriteLine($"병합된 클러스터 수: {mergedCount}");
+                Debug.WriteLine($"미병합 클러스터 수: {currentTargetIds.Count}");
+                Debug.WriteLine($"예상 데이터 수: 1308개");
 
-                await progress(40, "극한 속도 배치 분할...");
+                var unmergedList = unmergedClusters.ToList();
+                if (unmergedList.Count == 0) return;
 
-                // 더 많은 작은 배치로 분할하여 병렬성 극대화
-                var batches = new List<List<int>>();
-                for (int i = 0; i < unmergedClusterIds.Count; i += aggressiveBatchSize)
+                await progress(40, $"데이터 통합 중... ({unmergedList.Count}개 클러스터)");
+
+                // 2단계: *** 단일 스레드에서 통합 클러스터 생성 ***
+                var clusteringRepo = new ClusteringRepository();
+
+                // 새 통합 클러스터 번호 생성 (1개만)
+                int unifiedClusterNumber = await clusteringRepo.GetNextClusterNumberAsync();
+
+                // 모든 데이터를 단일 클러스터로 통합
+                var allKeywords = new HashSet<string>();
+                var allDataIndices = new HashSet<string>();
+                int totalCount = 0;
+                decimal totalAmount = 0;
+
+                foreach (var cluster in unmergedList)
                 {
-                    batches.Add(unmergedClusterIds.Skip(i).Take(aggressiveBatchSize).ToList());
+                    // 키워드 통합 (중복 제거)
+                    foreach (var keyword in cluster.Keywords)
+                    {
+                        allKeywords.Add(keyword);
+                    }
+
+                    // 데이터 인덱스 통합 (중복 제거)
+                    foreach (var index in cluster.DataIndices)
+                    {
+                        allDataIndices.Add(index);
+                    }
+
+                    // 카운트 및 금액 누적
+                    totalCount += cluster.Count;
+                    totalAmount += cluster.TotalAmount;
                 }
 
-                await progress(50, $"초고속 배치 처리... ({batches.Count}개 배치, {maxParallelism}개 스레드)");
+                // 3단계: 단일 "Undefined" 클러스터 생성
+                var unifiedCluster = new ClusteringResultDocument
+                {
+                    ClusterNumber = unifiedClusterNumber,
+                    ClusterId = unifiedClusterNumber, // 자신이 상위 클러스터
+                    ClusterName = "Undefined",
+                    Keywords = allKeywords.ToList(),
+                    Count = totalCount,
+                    TotalAmount = totalAmount,
+                    DataIndices = allDataIndices.ToList(),
+                    CreatedAt = DateTime.Now
+                };
 
-                // 극한 병렬 처리 - 세마포어 없이 최대 속도로 실행
-                var batchTasks = batches.Select(async (batch, batchIndex) =>
+                await progress(50, "통합 클러스터 생성 중...");
+
+                // MongoDB에 단일 클러스터 생성
+                await clusteringRepo.CreateAsync(unifiedCluster);
+
+                await progress(75, "클러스터 관계 업데이트 중...");
+
+                // 4단계: 병렬로 각 미병합 클러스터의 ClusterId를 통합 클러스터로 업데이트
+                var updateTasks = unmergedList.Select(async cluster =>
                 {
                     try
                     {
-                        string batchClusterName = $"UltraSpeed_Batch_{batchIndex + 1}";
-
-                        // 세마포어 제거하고 최대 속도로 병합
-                        await MergeAndCreateNewCluster(
-                            DataHandler.finalClusteringData,
-                            batch,
-                            batchClusterName
-                        );
-
-                        Debug.WriteLine($"초고속 배치 {batchIndex + 1}/{batches.Count} 완료 ({batch.Count}개)");
-
-                        // 진행률 업데이트 (비동기로 처리하여 속도 우선)
-                        _ = Task.Run(async () =>
-                        {
-                            int currentProgress = 50 + (int)(25.0 * (batchIndex + 1) / batches.Count);
-                            await progress(currentProgress, $"초고속 처리... ({batchIndex + 1}/{batches.Count})");
-                        });
+                        await clusteringRepo.UpdateClusterIdAsync(cluster.ClusterNumber, unifiedClusterNumber);
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"배치 {batchIndex + 1} 실패: {ex.Message}");
-                        // 오류가 발생해도 계속 진행 (속도 우선)
+                        Debug.WriteLine($"클러스터 {cluster.ClusterNumber} 업데이트 오류: {ex.Message}");
                     }
                 }).ToArray();
 
-                // 모든 작업을 동시에 시작 (리소스 과다 사용)
-                await Task.WhenAll(batchTasks);
+                await Task.WhenAll(updateTasks);
 
-                Debug.WriteLine($"극한 속도 클러스터 통합 완료: {batches.Count}개 배치");
+                await progress(90, "메모리 데이터 동기화 중...");
+
+                // *** 6단계: DataTable 업데이트 (기존 행 업데이트 + 병합된 클러스터들의 ClusterID 변경) ***
+                await UpdateDataTableAfterMerge(DataHandler.finalClusteringData, targetIdsList, unifiedClusterNumber, true);
+
+                // *** 7단계: 데이터 보강 (동기적 처리로 일관성 보장) ***
+                mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
+
+                Debug.WriteLine($"통합 클러스터 생성 완료: ID={unifiedClusterNumber}, Count={totalCount}, Amount={totalAmount}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"최대 속도 클러스터 통합 오류: {ex.Message}");
+                Debug.WriteLine($"극한 속도 클러스터 처리 오류: {ex.Message}");
                 throw;
             }
         }
@@ -2547,7 +2721,7 @@ namespace FinanceTool
         {
             try
             {
-                await progress(85, "극한 속도 검증...");
+                await progress(85, "클러스터링 데이터 검증...");
 
                 // 최대 병렬도로 검증 처리
                 int maxParallelism = Environment.ProcessorCount * 3;
