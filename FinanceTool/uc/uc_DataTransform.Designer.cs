@@ -28,8 +28,8 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle15 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle16 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_left = new Panel();
             tableLayoutLeft = new TableLayoutPanel();
@@ -66,14 +66,11 @@
             groupbox2 = new GroupBox();
             modified_keyword = new TextBox();
             label4 = new Label();
-            keyword_search_radio2 = new RadioButton();
-            keyword_search_radio1 = new RadioButton();
             search_keyword = new TextBox();
             check_all_keyword_list = new CheckBox();
             change_keyword = new Button();
             keyword_search_button = new Button();
             match_keyword_table = new DataGridView();
-            keyword_search_combo = new ComboBox();
             groupBox3 = new GroupBox();
             prod_col_check = new CheckBox();
             button5 = new Button();
@@ -439,8 +436,8 @@
             tableLayoutRight.Location = new Point(0, 0);
             tableLayoutRight.Name = "tableLayoutRight";
             tableLayoutRight.RowCount = 3;
-            tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 35F));
-            tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
+            tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 42.6278839F));
+            tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 47.2417259F));
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 10F));
             tableLayoutRight.Size = new Size(742, 997);
             tableLayoutRight.TabIndex = 0;
@@ -455,7 +452,7 @@
             groupBox1.Location = new Point(5, 5);
             groupBox1.Margin = new Padding(5);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(732, 338);
+            groupBox1.Size = new Size(732, 415);
             groupBox1.TabIndex = 25;
             groupBox1.TabStop = false;
             groupBox1.Text = "키워드 요약";
@@ -468,21 +465,21 @@
             sum_keyword_table.BackgroundColor = Color.White;
             sum_keyword_table.BorderStyle = BorderStyle.Fixed3D;
             sum_keyword_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle15.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle15.BackColor = SystemColors.Window;
-            dataGridViewCellStyle15.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle15.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle15.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle15.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle15.WrapMode = DataGridViewTriState.False;
-            sum_keyword_table.DefaultCellStyle = dataGridViewCellStyle15;
+            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = SystemColors.Window;
+            dataGridViewCellStyle1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle1.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.False;
+            sum_keyword_table.DefaultCellStyle = dataGridViewCellStyle1;
             sum_keyword_table.EnableHeadersVisualStyles = false;
             sum_keyword_table.GridColor = Color.LightGray;
             sum_keyword_table.Location = new Point(10, 80);
             sum_keyword_table.MinimumSize = new Size(300, 150);
             sum_keyword_table.Name = "sum_keyword_table";
             sum_keyword_table.ReadOnly = true;
-            sum_keyword_table.Size = new Size(712, 248);
+            sum_keyword_table.Size = new Size(712, 325);
             sum_keyword_table.TabIndex = 36;
             sum_keyword_table.CellClick += dataGridView_modified_CellClick;
             // 
@@ -510,20 +507,17 @@
             // 
             groupbox2.Controls.Add(modified_keyword);
             groupbox2.Controls.Add(label4);
-            groupbox2.Controls.Add(keyword_search_radio2);
-            groupbox2.Controls.Add(keyword_search_radio1);
             groupbox2.Controls.Add(search_keyword);
             groupbox2.Controls.Add(check_all_keyword_list);
             groupbox2.Controls.Add(change_keyword);
             groupbox2.Controls.Add(keyword_search_button);
             groupbox2.Controls.Add(match_keyword_table);
-            groupbox2.Controls.Add(keyword_search_combo);
             groupbox2.Dock = DockStyle.Fill;
             groupbox2.Font = new Font("맑은 고딕", 15.75F);
-            groupbox2.Location = new Point(5, 353);
+            groupbox2.Location = new Point(5, 430);
             groupbox2.Margin = new Padding(5);
             groupbox2.Name = "groupbox2";
-            groupbox2.Size = new Size(732, 538);
+            groupbox2.Size = new Size(732, 461);
             groupbox2.TabIndex = 30;
             groupbox2.TabStop = false;
             groupbox2.Text = "키워드 변환";
@@ -532,7 +526,7 @@
             // 
             modified_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             modified_keyword.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            modified_keyword.Location = new Point(350, 120);
+            modified_keyword.Location = new Point(350, 34);
             modified_keyword.Name = "modified_keyword";
             modified_keyword.PlaceholderText = "키워드 입력 가능";
             modified_keyword.Size = new Size(280, 33);
@@ -542,43 +536,17 @@
             // 
             label4.AutoSize = true;
             label4.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            label4.Location = new Point(150, 125);
+            label4.Location = new Point(150, 81);
             label4.Name = "label4";
             label4.Size = new Size(178, 25);
             label4.TabIndex = 30;
             label4.Text = "다음 키워드로 변경";
             // 
-            // keyword_search_radio2
-            // 
-            keyword_search_radio2.AutoSize = true;
-            keyword_search_radio2.Font = new Font("맑은 고딕", 14.25F);
-            keyword_search_radio2.Location = new Point(200, 80);
-            keyword_search_radio2.Name = "keyword_search_radio2";
-            keyword_search_radio2.Size = new Size(132, 29);
-            keyword_search_radio2.TabIndex = 33;
-            keyword_search_radio2.Text = "키워드 입력";
-            keyword_search_radio2.UseVisualStyleBackColor = true;
-            keyword_search_radio2.CheckedChanged += keyword_search_radio2_CheckedChanged;
-            // 
-            // keyword_search_radio1
-            // 
-            keyword_search_radio1.AutoSize = true;
-            keyword_search_radio1.Checked = true;
-            keyword_search_radio1.Font = new Font("맑은 고딕", 14.25F);
-            keyword_search_radio1.Location = new Point(47, 78);
-            keyword_search_radio1.Name = "keyword_search_radio1";
-            keyword_search_radio1.Size = new Size(132, 29);
-            keyword_search_radio1.TabIndex = 32;
-            keyword_search_radio1.TabStop = true;
-            keyword_search_radio1.Text = "키워드 선택";
-            keyword_search_radio1.UseVisualStyleBackColor = true;
-            keyword_search_radio1.CheckedChanged += keyword_search_radio1_CheckedChanged;
-            // 
             // search_keyword
             // 
             search_keyword.Enabled = false;
             search_keyword.Font = new Font("맑은 고딕", 14.25F);
-            search_keyword.Location = new Point(350, 78);
+            search_keyword.Location = new Point(350, 73);
             search_keyword.Name = "search_keyword";
             search_keyword.PlaceholderText = "키워드 입력";
             search_keyword.Size = new Size(280, 33);
@@ -590,7 +558,7 @@
             // 
             check_all_keyword_list.AutoSize = true;
             check_all_keyword_list.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            check_all_keyword_list.Location = new Point(15, 125);
+            check_all_keyword_list.Location = new Point(10, 81);
             check_all_keyword_list.Name = "check_all_keyword_list";
             check_all_keyword_list.Size = new Size(114, 29);
             check_all_keyword_list.TabIndex = 29;
@@ -606,7 +574,7 @@
             change_keyword.FlatStyle = FlatStyle.Flat;
             change_keyword.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             change_keyword.ForeColor = Color.White;
-            change_keyword.Location = new Point(650, 118);
+            change_keyword.Location = new Point(650, 74);
             change_keyword.Name = "change_keyword";
             change_keyword.Size = new Size(69, 35);
             change_keyword.TabIndex = 26;
@@ -622,7 +590,7 @@
             keyword_search_button.FlatStyle = FlatStyle.Flat;
             keyword_search_button.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             keyword_search_button.ForeColor = Color.White;
-            keyword_search_button.Location = new Point(650, 77);
+            keyword_search_button.Location = new Point(650, 33);
             keyword_search_button.Name = "keyword_search_button";
             keyword_search_button.Size = new Size(69, 37);
             keyword_search_button.TabIndex = 24;
@@ -638,34 +606,23 @@
             match_keyword_table.BackgroundColor = Color.White;
             match_keyword_table.BorderStyle = BorderStyle.Fixed3D;
             match_keyword_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle16.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle16.BackColor = SystemColors.Window;
-            dataGridViewCellStyle16.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle16.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle16.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle16.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle16.WrapMode = DataGridViewTriState.False;
-            match_keyword_table.DefaultCellStyle = dataGridViewCellStyle16;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle2.BackColor = SystemColors.Window;
+            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle2.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
+            match_keyword_table.DefaultCellStyle = dataGridViewCellStyle2;
             match_keyword_table.EnableHeadersVisualStyles = false;
             match_keyword_table.GridColor = Color.LightGray;
-            match_keyword_table.Location = new Point(15, 170);
+            match_keyword_table.Location = new Point(15, 126);
             match_keyword_table.MinimumSize = new Size(300, 200);
             match_keyword_table.Name = "match_keyword_table";
             match_keyword_table.ReadOnly = true;
-            match_keyword_table.Size = new Size(704, 358);
+            match_keyword_table.Size = new Size(704, 329);
             match_keyword_table.TabIndex = 23;
             match_keyword_table.CellClick += match_keyword_table_CellClick;
-            // 
-            // keyword_search_combo
-            // 
-            keyword_search_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            keyword_search_combo.Font = new Font("맑은 고딕", 14.25F);
-            keyword_search_combo.FormattingEnabled = true;
-            keyword_search_combo.Location = new Point(350, 78);
-            keyword_search_combo.Name = "keyword_search_combo";
-            keyword_search_combo.Size = new Size(280, 33);
-            keyword_search_combo.TabIndex = 31;
-            keyword_search_combo.Text = "키워드 선택";
             // 
             // groupBox3
             // 
@@ -822,9 +779,6 @@
         private DataGridView match_keyword_table;
         private TextBox modified_keyword;
         private Label label4;
-        private RadioButton keyword_search_radio2;
-        private RadioButton keyword_search_radio1;
-        private ComboBox keyword_search_combo;
         private TextBox search_keyword;
         private Button button5;
         private Label label5;

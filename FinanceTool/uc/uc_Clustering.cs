@@ -49,6 +49,13 @@ namespace FinanceTool
         //검색엔진 객체 신규 생성
         private ClusteringManager _clusteringManager;
 
+        // 새로 추가: 검색 내 검색 관련
+        private List<int> _baseSearchResults = new List<int>();
+        private bool _isSubSearchMode = false;
+
+        // 새로 추가: 현재 선택된 검색 컬럼
+        private string _currentSearchColumn = "키워드";
+
         // === 페이징 초기화 메서드 ===
 
 
@@ -425,11 +432,7 @@ namespace FinanceTool
                 // RawData 정보로 보강
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
-
-                // 검색 UI 초기화
-                set_keyword_combo_list();
-
-
+                
                 // 최초 수행 시 별도 수행
                 supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
 
@@ -437,6 +440,12 @@ namespace FinanceTool
                 _clusteringManager = new ClusteringManager();
                 await _clusteringManager.InitializeAsync(mergeClusterDataTable, merge_cluster_table,
                     num_pageNumber, cmb_pageSize, btn_prevPage, btn_nextPage, lbl_pagination2, merge_all_check);
+
+                // 검색 UI 초기화 (새로 추가)
+                InitializeSearchUI();
+
+                // 검색 UI 초기화
+                set_keyword_combo_list();
 
                 // 5. *** 수정: 초기 전체 검색을 안전하게 실행 ***
                 await PerformInitialSearch();
@@ -452,6 +461,33 @@ namespace FinanceTool
             }
         }
 
+        /// <summary>
+        /// 검색 UI 초기화 (새로 추가)
+        /// </summary>
+        private void InitializeSearchUI()
+        {
+            // 1. 검색 컬럼 콤보박스 초기화
+            column_search_combo.Items.Clear();
+
+            // ClusteringManager에서 검색 가능한 컬럼 정보 가져오기
+            var searchableColumns = _clusteringManager.GetSearchableColumns();
+
+            column_search_combo.Items.Add("컬럼 선택");
+            foreach (var column in searchableColumns)
+            {
+                column_search_combo.Items.Add(column.Value); // 표시명 (키워드, 공급업체, 타겟, 계정, 코스트센터)
+            }
+
+            column_search_combo.SelectedIndex = 0;
+
+            // 2. 검색 내 검색 체크박스 초기화
+            sub_search_checkbox.Checked = false;
+            sub_search_checkbox.Text = "검색 결과 내 재검색";
+
+            
+            Debug.WriteLine("검색 UI 초기화 완료");
+        }
+
 
         // *** 새로 추가: 초기 전체 검색 메서드 ***
         private async Task PerformInitialSearch()
@@ -463,8 +499,6 @@ namespace FinanceTool
                 {
                     Keywords = new List<string>(), // 빈 키워드 = 전체 검색
                     ExcludeKeywords = null,
-                    IsKeywordSearch = keyword_radio1.Checked,
-                    IsSupplierSearch = keyword_radio2.Checked,
                     ExactMatch = false,
                     AndSearch = false
                 };
@@ -642,26 +676,23 @@ namespace FinanceTool
             string targetKeyword = "";
 
             // 검색어 수집
-            if (merge_search_radio1.Checked)
+            if (!string.IsNullOrEmpty(merge_search_keyword.Text))
             {
-                if (merge_keyword_combo.SelectedIndex != 0)
-                {
-                    targetKeyword = merge_keyword_combo.SelectedItem.ToString();
-                }
-            }
-            else if (merge_search_radio2.Checked)
-            {
-                if (!string.IsNullOrEmpty(merge_search_keyword.Text))
-                {
-                    targetKeyword = merge_search_keyword.Text;
-                }
+                targetKeyword = merge_search_keyword.Text;
             }
 
             List<string> keywords = new List<string>();
             if (!string.IsNullOrEmpty(targetKeyword))
             {
-                // 키워드 매칭 수행
-                List<string> searchList = keyword_radio1.Checked ? merge_keyword_list : supplier_keyword_list;
+                // 현재 선택된 컬럼 기준으로 검색 리스트 결정
+                string currentColumn = GetSelectedSearchColumn();
+                List<string> searchList = _clusteringManager.GetColumnValues(currentColumn);
+
+                // 빈 리스트인 경우 입력값 그대로 사용
+                if (searchList.Count == 0)
+                {
+                    searchList = new List<string> { targetKeyword };
+                }
 
                 if (equalsSearchYN)
                 {
@@ -1145,116 +1176,44 @@ namespace FinanceTool
             {
                 string target_keyword = "";
 
-                //combobox로 검색할 경우
-                if (merge_search_radio1.Checked)
+                if (!"".Equals(merge_search_keyword.Text.ToString()) && merge_search_keyword.Text != null)
                 {
-                    if (merge_keyword_combo.SelectedIndex != 0)
-                    {
-                        target_keyword = merge_keyword_combo.SelectedItem.ToString();
-                    }
-                }
-                //직접 검색할 경우
-                else if (merge_search_radio2.Checked)
-                {
-                    if (!"".Equals(merge_search_keyword.Text.ToString()) && merge_search_keyword.Text != null)
-                    {
-                        target_keyword = merge_search_keyword.Text.ToString();
-                    }
+                    target_keyword = merge_search_keyword.Text.ToString();
                 }
 
-                List<string> MathcingPairs = new List<string>();
-
-                if (!"".Equals(target_keyword))
+                // 검색어가 없으면 전체 검색
+                if (string.IsNullOrEmpty(target_keyword))
                 {
-                    //쉼표 포함 시 다중검색 기능 표기
-                    if (target_keyword.Contains(","))
+                    await PerformSearchWithCriteria(new Dictionary<string, SearchColumnCriteria>(), isAlreadyProgress);
+                    return;
+                }
+
+                // AND/OR 검색 조건 파싱
+                bool useAndSearch = target_keyword.Contains(",");
+                List<string> keywords = ParseSearchKeywords(target_keyword);
+
+                // *** 핵심 변경: column_search_combo에서 선택된 컬럼 사용 ***
+                string searchColumn = GetSelectedSearchColumn();
+
+                Debug.WriteLine($"검색 실행 - 컬럼: {searchColumn}, 키워드: {string.Join(", ", keywords)}, 완전일치: {equalsSearchYN}, AND: {useAndSearch}");
+
+                // 다중 컬럼 검색 조건 구성
+                var columnCriteria = new Dictionary<string, SearchColumnCriteria>
+                {
                     {
-                        andSearchYN = true;
-                    }
-
-                    Debug.WriteLine($"andSearchYN : {andSearchYN} ,equalsSearchYN : {equalsSearchYN} ");
-
-                    // 키워드 검색 또는 공급업체 검색 여부에 따라 다른 리스트 사용
-                    List<string> searchList = keyword_radio1.Checked ? merge_keyword_list : supplier_keyword_list;
-
-                    //완전 일치 검색
-                    if (equalsSearchYN)
-                    {
-                        MathcingPairs = DataHandler.FindMachEqualsKeyword(searchList, target_keyword);
-                    }
-                    //포함 검색
-                    else
-                    {
-
-                        MathcingPairs = DataHandler.FindMachKeyword(searchList, target_keyword);
-                    }
-
-                    if (MathcingPairs.Count == 0)
-                    {
-                        Debug.WriteLine($"such result == 0");
-                        merge_cluster_table.DataSource = null;
-                        merge_cluster_table.Rows.Clear();
-                        merge_cluster_table.Columns.Clear();
-                        if (DataHandler.dragSelections.ContainsKey(merge_cluster_table))
+                        searchColumn,
+                        new SearchColumnCriteria
                         {
-                            DataHandler.dragSelections[merge_cluster_table].Clear();
+                            Keywords = keywords,
+                            ExactMatch = equalsSearchYN,
+                            UseAnd = useAndSearch
                         }
+                    }
+                };
 
-                        change_row_count();
-                        return;
-                    }
+                await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
 
-                    if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
-                    {
-                        Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
-                        return; // 또는 적절한 오류 처리
-                    }
-                    /*
-                    if (!"".Equals(except_keyword.Text))
-                    {
-                        CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString(), keyword_radio2.Checked);
-                    }
-                    else
-                    {
-                        CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
-                    }
-                    */
-                    var searchCriteria = new SearchCriteria
-                    {
-                        Keywords = MathcingPairs,
-                        ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
-                        IsSupplierSearch = keyword_radio2.Checked,
-                        ExactMatch = equalsSearchYN,
-                        AndSearch = andSearchYN
-                    };
-                    await _clusteringManager.SearchAsync(searchCriteria);
-                }
-                //전체 검색
-                else
-                {
-                    /*
-                    if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
-                    {
-                        Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
-                        return; // 또는 적절한 오류 처리
-                    }
-
-                    CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
-                    */
-                    var searchCriteria = new SearchCriteria
-                    {
-                        Keywords = MathcingPairs,
-                        ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
-                        IsSupplierSearch = keyword_radio2.Checked,
-                        ExactMatch = equalsSearchYN,
-                        AndSearch = andSearchYN
-                    };
-                    await _clusteringManager.SearchAsync(searchCriteria);
-                }
-
-                merge_all_check.Checked = false;
-                andSearchYN = false;
-                change_row_count();
+              
             }
             else
             {
@@ -1264,131 +1223,57 @@ namespace FinanceTool
 
                     string target_keyword = "";
 
-                    //combobox로 검색할 경우
-                    if (merge_search_radio1.Checked)
+                    if (!"".Equals(merge_search_keyword.Text.ToString()) && merge_search_keyword.Text != null)
                     {
-                        if (merge_keyword_combo.SelectedIndex != 0)
-                        {
-                            target_keyword = merge_keyword_combo.SelectedItem.ToString();
-                        }
-                    }
-                    //직접 검색할 경우
-                    else if (merge_search_radio2.Checked)
-                    {
-                        if (!"".Equals(merge_search_keyword.Text.ToString()) && merge_search_keyword.Text != null)
-                        {
-                            target_keyword = merge_search_keyword.Text.ToString();
-                        }
+                        target_keyword = merge_search_keyword.Text.ToString();
                     }
 
                     await progressForm.UpdateProgressHandler(10, "데이터 검색 시작");
                     await Task.Delay(10);
 
-                    List<string> MathcingPairs = new List<string>();
-
-                    if (!"".Equals(target_keyword))
+                    // 검색어가 없으면 전체 검색
+                    if (string.IsNullOrEmpty(target_keyword))
                     {
-                        //쉼표 포함 시 다중검색 기능 표기
-                        if (target_keyword.Contains(","))
-                        {
-                            andSearchYN = true;
-                        }
+                        await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
+                        await Task.Delay(10);
 
-                        Debug.WriteLine($"andSearchYN : {andSearchYN} ,equalsSearchYN : {equalsSearchYN} ");
+                        await PerformSearchWithCriteria(new Dictionary<string, SearchColumnCriteria>(), isAlreadyProgress);
+                        return;
+                    }
 
-                        // 키워드 검색 또는 공급업체 검색 여부에 따라 다른 리스트 사용
-                        List<string> searchList = keyword_radio1.Checked ? merge_keyword_list : supplier_keyword_list;
+                    // AND/OR 검색 조건 파싱
+                    bool useAndSearch = target_keyword.Contains(",");
+                    List<string> keywords = ParseSearchKeywords(target_keyword);
 
-                        //완전 일치 검색
-                        if (equalsSearchYN)
-                        {
-                            MathcingPairs = DataHandler.FindMachEqualsKeyword(searchList, target_keyword);
-                        }
-                        //포함 검색
-                        else
-                        {
-                            MathcingPairs = DataHandler.FindMachKeyword(searchList, target_keyword);
-                        }
+                    // *** 핵심 변경: column_search_combo에서 선택된 컬럼 사용 ***
+                    string searchColumn = GetSelectedSearchColumn();
 
-                        if (MathcingPairs.Count == 0)
+                    Debug.WriteLine($"검색 실행 - 컬럼: {searchColumn}, 키워드: {string.Join(", ", keywords)}, 완전일치: {equalsSearchYN}, AND: {useAndSearch}");
+
+                    // 다중 컬럼 검색 조건 구성
+                    var columnCriteria = new Dictionary<string, SearchColumnCriteria>
+                    {
                         {
-                            Debug.WriteLine($"such result == 0");
-                            merge_cluster_table.DataSource = null;
-                            merge_cluster_table.Rows.Clear();
-                            merge_cluster_table.Columns.Clear();
-                            if (DataHandler.dragSelections.ContainsKey(merge_cluster_table))
+                            searchColumn,
+                            new SearchColumnCriteria
                             {
-                                DataHandler.dragSelections[merge_cluster_table].Clear();
+                                Keywords = keywords,
+                                ExactMatch = equalsSearchYN,
+                                UseAnd = useAndSearch
                             }
-
-                            change_row_count();
-
-                            await progressForm.UpdateProgressHandler(100);
-                            await Task.Delay(10);
-                            progressForm.Close();
-
-                            return;
                         }
+                    };
 
-                        await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
-                        await Task.Delay(10);
 
-                        if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
-                        {
-                            Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
-                            return; // 또는 적절한 오류 처리
-                        }
+                    await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
+                    await Task.Delay(10);
 
-                        /*
-                        if (!"".Equals(except_keyword.Text))
-                        {
-                            CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, except_keyword.Text.ToString(), keyword_radio2.Checked);
-                        }
-                        else
-                        {
-                            CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
-                        }
-                        */
-                        var searchCriteria = new SearchCriteria
-                        {
-                            Keywords = MathcingPairs,
-                            ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
-                            IsSupplierSearch = keyword_radio2.Checked,
-                            ExactMatch = equalsSearchYN,
-                            AndSearch = andSearchYN
-                        };
-                        await _clusteringManager.SearchAsync(searchCriteria);
-                    }
-                    //전체 검색
-                    else
-                    {
-                        await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
-                        await Task.Delay(10);
-
-                        if (mergeClusterDataTable == null || mergeClusterDataTable.Columns.Count == 0)
-                        {
-                            Debug.WriteLine("mergeClusterDataTable이 null이거나 컬럼이 없습니다. CreateFilteredDataGridView 호출을 건너뜁니다.");
-                            return; // 또는 적절한 오류 처리
-                        }
-
-                        //CreateFilteredDataGridView(merge_cluster_table, mergeClusterDataTable, MathcingPairs, null, keyword_radio2.Checked);
-                        var searchCriteria = new SearchCriteria
-                        {
-                            Keywords = MathcingPairs,
-                            ExcludeKeywords = string.IsNullOrEmpty(except_keyword.Text) ? null : except_keyword.Text.Split(',').Select(k => k.Trim()).ToList(),
-                            IsSupplierSearch = keyword_radio2.Checked,
-                            ExactMatch = equalsSearchYN,
-                            AndSearch = andSearchYN
-                        };
-                        await _clusteringManager.SearchAsync(searchCriteria);
-                    }
+                    await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
 
                     await progressForm.UpdateProgressHandler(90, "데이터 검색 완료");
                     await Task.Delay(10);
 
-                    merge_all_check.Checked = false;
-                    andSearchYN = false;
-                    change_row_count();
+                   
 
                     await progressForm.UpdateProgressHandler(100);
                     await Task.Delay(10);
@@ -1396,10 +1281,146 @@ namespace FinanceTool
                 }
             }
 
+        }
+
+        /// <summary>
+        /// 현재 선택된 검색 컬럼 반환 (keyword_radio 대체)
+        /// </summary>
+        private string GetSelectedSearchColumn()
+        {
+            // column_search_combo에서 선택된 컬럼이 있으면 우선 사용
+            if (column_search_combo.SelectedIndex > 0)
+            {
+                string selectedDisplayName = column_search_combo.SelectedItem.ToString();
+                return ConvertDisplayNameToColumnName(selectedDisplayName);
+            }
+            else
+            {
+                return "키워드목록"; // 기본값: 키워드
+            }
+
+        }
+
+        /// <summary>
+        /// 검색 키워드 파싱 (AND/OR 지원)
+        /// </summary>
+        private List<string> ParseSearchKeywords(string searchText)
+        {
+            var keywords = new List<string>();
+
+            if (searchText.Contains("|"))
+            {
+                // OR 조건 처리 (현재는 단순화)
+                keywords.AddRange(searchText.Split('|').SelectMany(part =>
+                    part.Split(',').Select(k => k.Trim())).Where(k => !string.IsNullOrEmpty(k)));
+            }
+            else
+            {
+                // AND 조건 또는 단일 키워드
+                keywords.AddRange(searchText.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)));
+            }
+
+            return keywords;
+        }
+
+        /// <summary>
+        /// 검색 조건으로 실제 검색 수행
+        /// </summary>
+        private async Task PerformSearchWithCriteria(Dictionary<string, SearchColumnCriteria> columnCriteria, bool isAlreadyProgress)
+        {
+            try
+            {
+                // 제외 키워드 처리
+                List<string> excludeKeywords = null;
+                if (!string.IsNullOrEmpty(except_keyword.Text))
+                {
+                    excludeKeywords = except_keyword.Text.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).ToList();
+                }
+
+                // 검색 내 검색 모드 처리
+                if (_isSubSearchMode && _baseSearchResults.Count > 0)
+                {
+                    await PerformSubSearch(columnCriteria, excludeKeywords, isAlreadyProgress);
+                }
+                else
+                {
+                    await PerformNormalSearch(columnCriteria, excludeKeywords, isAlreadyProgress);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"검색 수행 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 일반 검색 수행
+        /// </summary>
+        private async Task PerformNormalSearch(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords, bool isAlreadyProgress)
+        {
+            if (isAlreadyProgress)
+            {
+                // 다중 컬럼 검색 수행
+                await _clusteringManager.SearchMultipleColumnsAsync(columnCriteria, excludeKeywords);
+            }
+            else
+            {
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "데이터 검색 시작");
+
+                    await _clusteringManager.SearchMultipleColumnsAsync(columnCriteria, excludeKeywords);
+
+                    await progressForm.UpdateProgressHandler(100, "데이터 검색 완료");
+                    await Task.Delay(10);
+                }
+            }
 
             merge_all_check.Checked = false;
-            //_selectedClusterNumbers.Clear();
             change_row_count();
+        }
+
+        /// <summary>
+        /// 검색 내 검색 수행
+        /// </summary>
+        private async Task PerformSubSearch(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords, bool isAlreadyProgress)
+        {
+            // 전체 검색 수행
+            var searchResult = await _clusteringManager.SearchMultipleColumnsAsync(columnCriteria, excludeKeywords);
+
+            // 기준 검색 결과와 교집합
+            var currentResults = _clusteringManager.GetCurrentResultClusterIds();
+            var filteredResults = currentResults.Intersect(_baseSearchResults).ToList();
+
+            Debug.WriteLine($"검색 내 검색 결과: 전체 {currentResults.Count}개 → 필터링 후 {filteredResults.Count}개");
+
+            // 필터링된 결과로 UI 업데이트 (추가 구현 필요)
+            await DisplayFilteredSubSearchResults(filteredResults);
+        }
+
+        /// <summary>
+        /// 검색 내 검색 결과를 화면에 표시
+        /// </summary>
+        private async Task DisplayFilteredSubSearchResults(List<int> filteredClusterIds)
+        {
+            try
+            {
+                // ClusteringManager의 새 메서드 사용
+                await _clusteringManager.DisplaySpecificClustersAsync(filteredClusterIds);
+
+                merge_all_check.Checked = false;
+                change_row_count();
+
+                Debug.WriteLine($"검색 내 검색 결과 표시 완료: {filteredClusterIds?.Count ?? 0}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"검색 내 검색 결과 표시 오류: {ex.Message}");
+                MessageBox.Show($"검색 내 검색 결과 표시 중 오류가 발생했습니다: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void change_row_count()
@@ -1458,23 +1479,10 @@ namespace FinanceTool
         {
             string target_keyword = "";
 
-            //combobox로 검색할 경우
-            if (check_search_radio1.Checked)
+            if (!"".Equals(check_search_keyword.Text.ToString()) && check_search_keyword.Text != null)
             {
-                if (check_search_combo.SelectedIndex != 0)
-                {
-                    target_keyword = check_search_combo.SelectedItem.ToString();
-                }
+                target_keyword = check_search_keyword.Text.ToString();
             }
-            //직접 검색할 경우
-            else if (check_search_radio2.Checked)
-            {
-                if (!"".Equals(check_search_keyword.Text.ToString()) && check_search_keyword.Text != null)
-                {
-                    target_keyword = check_search_keyword.Text.ToString();
-                }
-            }
-
 
             List<string> MathcingPairs = new List<string>();
             try
@@ -1653,44 +1661,35 @@ namespace FinanceTool
 
         private void set_keyword_combo_list()
         {
-            merge_keyword_combo.Items.Clear();
-            merge_keyword_combo.Items.Add("키워드 선택");
-
-            check_search_combo.Items.Clear();
-            check_search_combo.Items.Add("키워드 선택");
-
-            // 키워드 리스트 생성
-            merge_keyword_list = ExtractUniqueKeywords(DataHandler.finalClusteringData, 0);
-            check_keyword_list = ExtractUniqueKeywords(DataHandler.finalClusteringData, 1);
-
-            // 공급업체 리스트 생성
-            if (mergeClusterDataTable != null && mergeClusterDataTable.Columns.Contains(DataHandler.prod_col_name))
+            try
             {
-                supplier_keyword_list = ExtractUniqueSupplierKeywords(mergeClusterDataTable, 0);
-            }
-            else
-            {
-                supplier_keyword_list = new List<string>();
-            }
+                // 기존 리스트 방식도 ClusteringManager 기반으로 변경 (하위 호환성)
+                merge_keyword_list = _clusteringManager.GetColumnValues("키워드목록");
+                check_keyword_list = FilterValuesByMergeStatus(merge_keyword_list, "키워드목록", true);
 
-            // 현재 선택된 검색 모드에 따라 콤보박스 내용 업데이트
-            UpdateSearchComboBox();
-
-            // 검증 콤보박스는 항상 키워드 기준
-            foreach (string keyword in check_keyword_list)
-            {
-                if (!"\\".Equals(keyword))
+                // 공급업체 리스트
+                if (!string.IsNullOrEmpty(DataHandler.prod_col_name))
                 {
-                    check_search_combo.Items.Add(keyword);
+                    supplier_keyword_list = _clusteringManager.GetColumnValues(DataHandler.prod_col_name);
                 }
-            }
+                else
+                {
+                    supplier_keyword_list = new List<string>();
+                }
 
-            check_search_combo.SelectedIndex = 0;
+
+                Debug.WriteLine($"키워드 리스트 업데이트 완료 - 키워드: {merge_keyword_list.Count}개, 공급업체: {supplier_keyword_list.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"키워드 콤보박스 리스트 설정 오류: {ex.Message}");
+            }
 
             // *** 제거: create_merge_keyword_list(true) 호출 삭제 ***
         }
 
 
+      
         public void CreateCheckDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords)
         {
             // DataGridView 초기화
@@ -2391,7 +2390,6 @@ namespace FinanceTool
             set_keyword_combo_list();
 
             //검색조건 초기화
-            check_search_combo.SelectedIndex = 0;
             check_search_keyword.Text = "";
 
             create_merge_keyword_list();
@@ -2528,31 +2526,6 @@ namespace FinanceTool
         private void check_search_button_Click(object sender, EventArgs e)
         {
             create_check_keyword_list();
-        }
-
-        private void merge_search_radio1_CheckedChanged(object sender, EventArgs e)
-        {
-            merge_search_keyword.Enabled = merge_search_radio2.Checked;
-            merge_search_keyword.Visible = merge_search_radio2.Checked;
-
-        }
-
-        private void merge_search_radio2_CheckedChanged(object sender, EventArgs e)
-        {
-            merge_search_keyword.Enabled = merge_search_radio2.Checked;
-            merge_search_keyword.Visible = merge_search_radio2.Checked;
-        }
-
-        private void check_search_radio1_CheckedChanged(object sender, EventArgs e)
-        {
-            check_search_keyword.Enabled = check_search_radio2.Checked;
-            check_search_keyword.Visible = check_search_radio2.Checked;
-        }
-
-        private void check_search_radio2_CheckedChanged(object sender, EventArgs e)
-        {
-            check_search_keyword.Enabled = check_search_radio2.Checked;
-            check_search_keyword.Visible = check_search_radio2.Checked;
         }
 
         private void merge_search_keyword_KeyDown(object sender, KeyEventArgs e)
@@ -3054,7 +3027,6 @@ namespace FinanceTool
                 set_keyword_combo_list();
 
                 //검색조건 초기화
-                merge_keyword_combo.SelectedIndex = 0;
                 merge_search_keyword.Text = "";
 
                 await progressForm.UpdateProgressHandler(70, "클러스터 병합 결과 출력 중...");
@@ -3254,54 +3226,6 @@ namespace FinanceTool
                 create_merge_keyword_list();   // 호출하고 싶은 함수
                 e.SuppressKeyPress = true;  // 비프음 방지
             }
-        }
-
-        private void keyword_radio1_CheckedChanged(object sender, EventArgs e)
-        {
-            // 검색 모드가 변경되면 콤보박스와 검색어 초기화
-            //merge_keyword_combo.SelectedIndex = 0;
-            merge_search_keyword.Text = "";
-
-            // 필요에 따라 콤보박스 내용 업데이트
-            UpdateSearchComboBox();
-        }
-
-        private void UpdateSearchComboBox()
-        {
-            merge_keyword_combo.Items.Clear();
-
-            if (keyword_radio1.Checked)
-            {
-                // 키워드 검색 모드
-                merge_keyword_combo.Items.Add("키워드 선택");
-                foreach (string keyword in merge_keyword_list)
-                {
-                    if ("\\".Equals(keyword))
-                    {
-                        continue;
-                    }
-                    merge_keyword_combo.Items.Add(keyword);
-                }
-            }
-            else
-            {
-                // 공급업체 검색 모드
-                merge_keyword_combo.Items.Add("공급업체 선택");
-                if (supplier_keyword_list != null)
-                {
-                    foreach (string supplier in supplier_keyword_list)
-                    {
-                        if ("\\".Equals(supplier))
-                        {
-                            continue;
-                        }
-                        merge_keyword_combo.Items.Add(supplier);
-                    }
-                }
-
-            }
-
-            merge_keyword_combo.SelectedIndex = 0;
         }
 
         // 키워드별 데이터를 저장할 클래스
@@ -3963,7 +3887,7 @@ namespace FinanceTool
 
         }
 
-        private async  void auto_cluster_btn_Click(object sender, EventArgs e)
+        private async void auto_cluster_btn_Click(object sender, EventArgs e)
         {
             try
             {
@@ -4131,6 +4055,175 @@ namespace FinanceTool
                 MessageBox.Show($"자동 클러스터링 중 오류가 발생했습니다: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void column_search_combo_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (column_search_combo.SelectedIndex <= 0)
+                {
+                    // "컬럼 선택"이 선택된 경우 - 기존 라디오 버튼 방식 활성화
+                    _currentSearchColumn = GetSelectedSearchColumn();
+
+
+                    Debug.WriteLine("컬럼 선택 초기화 - 라디오 버튼 방식 사용");
+                    return;
+                }
+
+                // 특정 컬럼이 선택된 경우
+                string selectedDisplayName = column_search_combo.SelectedItem.ToString();
+                _currentSearchColumn = ConvertDisplayNameToColumnName(selectedDisplayName);
+
+                Debug.WriteLine($"검색 컬럼 변경: {selectedDisplayName} ({_currentSearchColumn})");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"검색 컬럼 선택 변경 오류: {ex.Message}");
+            }
+        }
+
+        private void sub_search_checkbox_CheckedChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                if (sub_search_checkbox.Checked)
+                {
+                    // 현재 검색 결과를 기준으로 저장
+                    _baseSearchResults = _clusteringManager.GetCurrentResultClusterIds();
+                    _isSubSearchMode = true;
+
+                    sub_search_info_label.Text = $"검색 결과 내 재검색 ({_baseSearchResults.Count}개 결과 저장됨)";
+                    Debug.WriteLine($"검색 내 검색 모드 활성화: {_baseSearchResults.Count}개 결과 저장");
+                }
+                else
+                {
+                    // 검색 내 검색 모드 해제
+                    _isSubSearchMode = false;
+                    _baseSearchResults.Clear();
+                    sub_search_info_label.Text = "";
+                    Debug.WriteLine("검색 내 검색 모드 비활성화");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"검색 내 검색 체크박스 변경 오류: {ex.Message}");
+            }
+        }
+
+        /////////////////////////////검색 헬퍼 메서드///////////////////////////////////
+        ////// <summary>
+        /// 표시명을 실제 컬럼명으로 변환
+        /// </summary>
+        private string ConvertDisplayNameToColumnName(string displayName)
+        {
+            var columnMapping = new Dictionary<string, string>
+    {
+        { "키워드", "키워드목록" },
+        { "공급업체", DataHandler.prod_col_name },
+        { "타겟", DataHandler.levelName[1] },
+        { "계정", DataHandler.sub_acc_col_name },
+        { "코스트센터", DataHandler.dept_col_name }
+    };
+
+            return columnMapping.TryGetValue(displayName, out string columnName) ? columnName : "키워드목록";
+        }
+
+       
+
+        /// <summary>
+        /// 병합 상태에 따른 값 필터링
+        /// </summary>
+        private List<string> FilterValuesByMergeStatus(List<string> allValues, string columnName, bool onlyMerged)
+        {
+            try
+            {
+                var filteredValues = new HashSet<string>();
+
+                // 각 값에 대해 해당 값을 가진 클러스터들의 병합 상태 확인
+                foreach (string value in allValues)
+                {
+                    var searchCriteria = SearchCriteria.FromMultiColumn(
+                        new Dictionary<string, SearchColumnCriteria>
+                        {
+                    { columnName, new SearchColumnCriteria { Keywords = new List<string> { value }, ExactMatch = true } }
+                        }
+                    );
+
+                    // 해당 값을 가진 클러스터 ID들 조회
+                    var clusterIds = GetClusterIdsForValue(columnName, value);
+
+                    // 병합 상태 확인
+                    bool hasTargetStatus = clusterIds.Any(id => CheckMergeStatus(id, onlyMerged));
+
+                    if (hasTargetStatus)
+                    {
+                        filteredValues.Add(value);
+                    }
+                }
+
+                return filteredValues.OrderBy(v => v).ToList();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"값 필터링 오류: {ex.Message}");
+                return allValues; // 오류 시 전체 값 반환
+            }
+        }
+
+        /// <summary>
+        /// 특정 값을 가진 클러스터 ID들 조회
+        /// </summary>
+        private List<int> GetClusterIdsForValue(string columnName, string value)
+        {
+            // ClusteringManager를 통해 조회하거나, 직접 DataTable에서 조회
+            var clusterIds = new List<int>();
+
+            if (mergeClusterDataTable != null)
+            {
+                foreach (DataRow row in mergeClusterDataTable.Rows)
+                {
+                    if (row[columnName]?.ToString()?.Contains(value) == true)
+                    {
+                        if (int.TryParse(row["ID"]?.ToString(), out int clusterId))
+                        {
+                            clusterIds.Add(clusterId);
+                        }
+                    }
+                }
+            }
+
+            return clusterIds;
+        }
+
+        /// <summary>
+        /// 클러스터 병합 상태 확인
+        /// </summary>
+        private bool CheckMergeStatus(int clusterId, bool checkForMerged)
+        {
+            var row = mergeClusterDataTable?.AsEnumerable()
+                .FirstOrDefault(r => Convert.ToInt32(r["ID"]) == clusterId);
+
+            if (row == null) return false;
+
+            if (!row.IsNull("ClusterID") && !row.IsNull("ID"))
+            {
+                int clusterIdValue = Convert.ToInt32(row["ClusterID"]);
+                int idValue = Convert.ToInt32(row["ID"]);
+
+                if (checkForMerged)
+                {
+                    // 병합된 클러스터: ClusterID > 0 && ClusterID == ID
+                    return clusterIdValue > 0 && clusterIdValue == idValue;
+                }
+                else
+                {
+                    // 미병합 클러스터: ClusterID <= 0 || ClusterID != ID
+                    return clusterIdValue <= 0 || clusterIdValue != idValue;
+                }
+            }
+
+            return !checkForMerged; // 정보가 없으면 미병합으로 간주
         }
     }
 }

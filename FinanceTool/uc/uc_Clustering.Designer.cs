@@ -30,9 +30,9 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_left = new Panel();
             groupBox1 = new GroupBox();
@@ -40,6 +40,7 @@
             label1 = new Label();
             label10 = new Label();
             panel1 = new Panel();
+            sub_search_info_label = new Label();
             groupBox6 = new GroupBox();
             radioButton1 = new RadioButton();
             radioButton2 = new RadioButton();
@@ -64,22 +65,16 @@
             lbl_pagination2 = new Label();
             pnl_merge_controls = new Panel();
             groupBox8 = new GroupBox();
-            textBox1 = new TextBox();
             merge_search_keyword = new TextBox();
-            merge_keyword_combo = new ComboBox();
-            merge_search_radio1 = new RadioButton();
-            merge_search_radio2 = new RadioButton();
             except_keyword = new TextBox();
+            sub_search_checkbox = new CheckBox();
             groupBox7 = new GroupBox();
             column_search_combo = new ComboBox();
-            column_change_checkbox = new CheckBox();
-            keyword_radio2 = new RadioButton();
-            keyword_radio1 = new RadioButton();
-            label2 = new Label();
             excep_search_checkbox = new CheckBox();
-            label3 = new Label();
             equal_search_checkbox = new CheckBox();
+            label2 = new Label();
             merge_search_button = new Button();
+            label3 = new Label();
             pnl_right = new Panel();
             tableLayoutRight = new TableLayoutPanel();
             groupBox3 = new GroupBox();
@@ -104,13 +99,10 @@
             union_cluster_btn = new Button();
             label7 = new Label();
             complete_btn = new Button();
-            check_search_radio2 = new RadioButton();
-            check_search_radio1 = new RadioButton();
             check_search_keyword = new TextBox();
             merge_cancel_button = new Button();
             check_search_button = new Button();
             merge_check_table = new DataGridView();
-            check_search_combo = new ComboBox();
             tableLayoutMain.SuspendLayout();
             pnl_left.SuspendLayout();
             groupBox1.SuspendLayout();
@@ -194,9 +186,9 @@
             tableLayoutLeft.RowCount = 7;
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 55F));
-            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 243F));
-            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 63F));
-            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 45F));
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 163F));
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 53F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
             tableLayoutLeft.Size = new Size(1211, 963);
@@ -208,7 +200,7 @@
             label1.BackColor = Color.SteelBlue;
             label1.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
             label1.ForeColor = Color.White;
-            label1.Location = new Point(415, 411);
+            label1.Location = new Point(415, 332);
             label1.Name = "label1";
             label1.Size = new Size(380, 40);
             label1.TabIndex = 57;
@@ -230,16 +222,25 @@
             // 
             // panel1
             // 
+            panel1.Controls.Add(sub_search_info_label);
             panel1.Controls.Add(groupBox6);
             panel1.Controls.Add(merge_all_check);
             panel1.Controls.Add(button1);
             panel1.Controls.Add(merge_addon_btn);
             panel1.Controls.Add(decimal_combo);
             panel1.Controls.Add(label5);
-            panel1.Location = new Point(3, 349);
+            panel1.Location = new Point(3, 269);
             panel1.Name = "panel1";
-            panel1.Size = new Size(1205, 55);
+            panel1.Size = new Size(1205, 54);
             panel1.TabIndex = 55;
+            // 
+            // sub_search_info_label
+            // 
+            sub_search_info_label.AutoSize = true;
+            sub_search_info_label.Location = new Point(852, 11);
+            sub_search_info_label.Name = "sub_search_info_label";
+            sub_search_info_label.Size = new Size(0, 30);
+            sub_search_info_label.TabIndex = 55;
             // 
             // groupBox6
             // 
@@ -380,10 +381,10 @@
             // 
             pnl_merge_data.Controls.Add(merge_cluster_table);
             pnl_merge_data.Dock = DockStyle.Fill;
-            pnl_merge_data.Location = new Point(5, 459);
+            pnl_merge_data.Location = new Point(5, 384);
             pnl_merge_data.Margin = new Padding(5);
             pnl_merge_data.Name = "pnl_merge_data";
-            pnl_merge_data.Size = new Size(1201, 449);
+            pnl_merge_data.Size = new Size(1201, 524);
             pnl_merge_data.TabIndex = 2;
             // 
             // merge_cluster_table
@@ -400,7 +401,7 @@
             merge_cluster_table.MinimumSize = new Size(500, 300);
             merge_cluster_table.Name = "merge_cluster_table";
             merge_cluster_table.ReadOnly = true;
-            merge_cluster_table.Size = new Size(1191, 443);
+            merge_cluster_table.Size = new Size(1191, 518);
             merge_cluster_table.TabIndex = 34;
             merge_cluster_table.CellContentClick += merge_cluster_table_CellContentClick;
             // 
@@ -492,45 +493,33 @@
             // pnl_merge_controls
             // 
             pnl_merge_controls.Controls.Add(groupBox8);
+            pnl_merge_controls.Controls.Add(sub_search_checkbox);
             pnl_merge_controls.Controls.Add(groupBox7);
+            pnl_merge_controls.Controls.Add(label2);
             pnl_merge_controls.Controls.Add(merge_search_button);
+            pnl_merge_controls.Controls.Add(label3);
             pnl_merge_controls.Location = new Point(3, 106);
             pnl_merge_controls.Name = "pnl_merge_controls";
-            pnl_merge_controls.Size = new Size(1205, 229);
+            pnl_merge_controls.Size = new Size(1205, 157);
             pnl_merge_controls.TabIndex = 1;
             // 
             // groupBox8
             // 
-            groupBox8.Controls.Add(textBox1);
             groupBox8.Controls.Add(merge_search_keyword);
-            groupBox8.Controls.Add(merge_keyword_combo);
-            groupBox8.Controls.Add(merge_search_radio1);
-            groupBox8.Controls.Add(merge_search_radio2);
             groupBox8.Controls.Add(except_keyword);
             groupBox8.Font = new Font("맑은 고딕", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            groupBox8.Location = new Point(560, 6);
+            groupBox8.Location = new Point(376, 3);
             groupBox8.Name = "groupBox8";
-            groupBox8.Size = new Size(426, 217);
+            groupBox8.Size = new Size(362, 143);
             groupBox8.TabIndex = 56;
             groupBox8.TabStop = false;
             groupBox8.Text = "검색 조건";
-            // 
-            // textBox1
-            // 
-            textBox1.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            textBox1.Enabled = false;
-            textBox1.Font = new Font("맑은 고딕", 14.25F);
-            textBox1.Location = new Point(72, 159);
-            textBox1.Name = "textBox1";
-            textBox1.PlaceholderText = "기존 결과 내 재검색";
-            textBox1.Size = new Size(300, 33);
-            textBox1.TabIndex = 46;
             // 
             // merge_search_keyword
             // 
             merge_search_keyword.Enabled = false;
             merge_search_keyword.Font = new Font("맑은 고딕", 14.25F);
-            merge_search_keyword.Location = new Point(72, 75);
+            merge_search_keyword.Location = new Point(32, 40);
             merge_search_keyword.Name = "merge_search_keyword";
             merge_search_keyword.PlaceholderText = "검색 키워드 입력";
             merge_search_keyword.Size = new Size(300, 33);
@@ -538,69 +527,40 @@
             merge_search_keyword.Visible = false;
             merge_search_keyword.KeyDown += merge_search_keyword_KeyDown;
             // 
-            // merge_keyword_combo
-            // 
-            merge_keyword_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            merge_keyword_combo.Font = new Font("맑은 고딕", 14.25F);
-            merge_keyword_combo.FormattingEnabled = true;
-            merge_keyword_combo.Location = new Point(72, 75);
-            merge_keyword_combo.Name = "merge_keyword_combo";
-            merge_keyword_combo.Size = new Size(300, 33);
-            merge_keyword_combo.TabIndex = 39;
-            merge_keyword_combo.Text = "검색어 선택";
-            // 
-            // merge_search_radio1
-            // 
-            merge_search_radio1.AutoSize = true;
-            merge_search_radio1.Checked = true;
-            merge_search_radio1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            merge_search_radio1.Location = new Point(68, 39);
-            merge_search_radio1.Name = "merge_search_radio1";
-            merge_search_radio1.Size = new Size(132, 29);
-            merge_search_radio1.TabIndex = 40;
-            merge_search_radio1.TabStop = true;
-            merge_search_radio1.Text = "검색어 선택";
-            merge_search_radio1.UseVisualStyleBackColor = true;
-            merge_search_radio1.CheckedChanged += merge_search_radio1_CheckedChanged;
-            // 
-            // merge_search_radio2
-            // 
-            merge_search_radio2.AutoSize = true;
-            merge_search_radio2.Font = new Font("맑은 고딕", 14.25F);
-            merge_search_radio2.Location = new Point(240, 39);
-            merge_search_radio2.Name = "merge_search_radio2";
-            merge_search_radio2.Size = new Size(132, 29);
-            merge_search_radio2.TabIndex = 41;
-            merge_search_radio2.Text = "검색어 입력";
-            merge_search_radio2.UseVisualStyleBackColor = true;
-            merge_search_radio2.CheckedChanged += merge_search_radio2_CheckedChanged;
-            // 
             // except_keyword
             // 
             except_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             except_keyword.Enabled = false;
             except_keyword.Font = new Font("맑은 고딕", 14.25F);
-            except_keyword.Location = new Point(72, 116);
+            except_keyword.Location = new Point(32, 92);
             except_keyword.Name = "except_keyword";
             except_keyword.PlaceholderText = "제외 항목 입력";
             except_keyword.Size = new Size(300, 33);
             except_keyword.TabIndex = 45;
             except_keyword.KeyDown += except_keyword_KeyDown;
             // 
+            // sub_search_checkbox
+            // 
+            sub_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            sub_search_checkbox.AutoSize = true;
+            sub_search_checkbox.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            sub_search_checkbox.Location = new Point(902, 99);
+            sub_search_checkbox.Name = "sub_search_checkbox";
+            sub_search_checkbox.Size = new Size(147, 29);
+            sub_search_checkbox.TabIndex = 54;
+            sub_search_checkbox.Text = "결과 내 검색 ";
+            sub_search_checkbox.UseVisualStyleBackColor = true;
+            sub_search_checkbox.CheckedChanged += sub_search_checkbox_CheckedChanged;
+            // 
             // groupBox7
             // 
             groupBox7.Controls.Add(column_search_combo);
-            groupBox7.Controls.Add(column_change_checkbox);
-            groupBox7.Controls.Add(keyword_radio2);
-            groupBox7.Controls.Add(keyword_radio1);
-            groupBox7.Controls.Add(label2);
             groupBox7.Controls.Add(excep_search_checkbox);
-            groupBox7.Controls.Add(label3);
             groupBox7.Controls.Add(equal_search_checkbox);
             groupBox7.Font = new Font("맑은 고딕", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             groupBox7.Location = new Point(10, 3);
             groupBox7.Name = "groupBox7";
-            groupBox7.Size = new Size(544, 220);
+            groupBox7.Size = new Size(357, 143);
             groupBox7.TabIndex = 55;
             groupBox7.TabStop = false;
             groupBox7.Text = "검색 설정";
@@ -610,66 +570,19 @@
             column_search_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             column_search_combo.Font = new Font("맑은 고딕", 14.25F);
             column_search_combo.FormattingEnabled = true;
-            column_search_combo.Location = new Point(205, 117);
+            column_search_combo.Location = new Point(25, 40);
             column_search_combo.Name = "column_search_combo";
-            column_search_combo.Size = new Size(300, 33);
+            column_search_combo.Size = new Size(284, 33);
             column_search_combo.TabIndex = 47;
             column_search_combo.Text = "검색 컬럼 선택";
-            // 
-            // column_change_checkbox
-            // 
-            column_change_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            column_change_checkbox.AutoSize = true;
-            column_change_checkbox.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            column_change_checkbox.Location = new Point(22, 119);
-            column_change_checkbox.Name = "column_change_checkbox";
-            column_change_checkbox.Size = new Size(177, 29);
-            column_change_checkbox.TabIndex = 54;
-            column_change_checkbox.Text = "검색 컬럼 변경 : ";
-            column_change_checkbox.UseVisualStyleBackColor = true;
-            // 
-            // keyword_radio2
-            // 
-            keyword_radio2.AutoSize = true;
-            keyword_radio2.Font = new Font("맑은 고딕", 14.25F);
-            keyword_radio2.Location = new Point(160, 42);
-            keyword_radio2.Name = "keyword_radio2";
-            keyword_radio2.Size = new Size(151, 29);
-            keyword_radio2.TabIndex = 53;
-            keyword_radio2.Text = "공급업체 검색";
-            keyword_radio2.UseVisualStyleBackColor = true;
-            // 
-            // keyword_radio1
-            // 
-            keyword_radio1.AutoSize = true;
-            keyword_radio1.Checked = true;
-            keyword_radio1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            keyword_radio1.Location = new Point(22, 42);
-            keyword_radio1.Name = "keyword_radio1";
-            keyword_radio1.Size = new Size(132, 29);
-            keyword_radio1.TabIndex = 52;
-            keyword_radio1.TabStop = true;
-            keyword_radio1.Text = "키워드 검색";
-            keyword_radio1.UseVisualStyleBackColor = true;
-            keyword_radio1.CheckedChanged += keyword_radio1_CheckedChanged;
-            // 
-            // label2
-            // 
-            label2.AutoSize = true;
-            label2.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            label2.ForeColor = Color.IndianRed;
-            label2.Location = new Point(22, 188);
-            label2.Name = "label2";
-            label2.Size = new Size(306, 17);
-            label2.TabIndex = 48;
-            label2.Text = "※ OR 조건 검색 : 검색어 마다 | 구분 후 추가 입력";
+            column_search_combo.SelectedIndexChanged += column_search_combo_SelectedIndexChanged;
             // 
             // excep_search_checkbox
             // 
             excep_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             excep_search_checkbox.AutoSize = true;
             excep_search_checkbox.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            excep_search_checkbox.Location = new Point(232, 77);
+            excep_search_checkbox.Location = new Point(25, 108);
             excep_search_checkbox.Name = "excep_search_checkbox";
             excep_search_checkbox.Size = new Size(204, 29);
             excep_search_checkbox.TabIndex = 48;
@@ -677,29 +590,29 @@
             excep_search_checkbox.UseVisualStyleBackColor = true;
             excep_search_checkbox.CheckedChanged += excep_search_checkbox_CheckedChanged;
             // 
-            // label3
-            // 
-            label3.AutoSize = true;
-            label3.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            label3.ForeColor = Color.IndianRed;
-            label3.Location = new Point(22, 159);
-            label3.Name = "label3";
-            label3.Size = new Size(316, 17);
-            label3.TabIndex = 49;
-            label3.Text = "※ AND 조건 검색 : 키워드 마다 , 구분 후 추가 입력";
-            // 
             // equal_search_checkbox
             // 
             equal_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             equal_search_checkbox.AutoSize = true;
             equal_search_checkbox.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            equal_search_checkbox.Location = new Point(22, 80);
+            equal_search_checkbox.Location = new Point(25, 79);
             equal_search_checkbox.Name = "equal_search_checkbox";
             equal_search_checkbox.Size = new Size(204, 29);
             equal_search_checkbox.TabIndex = 47;
             equal_search_checkbox.Text = "검색 조건 완전 일치";
             equal_search_checkbox.UseVisualStyleBackColor = true;
             equal_search_checkbox.CheckedChanged += equal_search_checkbox_CheckedChanged;
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label2.ForeColor = Color.IndianRed;
+            label2.Location = new Point(879, 53);
+            label2.Name = "label2";
+            label2.Size = new Size(306, 17);
+            label2.TabIndex = 48;
+            label2.Text = "※ OR 조건 검색 : 검색어 마다 | 구분 후 추가 입력";
             // 
             // merge_search_button
             // 
@@ -709,13 +622,24 @@
             merge_search_button.FlatStyle = FlatStyle.Flat;
             merge_search_button.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             merge_search_button.ForeColor = Color.White;
-            merge_search_button.Location = new Point(1099, 185);
+            merge_search_button.Location = new Point(1086, 99);
             merge_search_button.Name = "merge_search_button";
             merge_search_button.Size = new Size(99, 37);
             merge_search_button.TabIndex = 35;
             merge_search_button.Text = "검  색";
             merge_search_button.UseVisualStyleBackColor = false;
             merge_search_button.Click += merge_search_button_Click;
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label3.ForeColor = Color.IndianRed;
+            label3.Location = new Point(879, 25);
+            label3.Name = "label3";
+            label3.Size = new Size(316, 17);
+            label3.TabIndex = 49;
+            label3.Text = "※ AND 조건 검색 : 키워드 마다 , 구분 후 추가 입력";
             // 
             // pnl_right
             // 
@@ -991,13 +915,10 @@
             groupbox2.Controls.Add(union_cluster_btn);
             groupbox2.Controls.Add(label7);
             groupbox2.Controls.Add(complete_btn);
-            groupbox2.Controls.Add(check_search_radio2);
-            groupbox2.Controls.Add(check_search_radio1);
             groupbox2.Controls.Add(check_search_keyword);
             groupbox2.Controls.Add(merge_cancel_button);
             groupbox2.Controls.Add(check_search_button);
             groupbox2.Controls.Add(merge_check_table);
-            groupbox2.Controls.Add(check_search_combo);
             groupbox2.Dock = DockStyle.Fill;
             groupbox2.Font = new Font("맑은 고딕", 15.75F);
             groupbox2.Location = new Point(5, 559);
@@ -1066,37 +987,11 @@
             complete_btn.UseVisualStyleBackColor = false;
             complete_btn.Click += complete_btn_Click;
             // 
-            // check_search_radio2
-            // 
-            check_search_radio2.AutoSize = true;
-            check_search_radio2.Font = new Font("맑은 고딕", 14.25F);
-            check_search_radio2.Location = new Point(158, 102);
-            check_search_radio2.Name = "check_search_radio2";
-            check_search_radio2.Size = new Size(132, 29);
-            check_search_radio2.TabIndex = 33;
-            check_search_radio2.Text = "키워드 입력";
-            check_search_radio2.UseVisualStyleBackColor = true;
-            check_search_radio2.CheckedChanged += check_search_radio2_CheckedChanged;
-            // 
-            // check_search_radio1
-            // 
-            check_search_radio1.AutoSize = true;
-            check_search_radio1.Checked = true;
-            check_search_radio1.Font = new Font("맑은 고딕", 14.25F);
-            check_search_radio1.Location = new Point(20, 102);
-            check_search_radio1.Name = "check_search_radio1";
-            check_search_radio1.Size = new Size(132, 29);
-            check_search_radio1.TabIndex = 32;
-            check_search_radio1.TabStop = true;
-            check_search_radio1.Text = "키워드 선택";
-            check_search_radio1.UseVisualStyleBackColor = true;
-            check_search_radio1.CheckedChanged += check_search_radio1_CheckedChanged;
-            // 
             // check_search_keyword
             // 
             check_search_keyword.Enabled = false;
             check_search_keyword.Font = new Font("맑은 고딕", 14.25F);
-            check_search_keyword.Location = new Point(312, 101);
+            check_search_keyword.Location = new Point(323, 101);
             check_search_keyword.Name = "check_search_keyword";
             check_search_keyword.PlaceholderText = "키워드 입력";
             check_search_keyword.Size = new Size(209, 33);
@@ -1143,50 +1038,39 @@
             merge_check_table.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             merge_check_table.BackgroundColor = Color.White;
             merge_check_table.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle4.BackColor = SystemColors.Control;
-            dataGridViewCellStyle4.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle4.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle4.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle4.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
-            merge_check_table.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle4;
+            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = SystemColors.Control;
+            dataGridViewCellStyle1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle1.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.True;
+            merge_check_table.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
             merge_check_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle5.BackColor = SystemColors.Window;
-            dataGridViewCellStyle5.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle5.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.False;
-            merge_check_table.DefaultCellStyle = dataGridViewCellStyle5;
+            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle2.BackColor = SystemColors.Window;
+            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle2.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
+            merge_check_table.DefaultCellStyle = dataGridViewCellStyle2;
             merge_check_table.EnableHeadersVisualStyles = false;
             merge_check_table.GridColor = Color.LightGray;
             merge_check_table.Location = new Point(12, 142);
             merge_check_table.MinimumSize = new Size(300, 200);
             merge_check_table.Name = "merge_check_table";
             merge_check_table.ReadOnly = true;
-            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle6.BackColor = SystemColors.Control;
-            dataGridViewCellStyle6.Font = new Font("돋움체", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle6.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle6.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle6.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.True;
-            merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle6;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = SystemColors.Control;
+            dataGridViewCellStyle3.Font = new Font("돋움체", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle3.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.True;
+            merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle3;
             merge_check_table.Size = new Size(615, 235);
             merge_check_table.TabIndex = 23;
-            // 
-            // check_search_combo
-            // 
-            check_search_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            check_search_combo.Font = new Font("맑은 고딕", 14.25F);
-            check_search_combo.FormattingEnabled = true;
-            check_search_combo.Location = new Point(312, 101);
-            check_search_combo.Name = "check_search_combo";
-            check_search_combo.Size = new Size(209, 33);
-            check_search_combo.TabIndex = 31;
-            check_search_combo.Text = "키워드 선택";
             // 
             // uc_Clustering
             // 
@@ -1249,9 +1133,6 @@
         // 기존 컨트롤들 (모든 컨트롤명 유지)
         private Button complete_btn;
         private GroupBox groupbox2;
-        private RadioButton check_search_radio2;
-        private RadioButton check_search_radio1;
-        private ComboBox check_search_combo;
         private TextBox check_search_keyword;
         private Button merge_cancel_button;
         private Button check_search_button;
@@ -1274,8 +1155,6 @@
         private Button button2;
         private TableLayoutPanel tableLayoutLeft;
         private Panel pnl_merge_header;
-        private RadioButton keyword_radio1;
-        private RadioButton keyword_radio2;
         private Label uncluster_count_money;
         private Label label3;
         private Label label2;
@@ -1286,11 +1165,8 @@
         private CheckBox equal_search_checkbox;
         private TextBox except_keyword;
         private Button merge_addon_btn;
-        private RadioButton merge_search_radio2;
         private Label label5;
         private ComboBox decimal_combo;
-        private RadioButton merge_search_radio1;
-        private ComboBox merge_keyword_combo;
         private TextBox merge_search_keyword;
         private CheckBox merge_all_check;
         private Button button1;
@@ -1311,9 +1187,8 @@
         private RadioButton radioButton2;
         private GroupBox groupBox7;
         private GroupBox groupBox8;
-        private TextBox textBox1;
         private ComboBox column_search_combo;
-        private CheckBox column_change_checkbox;
+        private CheckBox sub_search_checkbox;
         private TabControl tabControl1;
         private TabPage tabPage1;
         private TabPage tabPage2;
@@ -1321,5 +1196,6 @@
         private Button auto_cluster_btn;
         private Label label1;
         private Label label10;
+        private Label sub_search_info_label;
     }
 }

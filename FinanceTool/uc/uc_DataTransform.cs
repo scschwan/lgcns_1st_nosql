@@ -500,8 +500,7 @@ namespace FinanceTool
                     await create_merge_keyword_list();
                     Debug.WriteLine("data Transform initUI -> create_merge_keyword_list 완료");
 
-                    // 키워드 콤보박스 설정
-                    await set_keyword_combo_list();
+                    
                     Debug.WriteLine("data Transform initUI -> set_keyword_combo_list 설정 완료");
 
                     // 메인 UI 스레드로 돌아가서 DataHandler 등록
@@ -1534,58 +1533,6 @@ namespace FinanceTool
         }
 
 
-        private async Task set_keyword_combo_list()
-        {
-            try
-            {
-                await Task.Run(() =>
-                {
-                    if (Application.OpenForms.Count > 0)
-                    {
-                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                        {
-                            // UI 컨트롤 접근은 이 블록 내부에서만 수행
-                            keyword_search_combo.Items.Clear();
-                            keyword_search_combo.Items.Add("키워드 선택");
-
-                            // modifiedDataTable이 생성됐는지 확인
-                            if (modifiedDataTable != null && modifiedDataTable.Rows.Count > 0)
-                            {
-                                // 키워드 추가 (정렬된 상태 유지)
-                                foreach (DataRow row in modifiedDataTable.Rows)
-                                {
-                                    if (row[0] != null && row[0] != DBNull.Value)
-                                    {
-                                        string keyword = row[0].ToString();
-                                        if (!string.IsNullOrWhiteSpace(keyword))
-                                        {
-                                            keyword_search_combo.Items.Add(keyword);
-                                        }
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                Debug.WriteLine("키워드 데이터가 없습니다.");
-                            }
-
-                            // 첫 번째 항목 선택 (최소 1개 항목이 존재)
-                            if (keyword_search_combo.Items.Count > 0)
-                            {
-                                keyword_search_combo.SelectedIndex = 0;
-                            }
-                        });
-                    }
-                });
-
-                Debug.WriteLine($"키워드 콤보박스 설정 완료: {(keyword_search_combo.Items.Count - 1)}개 항목");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"키워드 콤보박스 설정 중 오류: {ex.Message}");
-            }
-        }
-
         public void CreateFilteredDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords)
         {
             // DataGridView 초기화
@@ -1828,7 +1775,7 @@ namespace FinanceTool
                 //3.변경된 키워드 기반 리스트 재 생성
                 await create_merge_keyword_list();
                 await Task.Delay(10);
-                await set_keyword_combo_list();
+               
 
                 Debug.WriteLine("data Transform change_keyword_Click -> set_keyword_combo_list 설정 완료");
 
@@ -2126,18 +2073,6 @@ namespace FinanceTool
             }
         }
 
-        private void keyword_search_radio2_CheckedChanged(object sender, EventArgs e)
-        {
-            search_keyword.Enabled = keyword_search_radio2.Checked;
-            search_keyword.Visible = keyword_search_radio2.Checked;
-        }
-
-        private void keyword_search_radio1_CheckedChanged(object sender, EventArgs e)
-        {
-            search_keyword.Enabled = keyword_search_radio2.Checked;
-            search_keyword.Visible = keyword_search_radio2.Checked;
-
-        }
 
         private async void dept_col_check_CheckedChanged(object sender, EventArgs e)
         {
@@ -2241,22 +2176,12 @@ namespace FinanceTool
             }
             string target_keyword = "";
 
-            //combobox로 검색할 경우
-            if (keyword_search_radio1.Checked)
+           
+            if (!"".Equals(search_keyword.Text.ToString()) && search_keyword.Text != null)
             {
-                if (keyword_search_combo.SelectedIndex != 0)
-                {
-                    target_keyword = keyword_search_combo.SelectedItem.ToString();
-                }
+                target_keyword = search_keyword.Text.ToString();
             }
-            //직접 검색할 경우
-            else if (keyword_search_radio2.Checked)
-            {
-                if (!"".Equals(search_keyword.Text.ToString()) && search_keyword.Text != null)
-                {
-                    target_keyword = search_keyword.Text.ToString();
-                }
-            }
+            
 
             //List<string> lowlevelList = DataHandler.GetColumnValuesAsList(DataHandler.lowLevelData, 0);
             List<string> valuelList = DataHandler.GetColumnValuesAsList(modifiedDataTable, 0);
