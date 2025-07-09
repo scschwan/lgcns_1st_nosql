@@ -718,8 +718,6 @@ namespace FinanceTool
             {
                 Keywords = keywords,
                 ExcludeKeywords = excludeKeywords,
-                IsKeywordSearch = keyword_radio1.Checked,
-                IsSupplierSearch = keyword_radio2.Checked,
                 ExactMatch = equalsSearchYN,
                 AndSearch = andSearchYN
             };
