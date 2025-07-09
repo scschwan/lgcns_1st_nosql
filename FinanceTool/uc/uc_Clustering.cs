@@ -2410,22 +2410,26 @@ namespace FinanceTool
         private void merge_search_radio1_CheckedChanged(object sender, EventArgs e)
         {
             merge_search_keyword.Enabled = merge_search_radio2.Checked;
+            merge_search_keyword.Visible = merge_search_radio2.Checked;
 
         }
 
         private void merge_search_radio2_CheckedChanged(object sender, EventArgs e)
         {
             merge_search_keyword.Enabled = merge_search_radio2.Checked;
+            merge_search_keyword.Visible = merge_search_radio2.Checked;
         }
 
         private void check_search_radio1_CheckedChanged(object sender, EventArgs e)
         {
             check_search_keyword.Enabled = check_search_radio2.Checked;
+            check_search_keyword.Visible = check_search_radio2.Checked;
         }
 
         private void check_search_radio2_CheckedChanged(object sender, EventArgs e)
         {
             check_search_keyword.Enabled = check_search_radio2.Checked;
+            check_search_keyword.Visible = check_search_radio2.Checked;
         }
 
         private void merge_search_keyword_KeyDown(object sender, KeyEventArgs e)
