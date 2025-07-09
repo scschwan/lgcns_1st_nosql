@@ -30,13 +30,15 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_left = new Panel();
             groupBox1 = new GroupBox();
             tableLayoutLeft = new TableLayoutPanel();
+            label1 = new Label();
+            label10 = new Label();
             panel1 = new Panel();
             groupBox6 = new GroupBox();
             radioButton1 = new RadioButton();
@@ -174,28 +176,57 @@
             groupBox1.Size = new Size(1217, 997);
             groupBox1.TabIndex = 42;
             groupBox1.TabStop = false;
-            groupBox1.Text = "Clustering 병합";
             // 
             // tableLayoutLeft
             // 
             tableLayoutLeft.ColumnCount = 1;
             tableLayoutLeft.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            tableLayoutLeft.Controls.Add(panel1, 0, 2);
-            tableLayoutLeft.Controls.Add(pnl_merge_header, 0, 0);
-            tableLayoutLeft.Controls.Add(pnl_merge_data, 0, 3);
-            tableLayoutLeft.Controls.Add(pnl_merge_pagination, 0, 4);
-            tableLayoutLeft.Controls.Add(pnl_merge_controls, 0, 1);
+            tableLayoutLeft.Controls.Add(label1, 0, 4);
+            tableLayoutLeft.Controls.Add(label10, 0, 0);
+            tableLayoutLeft.Controls.Add(panel1, 0, 3);
+            tableLayoutLeft.Controls.Add(pnl_merge_header, 0, 1);
+            tableLayoutLeft.Controls.Add(pnl_merge_data, 0, 5);
+            tableLayoutLeft.Controls.Add(pnl_merge_pagination, 0, 6);
+            tableLayoutLeft.Controls.Add(pnl_merge_controls, 0, 2);
             tableLayoutLeft.Dock = DockStyle.Fill;
             tableLayoutLeft.Location = new Point(3, 31);
             tableLayoutLeft.Name = "tableLayoutLeft";
-            tableLayoutLeft.RowCount = 5;
-            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 57F));
+            tableLayoutLeft.RowCount = 7;
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 55F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 243F));
-            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 64F));
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 63F));
+            tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 45F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
             tableLayoutLeft.Size = new Size(1211, 963);
             tableLayoutLeft.TabIndex = 0;
+            // 
+            // label1
+            // 
+            label1.Anchor = AnchorStyles.None;
+            label1.BackColor = Color.SteelBlue;
+            label1.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label1.ForeColor = Color.White;
+            label1.Location = new Point(415, 411);
+            label1.Name = "label1";
+            label1.Size = new Size(380, 40);
+            label1.TabIndex = 57;
+            label1.Text = "미병합 클러스터 조회 목록";
+            label1.TextAlign = ContentAlignment.MiddleCenter;
+            // 
+            // label10
+            // 
+            label10.Anchor = AnchorStyles.None;
+            label10.BackColor = Color.SteelBlue;
+            label10.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label10.ForeColor = Color.White;
+            label10.Location = new Point(415, 4);
+            label10.Name = "label10";
+            label10.Size = new Size(380, 40);
+            label10.TabIndex = 56;
+            label10.Text = "Clustering 병합";
+            label10.TextAlign = ContentAlignment.MiddleCenter;
             // 
             // panel1
             // 
@@ -205,7 +236,7 @@
             panel1.Controls.Add(merge_addon_btn);
             panel1.Controls.Add(decimal_combo);
             panel1.Controls.Add(label5);
-            panel1.Location = new Point(3, 303);
+            panel1.Location = new Point(3, 349);
             panel1.Name = "panel1";
             panel1.Size = new Size(1205, 55);
             panel1.TabIndex = 55;
@@ -260,25 +291,31 @@
             // button1
             // 
             button1.AutoSize = true;
-            button1.Font = new Font("맑은 고딕", 14.25F);
+            button1.BackColor = Color.RoyalBlue;
+            button1.FlatStyle = FlatStyle.Flat;
+            button1.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button1.ForeColor = Color.White;
             button1.Location = new Point(130, 11);
             button1.Name = "button1";
             button1.Size = new Size(63, 35);
             button1.TabIndex = 36;
-            button1.Text = "병합";
-            button1.UseVisualStyleBackColor = true;
+            button1.Text = "병  합";
+            button1.UseVisualStyleBackColor = false;
             button1.Click += button1_Click;
             // 
             // merge_addon_btn
             // 
             merge_addon_btn.AutoSize = true;
-            merge_addon_btn.Font = new Font("맑은 고딕", 14.25F);
+            merge_addon_btn.BackColor = Color.RoyalBlue;
+            merge_addon_btn.FlatStyle = FlatStyle.Flat;
+            merge_addon_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            merge_addon_btn.ForeColor = Color.White;
             merge_addon_btn.Location = new Point(220, 11);
             merge_addon_btn.Name = "merge_addon_btn";
             merge_addon_btn.Size = new Size(122, 35);
             merge_addon_btn.TabIndex = 42;
             merge_addon_btn.Text = "추가 병합";
-            merge_addon_btn.UseVisualStyleBackColor = true;
+            merge_addon_btn.UseVisualStyleBackColor = false;
             merge_addon_btn.Click += merge_addon_btn_Click;
             // 
             // decimal_combo
@@ -307,7 +344,7 @@
             pnl_merge_header.Controls.Add(uncluster_count_money);
             pnl_merge_header.Controls.Add(uncluster_count);
             pnl_merge_header.Controls.Add(cluster_count);
-            pnl_merge_header.Location = new Point(3, 3);
+            pnl_merge_header.Location = new Point(3, 51);
             pnl_merge_header.Name = "pnl_merge_header";
             pnl_merge_header.Size = new Size(1205, 48);
             pnl_merge_header.TabIndex = 0;
@@ -343,10 +380,10 @@
             // 
             pnl_merge_data.Controls.Add(merge_cluster_table);
             pnl_merge_data.Dock = DockStyle.Fill;
-            pnl_merge_data.Location = new Point(5, 369);
+            pnl_merge_data.Location = new Point(5, 459);
             pnl_merge_data.Margin = new Padding(5);
             pnl_merge_data.Name = "pnl_merge_data";
-            pnl_merge_data.Size = new Size(1201, 539);
+            pnl_merge_data.Size = new Size(1201, 449);
             pnl_merge_data.TabIndex = 2;
             // 
             // merge_cluster_table
@@ -359,11 +396,11 @@
             merge_cluster_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             merge_cluster_table.EnableHeadersVisualStyles = false;
             merge_cluster_table.GridColor = Color.LightGray;
-            merge_cluster_table.Location = new Point(5, 8);
+            merge_cluster_table.Location = new Point(5, 3);
             merge_cluster_table.MinimumSize = new Size(500, 300);
             merge_cluster_table.Name = "merge_cluster_table";
             merge_cluster_table.ReadOnly = true;
-            merge_cluster_table.Size = new Size(1191, 528);
+            merge_cluster_table.Size = new Size(1191, 443);
             merge_cluster_table.TabIndex = 34;
             merge_cluster_table.CellContentClick += merge_cluster_table_CellContentClick;
             // 
@@ -457,7 +494,7 @@
             pnl_merge_controls.Controls.Add(groupBox8);
             pnl_merge_controls.Controls.Add(groupBox7);
             pnl_merge_controls.Controls.Add(merge_search_button);
-            pnl_merge_controls.Location = new Point(3, 60);
+            pnl_merge_controls.Location = new Point(3, 106);
             pnl_merge_controls.Name = "pnl_merge_controls";
             pnl_merge_controls.Size = new Size(1205, 229);
             pnl_merge_controls.TabIndex = 1;
@@ -632,11 +669,11 @@
             excep_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             excep_search_checkbox.AutoSize = true;
             excep_search_checkbox.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            excep_search_checkbox.Location = new Point(236, 80);
+            excep_search_checkbox.Location = new Point(232, 77);
             excep_search_checkbox.Name = "excep_search_checkbox";
-            excep_search_checkbox.Size = new Size(166, 29);
+            excep_search_checkbox.Size = new Size(204, 29);
             excep_search_checkbox.TabIndex = 48;
-            excep_search_checkbox.Text = "검색 제외 항목 ";
+            excep_search_checkbox.Text = "검색 제외 항목 적용";
             excep_search_checkbox.UseVisualStyleBackColor = true;
             excep_search_checkbox.CheckedChanged += excep_search_checkbox_CheckedChanged;
             // 
@@ -668,13 +705,16 @@
             // 
             merge_search_button.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             merge_search_button.AutoSize = true;
-            merge_search_button.Font = new Font("맑은 고딕", 14.25F);
-            merge_search_button.Location = new Point(1099, 191);
+            merge_search_button.BackColor = Color.DodgerBlue;
+            merge_search_button.FlatStyle = FlatStyle.Flat;
+            merge_search_button.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            merge_search_button.ForeColor = Color.White;
+            merge_search_button.Location = new Point(1099, 185);
             merge_search_button.Name = "merge_search_button";
-            merge_search_button.Size = new Size(99, 35);
+            merge_search_button.Size = new Size(99, 37);
             merge_search_button.TabIndex = 35;
-            merge_search_button.Text = "검색";
-            merge_search_button.UseVisualStyleBackColor = true;
+            merge_search_button.Text = "검  색";
+            merge_search_button.UseVisualStyleBackColor = false;
             merge_search_button.Click += merge_search_button_Click;
             // 
             // pnl_right
@@ -721,19 +761,23 @@
             // 
             auto_cluster_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             auto_cluster_btn.AutoSize = true;
-            auto_cluster_btn.Font = new Font("맑은 고딕", 14.25F);
-            auto_cluster_btn.Location = new Point(378, 296);
+            auto_cluster_btn.BackColor = Color.RoyalBlue;
+            auto_cluster_btn.FlatStyle = FlatStyle.Flat;
+            auto_cluster_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            auto_cluster_btn.ForeColor = Color.White;
+            auto_cluster_btn.Location = new Point(419, 296);
             auto_cluster_btn.Name = "auto_cluster_btn";
-            auto_cluster_btn.Size = new Size(245, 35);
+            auto_cluster_btn.Size = new Size(204, 35);
             auto_cluster_btn.TabIndex = 57;
             auto_cluster_btn.Text = "선택항목 자동 클러스터링";
-            auto_cluster_btn.UseVisualStyleBackColor = true;
+            auto_cluster_btn.UseVisualStyleBackColor = false;
             auto_cluster_btn.Click += auto_cluster_btn_Click;
             // 
             // tabControl1
             // 
             tabControl1.Controls.Add(tabPage1);
             tabControl1.Controls.Add(tabPage2);
+            tabControl1.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             tabControl1.Location = new Point(10, 26);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
@@ -743,10 +787,11 @@
             // tabPage1
             // 
             tabPage1.Controls.Add(dataGridView_modified);
-            tabPage1.Location = new Point(4, 39);
+            tabPage1.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            tabPage1.Location = new Point(4, 29);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(609, 225);
+            tabPage1.Size = new Size(609, 235);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "키워드별";
             tabPage1.UseVisualStyleBackColor = true;
@@ -771,10 +816,11 @@
             // tabPage2
             // 
             tabPage2.Controls.Add(dataGridView_supply_summary);
-            tabPage2.Location = new Point(4, 39);
+            tabPage2.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            tabPage2.Location = new Point(4, 29);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(609, 225);
+            tabPage2.Size = new Size(609, 235);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "공급업체별";
             tabPage2.UseVisualStyleBackColor = true;
@@ -841,25 +887,31 @@
             // 
             reco_del_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             reco_del_btn.AutoSize = true;
-            reco_del_btn.Font = new Font("맑은 고딕", 14.25F);
+            reco_del_btn.BackColor = Color.Crimson;
+            reco_del_btn.FlatStyle = FlatStyle.Flat;
+            reco_del_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            reco_del_btn.ForeColor = Color.White;
             reco_del_btn.Location = new Point(230, 33);
             reco_del_btn.Name = "reco_del_btn";
             reco_del_btn.Size = new Size(60, 35);
             reco_del_btn.TabIndex = 24;
             reco_del_btn.Text = "제거";
-            reco_del_btn.UseVisualStyleBackColor = true;
+            reco_del_btn.UseVisualStyleBackColor = false;
             reco_del_btn.Click += reco_del_btn_Click;
             // 
             // reco_add_btn
             // 
             reco_add_btn.AutoSize = true;
-            reco_add_btn.Font = new Font("맑은 고딕", 14.25F);
-            reco_add_btn.Location = new Point(176, 33);
+            reco_add_btn.BackColor = Color.Orange;
+            reco_add_btn.FlatStyle = FlatStyle.Flat;
+            reco_add_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            reco_add_btn.ForeColor = Color.White;
+            reco_add_btn.Location = new Point(166, 33);
             reco_add_btn.Name = "reco_add_btn";
             reco_add_btn.Size = new Size(60, 35);
             reco_add_btn.TabIndex = 23;
             reco_add_btn.Text = "추가";
-            reco_add_btn.UseVisualStyleBackColor = true;
+            reco_add_btn.UseVisualStyleBackColor = false;
             reco_add_btn.Click += reco_add_btn_Click;
             // 
             // gb_separator
@@ -906,25 +958,31 @@
             // 
             lv1_del_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             lv1_del_btn.AutoSize = true;
-            lv1_del_btn.Font = new Font("맑은 고딕", 14.25F);
+            lv1_del_btn.BackColor = Color.Crimson;
+            lv1_del_btn.FlatStyle = FlatStyle.Flat;
+            lv1_del_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            lv1_del_btn.ForeColor = Color.White;
             lv1_del_btn.Location = new Point(241, 33);
             lv1_del_btn.Name = "lv1_del_btn";
             lv1_del_btn.Size = new Size(60, 35);
             lv1_del_btn.TabIndex = 24;
             lv1_del_btn.Text = "제거";
-            lv1_del_btn.UseVisualStyleBackColor = true;
+            lv1_del_btn.UseVisualStyleBackColor = false;
             lv1_del_btn.Click += lv1_del_btn_Click;
             // 
             // lv1_add_btn
             // 
             lv1_add_btn.AutoSize = true;
-            lv1_add_btn.Font = new Font("맑은 고딕", 14.25F);
+            lv1_add_btn.BackColor = Color.Orange;
+            lv1_add_btn.FlatStyle = FlatStyle.Flat;
+            lv1_add_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            lv1_add_btn.ForeColor = Color.White;
             lv1_add_btn.Location = new Point(175, 33);
             lv1_add_btn.Name = "lv1_add_btn";
             lv1_add_btn.Size = new Size(60, 35);
             lv1_add_btn.TabIndex = 23;
             lv1_add_btn.Text = "추가";
-            lv1_add_btn.UseVisualStyleBackColor = true;
+            lv1_add_btn.UseVisualStyleBackColor = false;
             lv1_add_btn.Click += lv1_add_btn_Click;
             // 
             // groupbox2
@@ -953,25 +1011,31 @@
             // button2
             // 
             button2.AutoSize = true;
-            button2.Font = new Font("맑은 고딕", 14.25F);
+            button2.BackColor = Color.Magenta;
+            button2.FlatStyle = FlatStyle.Flat;
+            button2.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button2.ForeColor = Color.White;
             button2.Location = new Point(10, 47);
             button2.Name = "button2";
-            button2.Size = new Size(195, 35);
+            button2.Size = new Size(197, 37);
             button2.TabIndex = 49;
             button2.Text = "선택 항목 상세 보기";
-            button2.UseVisualStyleBackColor = true;
+            button2.UseVisualStyleBackColor = false;
             button2.Click += button2_Click;
             // 
             // union_cluster_btn
             // 
             union_cluster_btn.AutoSize = true;
-            union_cluster_btn.Font = new Font("맑은 고딕", 14.25F);
+            union_cluster_btn.BackColor = Color.RoyalBlue;
+            union_cluster_btn.FlatStyle = FlatStyle.Flat;
+            union_cluster_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            union_cluster_btn.ForeColor = Color.White;
             union_cluster_btn.Location = new Point(221, 47);
             union_cluster_btn.Name = "union_cluster_btn";
-            union_cluster_btn.Size = new Size(195, 35);
+            union_cluster_btn.Size = new Size(195, 37);
             union_cluster_btn.TabIndex = 48;
             union_cluster_btn.Text = "선택 항목 간 병합";
-            union_cluster_btn.UseVisualStyleBackColor = true;
+            union_cluster_btn.UseVisualStyleBackColor = false;
             union_cluster_btn.Click += union_cluster_btn_Click;
             // 
             // label7
@@ -990,13 +1054,16 @@
             // 
             complete_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             complete_btn.AutoSize = true;
-            complete_btn.Font = new Font("맑은 고딕", 14.25F);
-            complete_btn.Location = new Point(547, 383);
+            complete_btn.BackColor = Color.LimeGreen;
+            complete_btn.FlatStyle = FlatStyle.Flat;
+            complete_btn.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            complete_btn.ForeColor = Color.White;
+            complete_btn.Location = new Point(547, 381);
             complete_btn.Name = "complete_btn";
-            complete_btn.Size = new Size(80, 35);
+            complete_btn.Size = new Size(80, 37);
             complete_btn.TabIndex = 45;
-            complete_btn.Text = "완료";
-            complete_btn.UseVisualStyleBackColor = true;
+            complete_btn.Text = "완  료";
+            complete_btn.UseVisualStyleBackColor = false;
             complete_btn.Click += complete_btn_Click;
             // 
             // check_search_radio2
@@ -1041,26 +1108,32 @@
             // 
             merge_cancel_button.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             merge_cancel_button.AutoSize = true;
-            merge_cancel_button.Font = new Font("맑은 고딕", 14.25F);
+            merge_cancel_button.BackColor = Color.Crimson;
+            merge_cancel_button.FlatStyle = FlatStyle.Flat;
+            merge_cancel_button.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            merge_cancel_button.ForeColor = Color.White;
             merge_cancel_button.Location = new Point(428, 47);
             merge_cancel_button.Name = "merge_cancel_button";
-            merge_cancel_button.Size = new Size(195, 35);
+            merge_cancel_button.Size = new Size(195, 37);
             merge_cancel_button.TabIndex = 26;
             merge_cancel_button.Text = "선택 항목 병합 해제";
-            merge_cancel_button.UseVisualStyleBackColor = true;
+            merge_cancel_button.UseVisualStyleBackColor = false;
             merge_cancel_button.Click += merge_cancel_button_Click;
             // 
             // check_search_button
             // 
             check_search_button.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             check_search_button.AutoSize = true;
-            check_search_button.Font = new Font("맑은 고딕", 14.25F);
+            check_search_button.BackColor = Color.DodgerBlue;
+            check_search_button.FlatStyle = FlatStyle.Flat;
+            check_search_button.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            check_search_button.ForeColor = Color.White;
             check_search_button.Location = new Point(547, 101);
             check_search_button.Name = "check_search_button";
             check_search_button.Size = new Size(80, 35);
             check_search_button.TabIndex = 24;
-            check_search_button.Text = "검색";
-            check_search_button.UseVisualStyleBackColor = true;
+            check_search_button.Text = "검  색";
+            check_search_button.UseVisualStyleBackColor = false;
             check_search_button.Click += check_search_button_Click;
             // 
             // merge_check_table
@@ -1070,37 +1143,37 @@
             merge_check_table.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             merge_check_table.BackgroundColor = Color.White;
             merge_check_table.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle1.BackColor = SystemColors.Control;
-            dataGridViewCellStyle1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle1.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.True;
-            merge_check_table.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle4.BackColor = SystemColors.Control;
+            dataGridViewCellStyle4.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle4.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle4.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle4.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
+            merge_check_table.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle4;
             merge_check_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = SystemColors.Window;
-            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle2.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
-            merge_check_table.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle5.BackColor = SystemColors.Window;
+            dataGridViewCellStyle5.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle5.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.False;
+            merge_check_table.DefaultCellStyle = dataGridViewCellStyle5;
             merge_check_table.EnableHeadersVisualStyles = false;
             merge_check_table.GridColor = Color.LightGray;
             merge_check_table.Location = new Point(12, 142);
             merge_check_table.MinimumSize = new Size(300, 200);
             merge_check_table.Name = "merge_check_table";
             merge_check_table.ReadOnly = true;
-            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = SystemColors.Control;
-            dataGridViewCellStyle3.Font = new Font("돋움체", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle3.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.True;
-            merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle3;
+            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle6.BackColor = SystemColors.Control;
+            dataGridViewCellStyle6.Font = new Font("돋움체", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle6.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle6.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle6.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.True;
+            merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle6;
             merge_check_table.Size = new Size(615, 235);
             merge_check_table.TabIndex = 23;
             // 
@@ -1246,5 +1319,7 @@
         private TabPage tabPage2;
         private DataGridView dataGridView_supply_summary;
         private Button auto_cluster_btn;
+        private Label label1;
+        private Label label10;
     }
 }

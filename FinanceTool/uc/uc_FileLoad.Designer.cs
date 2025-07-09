@@ -627,7 +627,7 @@
             btn_complete.Name = "btn_complete";
             btn_complete.Size = new Size(150, 40);
             btn_complete.TabIndex = 38;
-            btn_complete.Text = "완료";
+            btn_complete.Text = "완  료";
             btn_complete.UseVisualStyleBackColor = false;
             btn_complete.Click += btn_complete_Click;
             // 

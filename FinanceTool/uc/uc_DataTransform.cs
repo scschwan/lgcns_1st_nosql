@@ -2129,11 +2129,13 @@ namespace FinanceTool
         private void keyword_search_radio2_CheckedChanged(object sender, EventArgs e)
         {
             search_keyword.Enabled = keyword_search_radio2.Checked;
+            search_keyword.Visible = keyword_search_radio2.Checked;
         }
 
         private void keyword_search_radio1_CheckedChanged(object sender, EventArgs e)
         {
             search_keyword.Enabled = keyword_search_radio2.Checked;
+            search_keyword.Visible = keyword_search_radio2.Checked;
 
         }
 

@@ -74,13 +74,16 @@
             // 
             // select_all_btn
             // 
-            select_all_btn.Font = new Font("맑은 고딕", 12F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            select_all_btn.BackColor = Color.DodgerBlue;
+            select_all_btn.FlatStyle = FlatStyle.Flat;
+            select_all_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            select_all_btn.ForeColor = Color.White;
             select_all_btn.Location = new Point(475, 16);
             select_all_btn.Name = "select_all_btn";
             select_all_btn.Size = new Size(120, 30);
             select_all_btn.TabIndex = 4;
             select_all_btn.Text = "모두 선택";
-            select_all_btn.UseVisualStyleBackColor = true;
+            select_all_btn.UseVisualStyleBackColor = false;
             // 
             // status_label
             // 
@@ -95,25 +98,31 @@
             // unmerge_selected_btn
             // 
             unmerge_selected_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            unmerge_selected_btn.Font = new Font("맑은 고딕", 12F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            unmerge_selected_btn.BackColor = Color.Crimson;
+            unmerge_selected_btn.FlatStyle = FlatStyle.Flat;
+            unmerge_selected_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            unmerge_selected_btn.ForeColor = Color.White;
             unmerge_selected_btn.Location = new Point(894, 15);
             unmerge_selected_btn.Name = "unmerge_selected_btn";
             unmerge_selected_btn.Size = new Size(180, 30);
             unmerge_selected_btn.TabIndex = 2;
             unmerge_selected_btn.Text = "선택 항목 병합 해제";
-            unmerge_selected_btn.UseVisualStyleBackColor = true;
+            unmerge_selected_btn.UseVisualStyleBackColor = false;
             unmerge_selected_btn.Click += unmerge_selected_btn_Click;
             // 
             // close_btn
             // 
             close_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            close_btn.Font = new Font("맑은 고딕", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            close_btn.BackColor = Color.LimeGreen;
+            close_btn.FlatStyle = FlatStyle.Flat;
+            close_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            close_btn.ForeColor = Color.White;
             close_btn.Location = new Point(1094, 15);
             close_btn.Name = "close_btn";
-            close_btn.Size = new Size(80, 30);
+            close_btn.Size = new Size(80, 28);
             close_btn.TabIndex = 1;
             close_btn.Text = "닫기";
-            close_btn.UseVisualStyleBackColor = true;
+            close_btn.UseVisualStyleBackColor = false;
             // 
             // detail_title_label
             // 

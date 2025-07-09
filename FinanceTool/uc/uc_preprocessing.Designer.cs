@@ -283,7 +283,7 @@
             dataGridView_seperator.MinimumSize = new Size(250, 80);
             dataGridView_seperator.Name = "dataGridView_seperator";
             dataGridView_seperator.RowHeadersVisible = false;
-            dataGridView_seperator.Size = new Size(351, 120);
+            dataGridView_seperator.Size = new Size(336, 120);
             dataGridView_seperator.TabIndex = 43;
             // 
             // seper_del_btn
@@ -393,7 +393,7 @@
             dataGridView_remove.MinimumSize = new Size(250, 80);
             dataGridView_remove.Name = "dataGridView_remove";
             dataGridView_remove.RowHeadersVisible = false;
-            dataGridView_remove.Size = new Size(351, 120);
+            dataGridView_remove.Size = new Size(336, 120);
             dataGridView_remove.TabIndex = 45;
             // 
             // remove_del_btn
@@ -592,7 +592,7 @@
             button5.Name = "button5";
             button5.Size = new Size(140, 40);
             button5.TabIndex = 38;
-            button5.Text = "완료";
+            button5.Text = "완  료";
             button5.UseVisualStyleBackColor = false;
             button5.Click += btn_complete_Click;
             // 
