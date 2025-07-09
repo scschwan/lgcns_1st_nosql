@@ -81,11 +81,12 @@
             pnl_right = new Panel();
             tableLayoutRight = new TableLayoutPanel();
             groupBox3 = new GroupBox();
+            auto_cluster_btn = new Button();
             tabControl1 = new TabControl();
             tabPage1 = new TabPage();
             dataGridView_modified = new DataGridView();
             tabPage2 = new TabPage();
-            dataGridView_supply_surmary = new DataGridView();
+            dataGridView_supply_summary = new DataGridView();
             groupBox4 = new GroupBox();
             dataGridView_recoman_keyword = new DataGridView();
             new_reco_word = new TextBox();
@@ -103,12 +104,11 @@
             complete_btn = new Button();
             check_search_radio2 = new RadioButton();
             check_search_radio1 = new RadioButton();
-            check_search_combo = new ComboBox();
             check_search_keyword = new TextBox();
             merge_cancel_button = new Button();
             check_search_button = new Button();
             merge_check_table = new DataGridView();
-            auto_cluster_btn = new Button();
+            check_search_combo = new ComboBox();
             tableLayoutMain.SuspendLayout();
             pnl_left.SuspendLayout();
             groupBox1.SuspendLayout();
@@ -130,7 +130,7 @@
             tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_modified).BeginInit();
             tabPage2.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)dataGridView_supply_surmary).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_supply_summary).BeginInit();
             groupBox4.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_recoman_keyword).BeginInit();
             gb_separator.SuspendLayout();
@@ -717,6 +717,19 @@
             groupBox3.TabIndex = 43;
             groupBox3.TabStop = false;
             // 
+            // auto_cluster_btn
+            // 
+            auto_cluster_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            auto_cluster_btn.AutoSize = true;
+            auto_cluster_btn.Font = new Font("맑은 고딕", 14.25F);
+            auto_cluster_btn.Location = new Point(378, 296);
+            auto_cluster_btn.Name = "auto_cluster_btn";
+            auto_cluster_btn.Size = new Size(245, 35);
+            auto_cluster_btn.TabIndex = 57;
+            auto_cluster_btn.Text = "선택항목 자동 클러스터링";
+            auto_cluster_btn.UseVisualStyleBackColor = true;
+            auto_cluster_btn.Click += auto_cluster_btn_Click;
+            // 
             // tabControl1
             // 
             tabControl1.Controls.Add(tabPage1);
@@ -757,7 +770,7 @@
             // 
             // tabPage2
             // 
-            tabPage2.Controls.Add(dataGridView_supply_surmary);
+            tabPage2.Controls.Add(dataGridView_supply_summary);
             tabPage2.Location = new Point(4, 39);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
@@ -766,22 +779,22 @@
             tabPage2.Text = "공급업체별";
             tabPage2.UseVisualStyleBackColor = true;
             // 
-            // dataGridView_supply_surmary
+            // dataGridView_supply_summary
             // 
-            dataGridView_supply_surmary.AllowUserToAddRows = false;
-            dataGridView_supply_surmary.AllowUserToDeleteRows = false;
-            dataGridView_supply_surmary.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            dataGridView_supply_surmary.BackgroundColor = Color.White;
-            dataGridView_supply_surmary.BorderStyle = BorderStyle.Fixed3D;
-            dataGridView_supply_surmary.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridView_supply_surmary.EnableHeadersVisualStyles = false;
-            dataGridView_supply_surmary.GridColor = Color.LightGray;
-            dataGridView_supply_surmary.Location = new Point(6, 6);
-            dataGridView_supply_surmary.MinimumSize = new Size(300, 100);
-            dataGridView_supply_surmary.Name = "dataGridView_supply_surmary";
-            dataGridView_supply_surmary.ReadOnly = true;
-            dataGridView_supply_surmary.Size = new Size(597, 213);
-            dataGridView_supply_surmary.TabIndex = 24;
+            dataGridView_supply_summary.AllowUserToAddRows = false;
+            dataGridView_supply_summary.AllowUserToDeleteRows = false;
+            dataGridView_supply_summary.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            dataGridView_supply_summary.BackgroundColor = Color.White;
+            dataGridView_supply_summary.BorderStyle = BorderStyle.Fixed3D;
+            dataGridView_supply_summary.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dataGridView_supply_summary.EnableHeadersVisualStyles = false;
+            dataGridView_supply_summary.GridColor = Color.LightGray;
+            dataGridView_supply_summary.Location = new Point(6, 6);
+            dataGridView_supply_summary.MinimumSize = new Size(300, 100);
+            dataGridView_supply_summary.Name = "dataGridView_supply_summary";
+            dataGridView_supply_summary.ReadOnly = true;
+            dataGridView_supply_summary.Size = new Size(597, 213);
+            dataGridView_supply_summary.TabIndex = 24;
             // 
             // groupBox4
             // 
@@ -1012,17 +1025,6 @@
             check_search_radio1.UseVisualStyleBackColor = true;
             check_search_radio1.CheckedChanged += check_search_radio1_CheckedChanged;
             // 
-            // check_search_combo
-            // 
-            check_search_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            check_search_combo.Font = new Font("맑은 고딕", 14.25F);
-            check_search_combo.FormattingEnabled = true;
-            check_search_combo.Location = new Point(312, 101);
-            check_search_combo.Name = "check_search_combo";
-            check_search_combo.Size = new Size(209, 33);
-            check_search_combo.TabIndex = 31;
-            check_search_combo.Text = "키워드 선택";
-            // 
             // check_search_keyword
             // 
             check_search_keyword.Enabled = false;
@@ -1102,17 +1104,16 @@
             merge_check_table.Size = new Size(615, 235);
             merge_check_table.TabIndex = 23;
             // 
-            // auto_cluster_btn
+            // check_search_combo
             // 
-            auto_cluster_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            auto_cluster_btn.AutoSize = true;
-            auto_cluster_btn.Font = new Font("맑은 고딕", 14.25F);
-            auto_cluster_btn.Location = new Point(378, 296);
-            auto_cluster_btn.Name = "auto_cluster_btn";
-            auto_cluster_btn.Size = new Size(245, 35);
-            auto_cluster_btn.TabIndex = 57;
-            auto_cluster_btn.Text = "선택항목 자동 클러스터링";
-            auto_cluster_btn.UseVisualStyleBackColor = true;
+            check_search_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            check_search_combo.Font = new Font("맑은 고딕", 14.25F);
+            check_search_combo.FormattingEnabled = true;
+            check_search_combo.Location = new Point(312, 101);
+            check_search_combo.Name = "check_search_combo";
+            check_search_combo.Size = new Size(209, 33);
+            check_search_combo.TabIndex = 31;
+            check_search_combo.Text = "키워드 선택";
             // 
             // uc_Clustering
             // 
@@ -1152,7 +1153,7 @@
             tabPage1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dataGridView_modified).EndInit();
             tabPage2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)dataGridView_supply_surmary).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_supply_summary).EndInit();
             groupBox4.ResumeLayout(false);
             groupBox4.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_recoman_keyword).EndInit();
@@ -1243,7 +1244,7 @@
         private TabControl tabControl1;
         private TabPage tabPage1;
         private TabPage tabPage2;
-        private DataGridView dataGridView_supply_surmary;
+        private DataGridView dataGridView_supply_summary;
         private Button auto_cluster_btn;
     }
 }
