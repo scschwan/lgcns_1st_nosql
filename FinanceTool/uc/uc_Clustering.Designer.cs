@@ -237,7 +237,7 @@
             // sub_search_info_label
             // 
             sub_search_info_label.AutoSize = true;
-            sub_search_info_label.Location = new Point(852, 11);
+            sub_search_info_label.Location = new Point(586, 16);
             sub_search_info_label.Name = "sub_search_info_label";
             sub_search_info_label.Size = new Size(0, 30);
             sub_search_info_label.TabIndex = 55;
@@ -517,14 +517,12 @@
             // 
             // merge_search_keyword
             // 
-            merge_search_keyword.Enabled = false;
             merge_search_keyword.Font = new Font("맑은 고딕", 14.25F);
             merge_search_keyword.Location = new Point(32, 40);
             merge_search_keyword.Name = "merge_search_keyword";
             merge_search_keyword.PlaceholderText = "검색 키워드 입력";
             merge_search_keyword.Size = new Size(300, 33);
             merge_search_keyword.TabIndex = 38;
-            merge_search_keyword.Visible = false;
             merge_search_keyword.KeyDown += merge_search_keyword_KeyDown;
             // 
             // except_keyword

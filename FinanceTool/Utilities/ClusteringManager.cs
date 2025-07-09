@@ -34,6 +34,192 @@ public class ClusterDataManager
     public int TotalCount => _fullClusterData?.Rows.Count ?? 0;
 
 
+    // 1. _columnIndexes 접근을 위한 public 메서드 추가
+    public Dictionary<string, HashSet<int>> GetColumnIndex(string columnName)
+    {
+        if (_columnIndexes.ContainsKey(columnName))
+        {
+            return new Dictionary<string, HashSet<int>>(_columnIndexes[columnName]);
+        }
+        return new Dictionary<string, HashSet<int>>();
+    }
+
+    /// <summary>
+    /// 정확한 값 검색 (DataHandler.FindMachEqualsKeyword 대체)
+    /// </summary>
+    public List<string> SearchExactValues(string columnName, string keyword)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(keyword) || !_columnIndexes.ContainsKey(columnName))
+            {
+                return new List<string>();
+            }
+
+            var columnIndex = _columnIndexes[columnName];
+            var result = new List<string>();
+
+            // 쉼표로 구분된 키워드 처리
+            if (keyword.Contains(","))
+            {
+                var keywords = keyword.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k));
+                foreach (string kw in keywords)
+                {
+                    if (columnIndex.ContainsKey(kw))
+                    {
+                        result.Add(kw);
+                    }
+                }
+            }
+            else
+            {
+                // 단일 키워드 정확 매칭
+                if (columnIndex.ContainsKey(keyword))
+                {
+                    result.Add(keyword);
+                }
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"SearchExactValues 오류: {ex.Message}");
+            return new List<string>();
+        }
+    }
+
+    /// <summary>
+    /// 부분 문자열 검색 (DataHandler.FindMachKeyword 대체)
+    /// </summary>
+    public List<string> SearchContainsValues(string columnName, string keyword)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(keyword) || !_columnIndexes.ContainsKey(columnName))
+            {
+                return new List<string>();
+            }
+
+            var columnIndex = _columnIndexes[columnName];
+            var result = new List<string>();
+
+            // 2글자 이상인 경우 CompareByTwoChars 로직 적용
+            if (keyword.Length >= 2)
+            {
+                foreach (var kvp in columnIndex)
+                {
+                    if (CompareByTwoChars(keyword, kvp.Key))
+                    {
+                        result.Add(kvp.Key);
+                    }
+                }
+            }
+            else
+            {
+                // 1글자인 경우 Contains 검색
+                var matchingKeys = columnIndex.Keys.Where(k => k.Contains(keyword));
+                result.AddRange(matchingKeys);
+            }
+
+            return result.Distinct().ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"SearchContainsValues 오류: {ex.Message}");
+            return new List<string>();
+        }
+    }
+
+    /// <summary>
+    /// 2글자 기준 비교 로직 (DataHandler.CompareByTwoChars 대체)
+    /// </summary>
+    private bool CompareByTwoChars(string baseWord, string targetWord)
+    {
+        if (targetWord.Length < 2) return false;
+        if (baseWord.Length < 2) return targetWord.Contains(baseWord);
+
+        // 기준 단어를 2글자씩 자르기
+        var baseParts = new List<string>();
+        for (int i = 0; i < baseWord.Length - 1; i++)
+        {
+            baseParts.Add(baseWord.Substring(i, 2));
+        }
+
+        // 대상 단어를 2글자씩 자르기
+        var targetParts = new List<string>();
+        for (int i = 0; i < targetWord.Length - 1; i++)
+        {
+            targetParts.Add(targetWord.Substring(i, 2));
+        }
+
+        // 공통된 2글자 조합 확인
+        return baseParts.Any(b => targetParts.Contains(b));
+    }
+
+    /// <summary>
+    /// 병합 상태에 따른 키워드 필터링 (ExtractUniqueKeywords 대체)
+    /// </summary>
+    public List<string> FilterValuesByMergeStatus(List<string> values, string columnName, bool mergedOnly = false)
+    {
+        try
+        {
+            if (!_columnIndexes.ContainsKey(columnName))
+            {
+                return new List<string>();
+            }
+
+            var columnIndex = _columnIndexes[columnName];
+            var filteredValues = new HashSet<string>();
+
+            foreach (string value in values)
+            {
+                if (!columnIndex.ContainsKey(value)) continue;
+
+                var clusterIds = columnIndex[value];
+                foreach (int clusterId in clusterIds)
+                {
+                    var row = GetClusterRow(clusterId);
+                    if (row == null) continue;
+
+                    // 병합 상태 확인
+                    if (!row.IsNull("ClusterID") && !row.IsNull("ID"))
+                    {
+                        int clusterIdValue = Convert.ToInt32(row["ClusterID"]);
+                        int idValue = Convert.ToInt32(row["ID"]);
+
+                        if (mergedOnly)
+                        {
+                            // 병합된 클러스터만: ClusterID > 0 && ClusterID == ID
+                            if (clusterIdValue > 0 && clusterIdValue == idValue)
+                            {
+                                filteredValues.Add(value);
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            // 병합되지 않은 클러스터만: ClusterID <= 0 || ClusterID == ID
+                            if (clusterIdValue <= 0 || clusterIdValue == idValue)
+                            {
+                                filteredValues.Add(value);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return filteredValues.OrderBy(v => v).ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"FilterValuesByMergeStatus 오류: {ex.Message}");
+            return new List<string>();
+        }
+    }
+
+
 
     /// <summary>
     /// 메모리에 전체 클러스터 데이터 로딩 및 인덱스 구축
@@ -198,6 +384,8 @@ public class ClusterDataManager
             _columnIndexes[columnName][value].Add(clusterId);
         }
     }
+
+
 
     /// <summary>
     /// 특정 컬럼에서 검색 가능한 모든 값 목록 조회
@@ -479,6 +667,8 @@ public class ClusterSearchEngine
         });
     }
     */
+
+    
 
     /// <summary>
     /// 다중 컬럼 검색 지원 (새로 추가)
@@ -1363,4 +1553,161 @@ public class ClusteringManager
         var refreshResult = await _searchEngine.ExecuteSearchAsync(new SearchCriteria());
         await _displayManager.DisplaySearchResultAsync(refreshResult);
     }
+
+    // ClusteringManager.cs 파일에 추가할 메서드들
+
+    /// <summary>
+    /// 정확한 값 검색 (DataHandler.FindMachEqualsKeyword 대체)
+    /// </summary>
+    public List<string> SearchExact(string columnName, string keyword)
+    {
+        return _dataManager.SearchExactValues(columnName, keyword);
+    }
+
+    /// <summary>
+    /// 부분 문자열 검색 (DataHandler.FindMachKeyword 대체)
+    /// </summary>
+    public List<string> SearchContains(string columnName, string keyword)
+    {
+        return _dataManager.SearchContainsValues(columnName, keyword);
+    }
+
+    /// <summary>
+    /// 2글자 기준 비교 로직 (DataHandler.CompareByTwoChars 대체)
+    /// </summary>
+    private bool CompareByTwoChars(string baseWord, string targetWord)
+    {
+        if (targetWord.Length < 2) return false;
+        if (baseWord.Length < 2) return targetWord.Contains(baseWord);
+
+        // 기준 단어를 2글자씩 자르기
+        var baseParts = new List<string>();
+        for (int i = 0; i < baseWord.Length - 1; i++)
+        {
+            baseParts.Add(baseWord.Substring(i, 2));
+        }
+
+        // 대상 단어를 2글자씩 자르기
+        var targetParts = new List<string>();
+        for (int i = 0; i < targetWord.Length - 1; i++)
+        {
+            targetParts.Add(targetWord.Substring(i, 2));
+        }
+
+        // 공통된 2글자 조합 확인
+        return baseParts.Any(b => targetParts.Contains(b));
+    }
+
+    /// <summary>
+    /// 병합 상태에 따른 키워드 필터링 (ExtractUniqueKeywords 대체)
+    /// </summary>
+    public List<string> FilterValuesByMergeStatus(List<string> values, string columnName, bool mergedOnly = false)
+    {
+        return _dataManager.FilterValuesByMergeStatus(values, columnName, mergedOnly);
+    }
+
+    /// <summary>
+    /// 표시명을 컬럼명으로 변환 (ConvertDisplayNameToColumnName 대체)
+    /// </summary>
+    public string ConvertDisplayNameToColumnName(string displayName)
+    {
+        var columnMapping = new Dictionary<string, string>
+    {
+        { "키워드", "키워드목록" },
+        { "공급업체", DataHandler.prod_col_name },
+        { "타겟", DataHandler.levelName[1] },
+        { "계정", DataHandler.sub_acc_col_name },
+        { "코스트센터", DataHandler.dept_col_name }
+    };
+
+        //return columnMapping.TryGetValue(displayName, out string columnName) ? columnName : displayName;
+        // null 체크 추가
+        if (string.IsNullOrEmpty(displayName))
+            return "키워드목록"; // 기본값
+
+        return columnMapping.TryGetValue(displayName, out string columnName) && !string.IsNullOrEmpty(columnName)
+            ? columnName
+            : displayName;
+    }
+
+    /// <summary>
+    /// 직접입력 전용 컬럼 확인
+    /// </summary>
+    public bool IsDirectInputOnlyColumn(string columnName)
+    {
+        var directInputOnlyColumns = new[]
+        {
+        DataHandler.levelName?.Count > 1 ? DataHandler.levelName[1] : "",
+        DataHandler.sub_acc_col_name
+    };
+
+        return directInputOnlyColumns.Contains(columnName);
+    }
+
+    /// <summary>
+    /// 검색 가능한 컬럼의 실제 데이터 존재 여부 확인
+    /// </summary>
+    public bool HasDataInColumn(string columnName)
+    {
+        try
+        {
+            var values = GetColumnValues(columnName);
+            return values != null && values.Count > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 컬럼별 고유값 개수 조회 (성능 모니터링용)
+    /// </summary>
+    public int GetColumnValueCount(string columnName)
+    {
+        try
+        {
+            var values = GetColumnValues(columnName);
+            return values?.Count ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// 검색 성능 통계 조회
+    /// </summary>
+    public Dictionary<string, object> GetSearchPerformanceStats()
+    {
+        var stats = new Dictionary<string, object>();
+
+        try
+        {
+            var searchableColumns = GetSearchableColumns();
+            foreach (var column in searchableColumns)
+            {
+                int valueCount = GetColumnValueCount(column.Key);
+                bool hasData = HasDataInColumn(column.Key);
+
+                stats[column.Key] = new
+                {
+                    DisplayName = column.Value,
+                    ValueCount = valueCount,
+                    HasData = hasData,
+                    //IsComboBoxSupported = IsComboBoxSupportedColumn(column.Key),
+                    IsDirectInputOnly = IsDirectInputOnlyColumn(column.Key)
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"검색 성능 통계 조회 오류: {ex.Message}");
+        }
+
+        return stats;
+    }
+
+
 }
