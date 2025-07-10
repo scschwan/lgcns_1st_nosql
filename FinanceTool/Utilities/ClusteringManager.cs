@@ -59,28 +59,28 @@ public class ClusterDataManager
             var columnIndex = _columnIndexes[columnName];
             var result = new List<string>();
 
+            // 영어 검색인지 확인
+            bool isEnglishSearch = IsEnglishText(keyword);
+            Debug.WriteLine($"검색어 '{keyword}' - 영어 검색: {isEnglishSearch}");
+
             // 쉼표로 구분된 키워드 처리
             if (keyword.Contains(","))
             {
                 var keywords = keyword.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k));
                 foreach (string kw in keywords)
                 {
-                    if (columnIndex.ContainsKey(kw))
-                    {
-                        result.Add(kw);
-                    }
+                    var matches = FindExactMatches(columnIndex, kw, isEnglishSearch);
+                    result.AddRange(matches);
                 }
             }
             else
             {
                 // 단일 키워드 정확 매칭
-                if (columnIndex.ContainsKey(keyword))
-                {
-                    result.Add(keyword);
-                }
+                var matches = FindExactMatches(columnIndex, keyword, isEnglishSearch);
+                result.AddRange(matches);
             }
 
-            return result;
+            return result.Distinct().ToList();
         }
         catch (Exception ex)
         {
@@ -104,12 +104,29 @@ public class ClusterDataManager
             var columnIndex = _columnIndexes[columnName];
             var result = new List<string>();
 
+            // 영어 검색인지 확인
+            bool isEnglishSearch = IsEnglishText(keyword);
+
             // 2글자 이상인 경우 CompareByTwoChars 로직 적용
             if (keyword.Length >= 2)
             {
                 foreach (var kvp in columnIndex)
                 {
-                    if (CompareByTwoChars(keyword, kvp.Key))
+                    bool isMatch = false;
+
+                    if (isEnglishSearch)
+                    {
+                        // 영어인 경우: 대소문자 무시 + 기존 로직
+                        isMatch = CompareByTwoCharsIgnoreCase(keyword, kvp.Key) ||
+                                 CompareByTwoChars(keyword, kvp.Key);
+                    }
+                    else
+                    {
+                        // 한글인 경우: 기존 로직만
+                        isMatch = CompareByTwoChars(keyword, kvp.Key);
+                    }
+
+                    if (isMatch)
                     {
                         result.Add(kvp.Key);
                     }
@@ -118,8 +135,26 @@ public class ClusterDataManager
             else
             {
                 // 1글자인 경우 Contains 검색
-                var matchingKeys = columnIndex.Keys.Where(k => k.Contains(keyword));
-                result.AddRange(matchingKeys);
+                foreach (var kvp in columnIndex)
+                {
+                    bool isMatch = false;
+
+                    if (isEnglishSearch)
+                    {
+                        // 영어인 경우: 대소문자 무시
+                        isMatch = kvp.Key.ToUpper().Contains(keyword.ToUpper());
+                    }
+                    else
+                    {
+                        // 한글인 경우: 기존 로직
+                        isMatch = kvp.Key.Contains(keyword);
+                    }
+
+                    if (isMatch)
+                    {
+                        result.Add(kvp.Key);
+                    }
+                }
             }
 
             return result.Distinct().ToList();
@@ -130,6 +165,77 @@ public class ClusterDataManager
             return new List<string>();
         }
     }
+
+    /// <summary>
+    /// 영어 텍스트인지 확인
+    /// </summary>
+    private bool IsEnglishText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+
+        // 영어 알파벳이 하나라도 있으면 영어로 판단 (더 민감하게 감지)
+        bool hasEnglish = text.Any(c => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
+        return hasEnglish;
+    }
+
+    /// <summary>
+    /// 정확 매칭 검색 (대소문자 무시 옵션)
+    /// </summary>
+    private List<string> FindExactMatches(Dictionary<string, HashSet<int>> columnIndex, string keyword, bool ignoreCase)
+    {
+        var matches = new List<string>();
+
+        if (ignoreCase)
+        {
+            string upperKeyword = keyword.ToUpper();
+            foreach (var kvp in columnIndex)
+            {
+                if (kvp.Key.ToUpper() == upperKeyword)
+                {
+                    matches.Add(kvp.Key);
+                }
+            }
+        }
+        else
+        {
+            // 기존 로직: 정확 매칭
+            if (columnIndex.ContainsKey(keyword))
+            {
+                matches.Add(keyword);
+            }
+        }
+
+        return matches;
+    }
+
+    /// <summary>
+    /// 2글자 기준 비교 로직 (대소문자 무시)
+    /// </summary>
+    private bool CompareByTwoCharsIgnoreCase(string baseWord, string targetWord)
+    {
+        if (targetWord.Length < 2) return false;
+        if (baseWord.Length < 2) return targetWord.ToUpper().Contains(baseWord.ToUpper());
+
+        // 기준 단어를 2글자씩 자르기 (대문자 변환)
+        var baseParts = new List<string>();
+        string upperBaseWord = baseWord.ToUpper();
+        for (int i = 0; i < upperBaseWord.Length - 1; i++)
+        {
+            baseParts.Add(upperBaseWord.Substring(i, 2));
+        }
+
+        // 대상 단어를 2글자씩 자르기 (대문자 변환)
+        var targetParts = new List<string>();
+        string upperTargetWord = targetWord.ToUpper();
+        for (int i = 0; i < upperTargetWord.Length - 1; i++)
+        {
+            targetParts.Add(upperTargetWord.Substring(i, 2));
+        }
+
+        // 공통된 2글자 조합 확인
+        return baseParts.Any(b => targetParts.Contains(b));
+    }
+
 
     /// <summary>
     /// 2글자 기준 비교 로직 (DataHandler.CompareByTwoChars 대체)
@@ -709,15 +815,35 @@ public class ClusterSearchEngine
             {
                 HashSet<int> candidateIds = null;
 
-                if (criteria.IsMultiColumnSearch)
+                // 빈 검색어 처리
+                if (criteria.IsFullSearch ||
+                    (criteria.Keywords?.Count == 0 && criteria.ColumnCriteria?.Count == 0))
                 {
-                    // 새로운 다중 컬럼 검색 방식
-                    candidateIds = ExecuteMultiColumnSearch(criteria);
+                    if (criteria.IsSubSearchMode && criteria.BaseSearchResults?.Count > 0)
+                    {
+                        // 결과 내 재검색: 이전 검색 결과만 반환
+                        candidateIds = new HashSet<int>(criteria.BaseSearchResults);
+                        Debug.WriteLine($"결과 내 재검색: {candidateIds.Count}개 항목");
+                    }
+                    else
+                    {
+                        // 전체 검색: 모든 데이터 반환
+                        candidateIds = _dataManager.GetAllClusterIds();
+                        Debug.WriteLine($"전체 검색: {candidateIds.Count}개 항목");
+                    }
                 }
+                //기존 검색 로직
                 else
                 {
-                    // 기존 단일 컬럼 검색 방식 (하위 호환성)
-                    candidateIds = ExecuteLegacySearch(criteria);
+                    // 기존 검색 로직
+                    if (criteria.IsMultiColumnSearch)
+                    {
+                        candidateIds = ExecuteMultiColumnSearch(criteria);
+                    }
+                    else
+                    {
+                        candidateIds = ExecuteLegacySearch(criteria);
+                    }
                 }
 
                 // 제외 키워드 적용
@@ -739,7 +865,7 @@ public class ClusterSearchEngine
                     Data = resultTable,
                     TotalCount = filteredIds.Count,
                     ElapsedMilliseconds = stopwatch.ElapsedMilliseconds,
-                    SearchCriteria = criteria  // 이제 타입이 일치함
+                    SearchCriteria = criteria
                 };
             }
             catch (Exception ex)
@@ -1325,6 +1451,11 @@ public class SearchCriteria
     // 새로 추가: 다중 컬럼 검색 지원
     public Dictionary<string, SearchColumnCriteria> ColumnCriteria { get; set; } = new Dictionary<string, SearchColumnCriteria>();
     public bool IsMultiColumnSearch { get; set; } = false;
+
+    // 새로 추가: 빈 검색어 처리
+    public bool IsFullSearch { get; set; } = false;
+    public bool IsSubSearchMode { get; set; } = false;
+    public List<int> BaseSearchResults { get; set; } = new List<int>();
 
     // 기존 방식과 새 방식 간 변환 메서드
     public static SearchCriteria FromLegacy(List<string> keywords, bool isSupplierSearch, bool exactMatch, bool andSearch, List<string> excludeKeywords = null)
