@@ -1261,9 +1261,15 @@ namespace FinanceTool
                         ExactMatch = true, // 이미 매칭된 키워드들이므로 정확 매칭
                         UseAnd = useAndSearch
                     };
+
+                    await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+                } 
+                else
+                {
+                    merge_cluster_table.ClearSelection();
                 }
 
-                await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+                
 
 
             }
@@ -1333,12 +1339,18 @@ namespace FinanceTool
                             ExactMatch = true, // 이미 매칭된 키워드들이므로 정확 매칭
                             UseAnd = useAndSearch
                         };
+
+                        await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
+                        await Task.Delay(10);
+
+                        await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+                    }
+                    else
+                    {
+                        merge_cluster_table.ClearSelection();
                     }
 
-                    await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
-                    await Task.Delay(10);
-
-                    await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+                   
 
                     await progressForm.UpdateProgressHandler(90, "데이터 검색 완료");
                     await Task.Delay(10);
@@ -2311,6 +2323,7 @@ namespace FinanceTool
                 string searchKeyword = merge_search_keyword.Text?.Trim() ?? "";
 
                 // 검색어가 없을 때 사용자에게 확인
+                /*
                 if (string.IsNullOrEmpty(searchKeyword))
                 {
                     if (_isSubSearchMode && _baseSearchResults.Count > 0)
@@ -2333,7 +2346,7 @@ namespace FinanceTool
                         Debug.WriteLine("전체 데이터 검색 실행");
                     }
                 }
-
+                */
                 await create_merge_keyword_list();
             }
             catch (Exception ex)
