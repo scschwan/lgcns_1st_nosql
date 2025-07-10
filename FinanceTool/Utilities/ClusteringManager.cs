@@ -660,17 +660,57 @@ public HashSet<int> GetAllClusterIds()
     {
         if (excludeKeywords == null || excludeKeywords.Count == 0) return clusterIds;
 
+        // _keywordIndex 대신 _columnIndexes 사용
+        if (_columnIndexes == null || !_columnIndexes.ContainsKey("키워드목록"))
+        {
+            Debug.WriteLine("키워드 인덱스가 초기화되지 않았습니다.");
+            return clusterIds;
+        }
+
         HashSet<int> excludeIds = new HashSet<int>();
+        var keywordIndex = _columnIndexes["키워드목록"];
+
         foreach (string excludeKeyword in excludeKeywords)
         {
-            var matchingKeys = _keywordIndex.Keys.Where(k => k.Contains(excludeKeyword));
-            foreach (string matchKey in matchingKeys)
+            if (string.IsNullOrEmpty(excludeKeyword)) continue;
+
+            // 영어 검색인지 확인
+            bool isEnglishSearch = IsEnglishText(excludeKeyword);
+
+            // 부분 매칭으로 제외 키워드 검색
+            foreach (var kvp in keywordIndex)
             {
-                excludeIds.UnionWith(_keywordIndex[matchKey]);
+                bool isMatch = false;
+
+                if (isEnglishSearch)
+                {
+                    // 영어인 경우: 대소문자 무시
+                    isMatch = kvp.Key.ToUpper().Contains(excludeKeyword.ToUpper());
+                }
+                else
+                {
+                    // 한글인 경우: 기존 로직
+                    if (excludeKeyword.Length >= 2)
+                    {
+                        isMatch = CompareByTwoChars(excludeKeyword, kvp.Key);
+                    }
+                    else
+                    {
+                        isMatch = kvp.Key.Contains(excludeKeyword);
+                    }
+                }
+
+                if (isMatch)
+                {
+                    excludeIds.UnionWith(kvp.Value);
+                }
             }
         }
 
-        return clusterIds.Except(excludeIds).ToHashSet();
+        var result = clusterIds.Except(excludeIds).ToHashSet();
+        Debug.WriteLine($"제외 키워드 적용: 전체 {clusterIds.Count}개 → 필터링 후 {result.Count}개");
+
+        return result;
     }
 }
 
@@ -849,7 +889,16 @@ public class ClusterSearchEngine
                 // 제외 키워드 적용
                 if (criteria.ExcludeKeywords?.Count > 0)
                 {
-                    candidateIds = _dataManager.ExcludeByKeywords(candidateIds ?? new HashSet<int>(), criteria.ExcludeKeywords);
+                    try
+                    {
+                        candidateIds = _dataManager.ExcludeByKeywords(candidateIds ?? new HashSet<int>(), criteria.ExcludeKeywords);
+                        Debug.WriteLine($"제외 키워드 적용 완료: {criteria.ExcludeKeywords.Count}개 키워드");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"제외 키워드 적용 오류: {ex.Message}");
+                        // 제외 키워드 적용 실패 시에도 검색은 계속 진행
+                    }
                 }
 
                 // 병합 상태 필터링

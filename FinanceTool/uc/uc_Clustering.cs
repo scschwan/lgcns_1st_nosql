@@ -475,7 +475,11 @@ namespace FinanceTool
                 column_search_combo.Items.Add(column.Value); // 표시명 (키워드, 공급업체, 타겟, 계정, 코스트센터)
             }
 
-            column_search_combo.SelectedIndex = 0;
+            // *** 수정: 첫 번째 항목(인덱스 0)을 기본 선택으로 설정 ***
+            if (column_search_combo.Items.Count > 0)
+            {
+                column_search_combo.SelectedIndex = 0;
+            }
 
             // 2. 검색 내 검색 체크박스 초기화
             sub_search_checkbox.Checked = false;
@@ -756,12 +760,15 @@ namespace FinanceTool
         private List<string> GetExcludeKeywords()
         {
             if (string.IsNullOrEmpty(except_keyword.Text))
-                return new List<string>();
+        return new List<string>();
 
-            return except_keyword.Text.Split(',')
-                                      .Select(k => k.Trim())
-                                      .Where(k => !string.IsNullOrEmpty(k))
-                                      .ToList();
+    var excludeKeywords = except_keyword.Text.Split(',')
+                                          .Select(k => k.Trim())
+                                          .Where(k => !string.IsNullOrEmpty(k))
+                                          .ToList();
+
+    Debug.WriteLine($"제외 키워드 {excludeKeywords.Count}개: {string.Join(", ", excludeKeywords)}");
+    return excludeKeywords;
         }
 
         // MongoDB에 클러스터링 데이터 저장하는 새 헬퍼 메서드
@@ -1266,11 +1273,10 @@ namespace FinanceTool
                 } 
                 else
                 {
-                    merge_cluster_table.ClearSelection();
+                    // *** 수정: 검색 결과가 없을 때 빈 테이블 표시 ***
+                    await ShowEmptySearchResult();
+                    Debug.WriteLine("검색 결과 없음 - 빈 테이블 표시");
                 }
-
-                
-
 
             }
             else
@@ -1347,7 +1353,9 @@ namespace FinanceTool
                     }
                     else
                     {
-                        merge_cluster_table.ClearSelection();
+                        // *** 수정: 검색 결과가 없을 때 빈 테이블 표시 ***
+                        await ShowEmptySearchResult();
+                        Debug.WriteLine("검색 결과 없음 - 빈 테이블 표시");
                     }
 
                    
@@ -1368,8 +1376,8 @@ namespace FinanceTool
         /// </summary>
         private string GetSelectedSearchColumn()
         {
-            // column_search_combo에서 선택된 컬럼이 있으면 우선 사용
-            if (column_search_combo.SelectedIndex > -1)
+            // *** 수정: 인덱스 0부터 유효한 컬럼으로 처리 ***
+            if (column_search_combo.SelectedIndex >= 0)
             {
                 string selectedDisplayName = column_search_combo.SelectedItem.ToString();
                 string columnName = _clusteringManager.ConvertDisplayNameToColumnName(selectedDisplayName);
@@ -1388,6 +1396,7 @@ namespace FinanceTool
             }
             else
             {
+                Debug.WriteLine("검색 컬럼이 선택되지 않아 기본값(키워드목록) 사용");
                 return "키워드목록"; // 기본값: 키워드
             }
 
