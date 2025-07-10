@@ -29,4 +29,10 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Update="uc\uc_DetailClustering.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+  </ItemGroup>
+
 </Project>

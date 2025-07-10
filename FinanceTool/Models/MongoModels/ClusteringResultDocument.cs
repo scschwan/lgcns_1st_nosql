@@ -26,6 +26,15 @@ namespace FinanceTool.MongoModels
         [BsonElement("cluster_id")]
         public int ClusterId { get; set; }
 
+        /// <summary>
+        /// 세부 클러스터 ID (신규 추가)
+        /// -1: 세부 클러스터링 미진행
+        /// cluster_number와 같음: 세부 상위 클러스터
+        /// 다른 값: 해당 세부 클러스터에 병합됨
+        /// </summary>
+        [BsonElement("cluster_sub_id")]
+        public int ClusterSubId { get; set; } = -1;
+
         [BsonElement("cluster_name")]
         public string ClusterName { get; set; }
 
@@ -45,6 +54,42 @@ namespace FinanceTool.MongoModels
 
         [BsonElement("created_at")]
         public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        /// <summary>
+        /// 일반 클러스터 여부 (cluster_sub_id = -1)
+        /// </summary>
+        [BsonIgnore]
+        public bool IsNormalCluster => ClusterSubId == -1;
+
+        /// <summary>
+        /// 세부 상위 클러스터 여부 (cluster_sub_id = cluster_number)
+        /// </summary>
+        [BsonIgnore]
+        public bool IsDetailParentCluster => ClusterSubId > 0 && ClusterSubId == ClusterNumber;
+
+        /// <summary>
+        /// 세부 하위 클러스터 여부 (cluster_sub_id > 0 && cluster_sub_id != cluster_number)
+        /// </summary>
+        [BsonIgnore]
+        public bool IsDetailChildCluster => ClusterSubId > 0 && ClusterSubId != ClusterNumber;
+
+        /// <summary>
+        /// 병합된 상위 클러스터 여부 (cluster_id = cluster_number)
+        /// </summary>
+        [BsonIgnore]
+        public bool IsMergedParentCluster => ClusterId > 0 && ClusterId == ClusterNumber;
+
+        /// <summary>
+        /// 병합된 하위 클러스터 여부 (cluster_id > 0 && cluster_id != cluster_number)
+        /// </summary>
+        [BsonIgnore]
+        public bool IsMergedChildCluster => ClusterId > 0 && ClusterId != ClusterNumber;
+
+        /// <summary>
+        /// 독립 클러스터 여부 (cluster_id = -1)
+        /// </summary>
+        [BsonIgnore]
+        public bool IsIndependentCluster => ClusterId == -1;
 
         /// <summary>
         /// 이 문서가 병합된 클러스터인지 여부

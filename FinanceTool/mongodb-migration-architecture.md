@@ -159,25 +159,25 @@ FinanceTool/
   - sqlite -> mongodb 대체 및 관련 함수 수정
   - clustering.cs 데이터 전송 로직 개선
 
-### 진행 중인 작업
-
-1. **UI 컴포넌트 MongoDB 연동**:
+5. **UI 컴포넌트 MongoDB 연동**:
    - `uc_Preprocessing.cs` MongoDB 연동
    - `uc_Classification.cs` MongoDB 연동
    - `uc_Clustering.cs` MongoDB 연동
 
-### 남은 작업
-
-1. **DataHandler.cs 완전 대체**:
+6. **DataHandler.cs 완전 대체**:
    - 모든 SQLite 참조 제거
    - MongoDB 기반 데이터 처리 로직으로 교체
 
-2. **전체 애플리케이션 테스트**:
+7. **SQLite 코드 제거**:
+   - 불필요한 참조 제거
+
+
+
+##   clustering_results 컬렉션 필드 구성
+
+1. **전체 애플리케이션 테스트**:
    - 모든 기능 테스트
    - 성능 검증
-
-3. **SQLite 코드 제거**:
-   - 불필요한 참조 제거
 
 ## 데이터 구조
 
@@ -258,7 +258,7 @@ FinanceTool/
   "last_modified_date": ISODate("2025-05-14T12:45:00Z")
 }
 ```
-## Clustering.cs 의 검색 알고리므
+## Clustering.cs 의 검색 알고리즘
 ### initUI에서의 데이터 로딩 과정
 1. clustering_results 컬렉션에서 클러스터 데이터 조회
 2. EnrichWithRawTableDataAsync()에서 raw_data와 조인
@@ -413,4 +413,101 @@ var batches = documents
 2.clustering 병합 결과 페이지 개성
 3.clustering 페이지 데이터 전송 구간 개선 -> 신규 로직 적용
 
-##
+## 2025-07-10
+1. clustering_results 컬렉션 필드 구성
+- _id: MongoDB ObjectId
+- cluster_number: 클러스터 고유 번호
+- cluster_id: 상위 병합 클러스터 ID
+- cluster_sub_id: 세부 클러스터 ID (신규 추가)
+- cluster_name: 클러스터명 (일반/세부 공통 사용)
+- keywords: 키워드 배열
+- count: 포함 항목 수
+- total_amount: 합산 금액
+- data_indices: 원본 데이터 참조 배열
+- created_at: 생성 시간
+
+
+## 클러스터 상태 관리 체계
+1단계: 일반 클러스터 (미병합 상태)
+cluster_id = -1
+cluster_sub_id = -1
+의미: 독립적인 개별 클러스터
+
+2단계: 상위 병합 클러스터
+cluster_id = cluster_number
+cluster_sub_id = -1
+의미: 다른 클러스터들을 포함하는 병합된 상위 클러스터
+
+3단계: 하위 병합 클러스터
+cluster_id = [상위클러스터번호] (cluster_number와 다름)
+cluster_sub_id = -1
+의미: 특정 상위 클러스터에 병합된 하위 클러스터
+
+4단계: 세부 상위 클러스터
+cluster_id = [기존상위클러스터번호]
+cluster_sub_id = cluster_number
+의미: 세부 클러스터링에서 새로 생성된 상위 세부 클러스터
+
+5단계: 세부 하위 클러스터
+cluster_id = [기존상위클러스터번호]
+cluster_sub_id = [세부상위클러스터번호] (cluster_number와 다름)
+의미: 특정 세부 클러스터에 병합된 하위 클러스터
+
+
+## 데이터 예시
+1.예시 1: 일반 클러스터
+json{
+  "cluster_number": 1,
+  "cluster_id": -1,
+  "cluster_sub_id": -1,
+  "cluster_name": "사무용품_클러스터1"
+}
+
+2.예시 2: 병합된 상위 클러스터
+json{
+  "cluster_number": 100,
+  "cluster_id": 100,
+  "cluster_sub_id": -1,
+  "cluster_name": "IT장비_통합클러스터"
+}
+
+3.예시 3: 상위 클러스터에 병합된 하위 클러스터
+json{
+  "cluster_number": 2,
+  "cluster_id": 100,
+  "cluster_sub_id": -1,
+  "cluster_name": "노트북_클러스터2"
+}
+
+4.예시 4: 세부 클러스터링 상위 클러스터
+json{
+  "cluster_number": 200,
+  "cluster_id": 100,
+  "cluster_sub_id": 200,
+  "cluster_name": "고성능노트북_세부클러스터"
+}
+
+5.예시 5: 세부 클러스터에 병합된 하위 클러스터
+json{
+  "cluster_number": 2,
+  "cluster_id": 100,
+  "cluster_sub_id": 200,
+  "cluster_name": "노트북_클러스터2"
+}
+## 기능별 데이터 조회 방식
+1.일반 클러스터링 화면 (uc_Clustering.cs)
+조회 조건: cluster_sub_id = -1
+표시 기준: cluster_id 기준으로 병합 상태 판단
+병합 로직: cluster_id 값 변경
+
+
+2. 세부 클러스터링 화면 (uc_DetailClustering.cs)
+조회 조건: cluster_id = [선택된상위클러스터ID]
+표시 기준: cluster_sub_id 기준으로 병합 상태 판단
+병합 로직: cluster_sub_id 값 변경 (cluster_id는 유지)
+분류 화면 업데이트 (uc_Classification.cs)
+
+세부 클러스터링 완료 후:
+- 기존 행: cluster_id 기준 집계
+- 추가 행: cluster_sub_id 기준 집계 (세부 클러스터별)
+- 새 컬럼: "세부 클러스터명" 추가

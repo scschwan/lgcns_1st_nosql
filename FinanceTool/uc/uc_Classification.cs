@@ -42,7 +42,90 @@ namespace FinanceTool
         // private static DateTime _cacheLastUpdated = DateTime.MinValue;
         // private static readonly TimeSpan CacheValidDuration = TimeSpan.FromMinutes(5);
 
-        
+        // 컨텍스트 메뉴 초기화 (initUI에서 호출)
+        private void InitializeContextMenu()
+        {
+            ContextMenuStrip contextMenu = new ContextMenuStrip();
+
+            // 세부 클러스터링 메뉴 항목 추가
+            ToolStripMenuItem detailClusteringItem = new ToolStripMenuItem("세부 클러스터링 수행");
+            detailClusteringItem.Click += DetailClustering_Click;
+
+            contextMenu.Items.Add(detailClusteringItem);
+            dataGridView_classify.ContextMenuStrip = contextMenu;
+        }
+
+        // 세부 클러스터링 메뉴 클릭 이벤트
+        private void DetailClustering_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // 현재 선택된 행 확인
+                if (dataGridView_classify.CurrentRow == null)
+                {
+                    MessageBox.Show("세부 클러스터링을 수행할 클러스터를 선택해주세요.", "알림",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // 선택된 클러스터 ID 가져오기
+                var selectedRow = dataGridView_classify.CurrentRow;
+                if (selectedRow.Cells["ID"]?.Value == null)
+                {
+                    MessageBox.Show("올바른 클러스터가 선택되지 않았습니다.", "오류",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                int selectedClusterId = Convert.ToInt32(selectedRow.Cells["ID"].Value);
+                string clusterName = selectedRow.Cells["클러스터명"]?.Value?.ToString() ?? "";
+
+                Debug.WriteLine($"세부 클러스터링 진입: 클러스터 ID {selectedClusterId}, 이름: {clusterName}");
+
+                // 확인 메시지
+                DialogResult result = MessageBox.Show(
+                    $"'{clusterName}' 클러스터의 세부 클러스터링을 수행하시겠습니까?",
+                    "세부 클러스터링 확인",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    // 세부 클러스터링 화면으로 이동
+                    NavigateToDetailClustering(selectedClusterId, clusterName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세부 클러스터링 진입 오류: {ex.Message}");
+                MessageBox.Show($"세부 클러스터링 진입 중 오류가 발생했습니다: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // 세부 클러스터링 화면으로 이동
+        private void NavigateToDetailClustering(int parentClusterId, string parentClusterName)
+        {
+            try
+            {
+                // 세부 클러스터링 화면 초기화 (부모 클러스터 정보 전달)
+                userControlHandler.uc_detailClustering.initUI(parentClusterId, parentClusterName);
+
+                // 화면 전환
+                if (this.ParentForm is Form1 form)
+                {
+                    form.LoadUserControl(userControlHandler.uc_detailClustering);
+                }
+
+                Debug.WriteLine($"세부 클러스터링 화면 진입 완료: 부모 클러스터 {parentClusterId}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세부 클러스터링 화면 전환 오류: {ex.Message}");
+                MessageBox.Show($"세부 클러스터링 화면 전환 중 오류가 발생했습니다: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
 
         // *** 4. 페이징 초기화 함수 추가 (dataTransform.cs, clustering.cs와 동일한 패턴) ***
         private void InitializePagination()
@@ -114,6 +197,8 @@ namespace FinanceTool
                             });
                         }
                     });
+
+                    InitializeContextMenu();
 
                     await progressForm.UpdateProgressHandler(100, "초기화 완료");
                     await Task.Delay(100);

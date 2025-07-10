@@ -31,18 +31,6 @@ public class ClusterDataManager
     }
 
     public DataTable FullData => _fullClusterData;
-    public int TotalCount => _fullClusterData?.Rows.Count ?? 0;
-
-
-    // 1. _columnIndexes 접근을 위한 public 메서드 추가
-    public Dictionary<string, HashSet<int>> GetColumnIndex(string columnName)
-    {
-        if (_columnIndexes.ContainsKey(columnName))
-        {
-            return new Dictionary<string, HashSet<int>>(_columnIndexes[columnName]);
-        }
-        return new Dictionary<string, HashSet<int>>();
-    }
 
     /// <summary>
     /// 정확한 값 검색 (DataHandler.FindMachEqualsKeyword 대체)
@@ -342,70 +330,7 @@ public class ClusterDataManager
         });
     }
 
-    /// <summary>
-    /// 고속 검색을 위한 인덱스 구축 (병렬 처리)
-    /// </summary>
-    /*
-    private void BuildSearchIndexes()
-    {
-        _keywordIndex = new Dictionary<string, HashSet<int>>();
-        _supplierIndex = new Dictionary<string, HashSet<int>>();
-        _clusterRowIndex = new Dictionary<int, DataRow>();
-
-        var lockKeyword = new object();
-        var lockSupplier = new object();
-        var lockRow = new object();
-
-        // 병렬 처리로 인덱스 구축 (16코어 CPU 활용)
-        Parallel.ForEach(_fullClusterData.AsEnumerable(), new ParallelOptions
-        {
-            MaxDegreeOfParallelism = Environment.ProcessorCount
-        }, row =>
-        {
-            if (!int.TryParse(row["ID"]?.ToString(), out int clusterId)) return;
-
-            // 행 인덱스 구축
-            lock (lockRow)
-            {
-                _clusterRowIndex[clusterId] = row;
-            }
-
-            // 키워드 인덱스 구축
-            string keywords = row["키워드목록"]?.ToString() ?? "";
-            if (!string.IsNullOrEmpty(keywords))
-            {
-                var keywordList = keywords.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k));
-                foreach (string keyword in keywordList)
-                {
-                    lock (lockKeyword)
-                    {
-                        if (!_keywordIndex.ContainsKey(keyword))
-                            _keywordIndex[keyword] = new HashSet<int>();
-                        _keywordIndex[keyword].Add(clusterId);
-                    }
-                }
-            }
-
-            // 공급업체 인덱스 구축
-            string supplier = row[DataHandler.prod_col_name]?.ToString() ?? "";
-            if (!string.IsNullOrEmpty(supplier))
-            {
-                var supplierList = supplier.Split(',').Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s));
-                foreach (string sup in supplierList)
-                {
-                    lock (lockSupplier)
-                    {
-                        if (!_supplierIndex.ContainsKey(sup))
-                            _supplierIndex[sup] = new HashSet<int>();
-                        _supplierIndex[sup].Add(clusterId);
-                    }
-                }
-            }
-        });
-
-        Debug.WriteLine($"인덱스 구축 완료 - 키워드: {_keywordIndex.Count}개, 공급업체: {_supplierIndex.Count}개, 클러스터: {_clusterRowIndex.Count}개");
-    }
-    */
+  
 
     private void BuildSearchIndexes()
     {
@@ -581,70 +506,6 @@ public HashSet<int> GetAllClusterIds()
         return new HashSet<int>(_clusterRowIndex.Keys);
     }
 
-   
-
-    /// <summary>
-    /// 키워드 기반 클러스터 ID 고속 검색
-    /// </summary>
-    public HashSet<int> GetClusterIdsByKeywords(List<string> keywords, bool exactMatch = false)
-    {
-        if (keywords == null || keywords.Count == 0)
-            return new HashSet<int>(_clusterRowIndex.Keys);
-
-        HashSet<int> result = null;
-
-        foreach (string keyword in keywords)
-        {
-            HashSet<int> keywordMatches = new HashSet<int>();
-
-            if (exactMatch)
-            {
-                // 정확한 키워드 매칭
-                if (_keywordIndex.TryGetValue(keyword, out HashSet<int> exactIds))
-                {
-                    keywordMatches = exactIds;
-                }
-            }
-            else
-            {
-                // 부분 매칭 (Contains)
-                var matchingKeys = _keywordIndex.Keys.Where(k => k.Contains(keyword));
-                foreach (string matchKey in matchingKeys)
-                {
-                    keywordMatches.UnionWith(_keywordIndex[matchKey]);
-                }
-            }
-
-            result = result == null ? keywordMatches : result.Intersect(keywordMatches).ToHashSet();
-
-            if (result.Count == 0) break; // 교집합이 없으면 조기 종료
-        }
-
-        return result ?? new HashSet<int>();
-    }
-
-    /// <summary>
-    /// 공급업체 기반 클러스터 ID 고속 검색
-    /// </summary>
-    public HashSet<int> GetClusterIdsBySupplier(List<string> suppliers)
-    {
-        if (suppliers == null || suppliers.Count == 0)
-            return new HashSet<int>(_clusterRowIndex.Keys);
-
-        HashSet<int> result = new HashSet<int>();
-
-        foreach (string supplier in suppliers)
-        {
-            var matchingKeys = _supplierIndex.Keys.Where(k => k.Contains(supplier));
-            foreach (string matchKey in matchingKeys)
-            {
-                result.UnionWith(_supplierIndex[matchKey]);
-            }
-        }
-
-        return result;
-    }
-
     /// <summary>
     /// 클러스터 ID로 DataRow 조회
     /// </summary>
@@ -726,95 +587,7 @@ public class ClusterSearchEngine
         _dataManager = dataManager;
     }
 
-    /// <summary>
-    /// 통합 검색 실행 (메모리 기반 고속 처리)
-    /// </summary>
-    /*
-    public async Task<SearchResult> ExecuteSearchAsync(SearchCriteria criteria)
-    {
-        return await Task.Run(() =>
-        {
-            var stopwatch = Stopwatch.StartNew();
-
-            try
-            {
-                HashSet<int> candidateIds = null;
-
-                // 1. 키워드 검색
-                if (criteria.IsKeywordSearch && criteria.Keywords?.Count > 0)
-                {
-                    candidateIds = _dataManager.GetClusterIdsByKeywords(criteria.Keywords, criteria.ExactMatch);
-                }
-                // 2. 공급업체 검색
-                else if (criteria.IsSupplierSearch && criteria.Keywords?.Count > 0)
-                {
-                    candidateIds = _dataManager.GetClusterIdsBySupplier(criteria.Keywords);
-                }
-                // 3. 전체 검색
-                else
-                {
-                    //candidateIds = new HashSet<int>(_dataManager._clusterRowIndex.Keys);
-                    candidateIds = _dataManager.GetAllClusterIds();
-                }
-
-                // 4. 제외 키워드 적용
-                if (criteria.ExcludeKeywords?.Count > 0)
-                {
-                    candidateIds = _dataManager.ExcludeByKeywords(candidateIds, criteria.ExcludeKeywords);
-                }
-
-                // 5. 병합 상태 필터링 (병렬 처리)
-                var filteredIds = candidateIds.AsParallel()
-                    .Where(id =>
-                    {
-                        var row = _dataManager.GetClusterRow(id);
-                        if (row == null) return false;
-
-                        // ClusterID 조건 확인
-                        if (!row.IsNull("ClusterID") && !row.IsNull("ID"))
-                        {
-                            int clusterId = Convert.ToInt32(row["ClusterID"]);
-                            int rowId = Convert.ToInt32(row["ID"]);
-
-                            // *** 수정된 조건: 병합되지 않은 클러스터만 표시 ***
-                            // ClusterID가 -1이거나, ClusterID와 ID가 다르면서 ClusterID < 0인 경우만 포함
-                            return clusterId == -1 || (clusterId != rowId && clusterId < 0);
-                        }
-
-                        // ClusterID나 ID가 null인 경우는 제외
-                        return false;
-                    })
-                    .ToList();
-
-                // 6. 결과 DataTable 생성
-                DataTable resultTable = CreateResultDataTable(filteredIds);
-
-                stopwatch.Stop();
-
-                return new SearchResult
-                {
-                    Data = resultTable,
-                    TotalCount = filteredIds.Count,
-                    ElapsedMilliseconds = stopwatch.ElapsedMilliseconds,
-                    SearchCriteria = criteria
-                };
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"검색 실행 오류: {ex.Message}");
-                return new SearchResult
-                {
-                    Data = _dataManager.FullData.Clone(),
-                    TotalCount = 0,
-                    ElapsedMilliseconds = stopwatch.ElapsedMilliseconds,
-                    Error = ex.Message
-                };
-            }
-        });
-    }
-    */
-
-    
+   
 
     /// <summary>
     /// 다중 컬럼 검색 지원 (새로 추가)
@@ -1007,33 +780,6 @@ public class SearchColumnCriteria
     public bool UseAnd { get; set; } = true;
 }
 
-/*
-/// <summary>
-/// 검색 결과를 DataTable로 변환
-/// </summary>
-private DataTable CreateResultDataTable(List<int> clusterIds)
-    {
-        if (_dataManager.FullData == null) return new DataTable();
-
-        DataTable resultTable = _dataManager.FullData.Clone();
-
-        // 병렬 처리로 행 추가 준비
-        var rows = clusterIds.AsParallel()
-            .Select(id => _dataManager.GetClusterRow(id))
-            .Where(row => row != null)
-            .OrderByDescending(row => Convert.ToInt32(row["ID"]))
-            .ToList();
-
-        // 결과 테이블에 행 추가 (순차 처리 - DataTable 스레드 안전성)
-        foreach (var row in rows)
-        {
-            resultTable.ImportRow(row);
-        }
-
-        return resultTable;
-    }
-}
-*/
 
 // =====================================
 // 3계층: UI 표시 관리자 (ClusterDisplayManager)
@@ -1055,8 +801,6 @@ public class ClusterDisplayManager
     private Label _paginationLabel;
     private CheckBox _selectAllCheckbox;
 
-    public int CurrentPage => _currentPage;
-    public int TotalPages => _totalPages;
     public int TotalRecords => _currentSearchResult?.Rows.Count ?? 0;
     public HashSet<int> SelectedClusterIds => new HashSet<int>(_selectedClusterIds);
 
@@ -1418,8 +1162,10 @@ public class ClusterDisplayManager
         if (_targetGrid == null) return;
 
         // 컬럼 숨김 처리
-        if (_targetGrid.Columns["ID"] != null) _targetGrid.Columns["ID"].Visible = true;
-        if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = true;
+        //if (_targetGrid.Columns["ID"] != null) _targetGrid.Columns["ID"].Visible = true;
+        //if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = true;
+        if (_targetGrid.Columns["ID"] != null) _targetGrid.Columns["ID"].Visible = false;
+        if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = false;
         if (_targetGrid.Columns["_id"] != null) _targetGrid.Columns["_id"].Visible = false;
         if (_targetGrid.Columns["is_hidden"] != null) _targetGrid.Columns["is_hidden"].Visible = false;
         if (_targetGrid.Columns["dataIndex"] != null) _targetGrid.Columns["dataIndex"].Visible = false;
@@ -1506,23 +1252,7 @@ public class SearchCriteria
     public bool IsSubSearchMode { get; set; } = false;
     public List<int> BaseSearchResults { get; set; } = new List<int>();
 
-    // 기존 방식과 새 방식 간 변환 메서드
-    public static SearchCriteria FromLegacy(List<string> keywords, bool isSupplierSearch, bool exactMatch, bool andSearch, List<string> excludeKeywords = null)
-    {
-        var criteria = new SearchCriteria
-        {
-            Keywords = keywords,
-            IsKeywordSearch = !isSupplierSearch,
-            IsSupplierSearch = isSupplierSearch,
-            ExactMatch = exactMatch,
-            AndSearch = andSearch,
-            ExcludeKeywords = excludeKeywords ?? new List<string>(),
-            IsMultiColumnSearch = false
-        };
-
-        return criteria;
-    }
-
+   
     public static SearchCriteria FromMultiColumn(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords = null)
     {
         var criteria = new SearchCriteria
@@ -1752,39 +1482,8 @@ public class ClusteringManager
         return _dataManager.SearchContainsValues(columnName, keyword);
     }
 
-    /// <summary>
-    /// 2글자 기준 비교 로직 (DataHandler.CompareByTwoChars 대체)
-    /// </summary>
-    private bool CompareByTwoChars(string baseWord, string targetWord)
-    {
-        if (targetWord.Length < 2) return false;
-        if (baseWord.Length < 2) return targetWord.Contains(baseWord);
+   
 
-        // 기준 단어를 2글자씩 자르기
-        var baseParts = new List<string>();
-        for (int i = 0; i < baseWord.Length - 1; i++)
-        {
-            baseParts.Add(baseWord.Substring(i, 2));
-        }
-
-        // 대상 단어를 2글자씩 자르기
-        var targetParts = new List<string>();
-        for (int i = 0; i < targetWord.Length - 1; i++)
-        {
-            targetParts.Add(targetWord.Substring(i, 2));
-        }
-
-        // 공통된 2글자 조합 확인
-        return baseParts.Any(b => targetParts.Contains(b));
-    }
-
-    /// <summary>
-    /// 병합 상태에 따른 키워드 필터링 (ExtractUniqueKeywords 대체)
-    /// </summary>
-    public List<string> FilterValuesByMergeStatus(List<string> values, string columnName, bool mergedOnly = false)
-    {
-        return _dataManager.FilterValuesByMergeStatus(values, columnName, mergedOnly);
-    }
 
     /// <summary>
     /// 표시명을 컬럼명으로 변환 (ConvertDisplayNameToColumnName 대체)
@@ -1854,39 +1553,6 @@ public class ClusteringManager
         {
             return 0;
         }
-    }
-
-    /// <summary>
-    /// 검색 성능 통계 조회
-    /// </summary>
-    public Dictionary<string, object> GetSearchPerformanceStats()
-    {
-        var stats = new Dictionary<string, object>();
-
-        try
-        {
-            var searchableColumns = GetSearchableColumns();
-            foreach (var column in searchableColumns)
-            {
-                int valueCount = GetColumnValueCount(column.Key);
-                bool hasData = HasDataInColumn(column.Key);
-
-                stats[column.Key] = new
-                {
-                    DisplayName = column.Value,
-                    ValueCount = valueCount,
-                    HasData = hasData,
-                    //IsComboBoxSupported = IsComboBoxSupportedColumn(column.Key),
-                    IsDirectInputOnly = IsDirectInputOnlyColumn(column.Key)
-                };
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"검색 성능 통계 조회 오류: {ex.Message}");
-        }
-
-        return stats;
     }
 
 
