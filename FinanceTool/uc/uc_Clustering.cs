@@ -1874,6 +1874,9 @@ namespace FinanceTool
             // ClusterID 컬럼 숨기기
             dgv.Columns["ClusterID"].Visible = false;
 
+            // ClusterSubID 컬럼 숨기기
+            dgv.Columns["ClusterSubID"].Visible = false;
+
             // dataIndex 컬럼 숨기기
             dgv.Columns["dataIndex"].Visible = false;
 

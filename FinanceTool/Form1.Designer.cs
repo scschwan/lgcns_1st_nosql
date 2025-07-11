@@ -29,24 +29,32 @@
         private void InitializeComponent()
         {
             menuStrip1 = new MenuStrip();
+            fileUploadToolStripMenuItem = new ToolStripMenuItem();
             fileLoadToolStripMenuItem = new ToolStripMenuItem();
             dataPreprocessingToolStripMenuItem = new ToolStripMenuItem();
             dataAnalToolStripMenuItem = new ToolStripMenuItem();
             classificationToolStripMenuItem = new ToolStripMenuItem();
             exportToolStripMenuItem = new ToolStripMenuItem();
-            fileUploadToolStripMenuItem = new ToolStripMenuItem();
             mainPanel = new Panel();
+            subClusteringToolStripMenuItem = new ToolStripMenuItem();
             menuStrip1.SuspendLayout();
             SuspendLayout();
             // 
             // menuStrip1
             // 
-            menuStrip1.Items.AddRange(new ToolStripItem[] { fileUploadToolStripMenuItem, fileLoadToolStripMenuItem, dataPreprocessingToolStripMenuItem, dataAnalToolStripMenuItem, classificationToolStripMenuItem, exportToolStripMenuItem });
+            menuStrip1.Items.AddRange(new ToolStripItem[] { fileUploadToolStripMenuItem, fileLoadToolStripMenuItem, dataPreprocessingToolStripMenuItem, dataAnalToolStripMenuItem, classificationToolStripMenuItem, exportToolStripMenuItem, subClusteringToolStripMenuItem });
             menuStrip1.Location = new Point(0, 0);
             menuStrip1.Name = "menuStrip1";
             menuStrip1.Size = new Size(1904, 24);
             menuStrip1.TabIndex = 0;
             menuStrip1.Text = "menuStrip1";
+            // 
+            // fileUploadToolStripMenuItem
+            // 
+            fileUploadToolStripMenuItem.Name = "fileUploadToolStripMenuItem";
+            fileUploadToolStripMenuItem.Size = new Size(79, 20);
+            fileUploadToolStripMenuItem.Text = "File Upload";
+            fileUploadToolStripMenuItem.Click += fileUploadToolStripMenuItem_Click;
             // 
             // fileLoadToolStripMenuItem
             // 
@@ -83,13 +91,6 @@
             exportToolStripMenuItem.Text = "Export";
             exportToolStripMenuItem.Click += exportToolStripMenuItem_Click;
             // 
-            // fileUploadToolStripMenuItem
-            // 
-            fileUploadToolStripMenuItem.Name = "fileUploadToolStripMenuItem";
-            fileUploadToolStripMenuItem.Size = new Size(79, 20);
-            fileUploadToolStripMenuItem.Text = "File Upload";
-            fileUploadToolStripMenuItem.Click += fileUploadToolStripMenuItem_Click;
-            // 
             // mainPanel
             // 
             mainPanel.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -98,6 +99,13 @@
             mainPanel.Padding = new Padding(5);
             mainPanel.Size = new Size(1904, 1017);
             mainPanel.TabIndex = 1;
+            // 
+            // subClusteringToolStripMenuItem
+            // 
+            subClusteringToolStripMenuItem.Name = "subClusteringToolStripMenuItem";
+            subClusteringToolStripMenuItem.Size = new Size(97, 20);
+            subClusteringToolStripMenuItem.Text = "sub_Clustering";
+            subClusteringToolStripMenuItem.Click += subClusteringToolStripMenuItem_Click;
             // 
             // Form1
             // 
@@ -128,5 +136,6 @@
         private ToolStripMenuItem classificationToolStripMenuItem;
         private ToolStripMenuItem exportToolStripMenuItem;
         private ToolStripMenuItem fileUploadToolStripMenuItem;
+        private ToolStripMenuItem subClusteringToolStripMenuItem;
     }
 }

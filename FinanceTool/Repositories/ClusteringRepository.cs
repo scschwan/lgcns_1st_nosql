@@ -489,7 +489,11 @@ namespace FinanceTool.Repositories
         {
             try
             {
-                var filter = Builders<ClusteringResultDocument>.Filter.Eq(d => d.ClusterId, parentClusterId);
+                // *** 수정: 부모 클러스터 자체는 제외 ***
+                var filter = Builders<ClusteringResultDocument>.Filter.And(
+                    Builders<ClusteringResultDocument>.Filter.Eq(d => d.ClusterId, parentClusterId),
+                    Builders<ClusteringResultDocument>.Filter.Ne(d => d.ClusterNumber, parentClusterId)
+                );
                 var documents = await _collection.Find(filter).ToListAsync();
 
                 Debug.WriteLine($"상위 클러스터 {parentClusterId}의 하위 데이터 {documents.Count}개 조회");

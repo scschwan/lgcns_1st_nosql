@@ -3,6 +3,7 @@ using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using MongoDB.Driver.Core.Clusters;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -269,6 +270,11 @@ namespace FinanceTool
 
             enhancedTable.Columns.Add("세부클러스터명");
 
+            // *** 수정: 컬럼 순서 조정 ***
+            // 세부클러스터명 컬럼을 클러스터명 다음에 배치
+            int clusterNameIndex = enhancedTable.Columns["클러스터명"].Ordinal;
+            enhancedTable.Columns["세부클러스터명"].SetOrdinal(clusterNameIndex + 1);
+
             // 3. 클러스터별 dataIndex 수집
             Dictionary<int, List<string>> clusterToDataIndices = new Dictionary<int, List<string>>();
 
@@ -344,29 +350,34 @@ namespace FinanceTool
                     {
                         row["ClusterSubID"] = -1;
                     }
+                   
+                }
+            }
 
-                    
-                    int clusterSubId = row["ClusterSubID"] != DBNull.Value ? Convert.ToInt32(row["ClusterSubID"]) : -1;
-                    int id = Convert.ToInt32(row["ID"]);
-                    string originalClusterName = row["클러스터명"].ToString();
+            // *** 여기에 클러스터명과 세부클러스터명 설정 로직을 한 번만 실행 ***
+            foreach (DataRow row in enhancedTable.Rows)
+            {
+                int clusterId = !row.IsNull("ClusterID") ? Convert.ToInt32(row["ClusterID"]) : -1;
+                int clusterSubId = !row.IsNull("ClusterSubID") ? Convert.ToInt32(row["ClusterSubID"]) : -1;
+                int id = Convert.ToInt32(row["ID"]);
+                string originalClusterName = row["클러스터명"]?.ToString() ?? "";
 
-                    // 클러스터명과 세부클러스터명 설정
-                    if (clusterSubId == id && clusterSubId > 0)
-                    {
-                        // 세부 상위 클러스터인 경우
-                        // 부모 클러스터명 찾기
-                        var parentCluster = enhancedTable.AsEnumerable()
-                            .FirstOrDefault(r => Convert.ToInt32(r["ID"]) == clusterId);
+                // 클러스터명과 세부클러스터명 설정
+                if (clusterSubId == id && clusterSubId > 0)
+                {
+                    // 세부 상위 클러스터인 경우
+                    // 부모 클러스터명 찾기
+                    var parentCluster = enhancedTable.AsEnumerable()
+                        .FirstOrDefault(r => Convert.ToInt32(r["ID"]) == clusterId);
 
-                        row["클러스터명"] = parentCluster?["클러스터명"]?.ToString() ?? "";
-                        row["세부클러스터명"] = originalClusterName;
-                    }
-                    else
-                    {
-                        // 일반 병합 클러스터인 경우
-                        row["클러스터명"] = originalClusterName;
-                        row["세부클러스터명"] = "";
-                    }
+                    row["클러스터명"] = parentCluster?["클러스터명"]?.ToString() ?? originalClusterName;
+                    row["세부클러스터명"] = originalClusterName;
+                }
+                else
+                {
+                    // 일반 병합 클러스터인 경우
+                    row["클러스터명"] = originalClusterName;
+                    row["세부클러스터명"] = "";
                 }
             }
 
@@ -377,7 +388,7 @@ namespace FinanceTool
                 .OrderBy(row =>
                 {
                     int clusterId = Convert.ToInt32(row["ClusterID"]);
-                    int clusterSubId = row["클러스터SubID"] != DBNull.Value ? Convert.ToInt32(row["클러스터SubID"]) : -1;
+                    int clusterSubId = row["ClusterSubID"] != DBNull.Value ? Convert.ToInt32(row["ClusterSubID"]) : -1;
                     int id = Convert.ToInt32(row["ID"]);
 
                     // 정렬 키: "부모클러스터ID_세부여부_ID"
@@ -1303,13 +1314,19 @@ namespace FinanceTool
                     var clusterNameMapping = await GetClusterNameMappingForPageAsync(currentPageRawDataIds);
                     Debug.WriteLine($"현재 페이지 클러스터 매핑: {clusterNameMapping.Count}개 항목");
 
+                    // *** 추가: 세부클러스터명 매핑도 함께 조회 ***
+                    var detailClusterNameMapping = await GetDetailClusterNameMappingForPageAsync(currentPageRawDataIds);
+                    Debug.WriteLine($"현재 페이지 세부클러스터 매핑: {detailClusterNameMapping.Count}개 항목");
+
+
                     if (progressHandler != null)
                     {
                         await progressHandler(65, "클러스터 매핑 조회 완료");
                     }
 
                     // 5. MongoDB 문서를 DataTable로 변환 (클러스터명 포함)
-                    pageData = ConvertRawDocumentsToDataTableWithClusterName(documents, clusterNameMapping);
+                    //pageData = ConvertRawDocumentsToDataTableWithClusterName(documents, clusterNameMapping);
+                    pageData = ConvertRawDocumentsToDataTableWithClusterName(documents, clusterNameMapping, detailClusterNameMapping);
                     Debug.WriteLine($"변환된 pageData: {pageData.Rows.Count}행, 클러스터명 매핑: {GetClusterNameMappingStats(pageData)}");
 
                     if (progressHandler != null)
@@ -1365,6 +1382,48 @@ namespace FinanceTool
             if (progressHandler != null)
             {
                 await progressHandler(90, "데이터 로드 마무리 중...");
+            }
+        }
+
+        // GetClusterNameMappingForPageAsync 함수 다음에 추가
+        private async Task<Dictionary<string, string>> GetDetailClusterNameMappingForPageAsync(List<string> rawDataIds)
+        {
+            var mappingDict = new Dictionary<string, string>();
+
+            if (rawDataIds == null || rawDataIds.Count == 0)
+                return mappingDict;
+
+            try
+            {
+                var clusteringRepo = new ClusteringRepository();
+
+                // cluster_sub_id == cluster_number인 세부 상위 클러스터만 조회
+                var filter = Builders<ClusteringResultDocument>.Filter.Where(c =>
+                    c.ClusterSubId == c.ClusterNumber && c.ClusterSubId > 0);
+                var detailClusters = await clusteringRepo.FindDocumentsAsync(filter);
+
+                // 현재 페이지의 raw_data ID에 대해서만 매핑 생성
+                foreach (var cluster in detailClusters)
+                {
+                    if (cluster.DataIndices != null && !string.IsNullOrEmpty(cluster.ClusterName))
+                    {
+                        foreach (var dataIndex in cluster.DataIndices)
+                        {
+                            if (rawDataIds.Contains(dataIndex) && !mappingDict.ContainsKey(dataIndex))
+                            {
+                                mappingDict[dataIndex] = cluster.ClusterName;
+                            }
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"현재 페이지 세부클러스터 매핑 생성: {rawDataIds.Count}개 ID 중 {mappingDict.Count}개 매핑");
+                return mappingDict;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세부클러스터명 매핑 조회 중 오류: {ex.Message}");
+                return mappingDict;
             }
         }
 
@@ -1481,6 +1540,9 @@ namespace FinanceTool
             // 클러스터명 추가
             essentialColumns.Add("클러스터명");
 
+            // *** 추가: 세부클러스터명도 필수 컬럼으로 설정 ***
+            essentialColumns.Add("세부클러스터명");
+
             // 데이터 처리 관련 필수 컬럼 추가
             if (!string.IsNullOrEmpty(DataHandler.dept_col_name))
                 essentialColumns.Add(DataHandler.dept_col_name);
@@ -1564,6 +1626,9 @@ namespace FinanceTool
             // 클러스터명 추가
             essentialColumns.Add("클러스터명");
 
+            // 클러스터명 추가
+            essentialColumns.Add("세부클러스터명");
+
             // 데이터 처리 관련 필수 컬럼 추가
             if (!string.IsNullOrEmpty(DataHandler.dept_col_name))
                 essentialColumns.Add(DataHandler.dept_col_name);
@@ -1592,7 +1657,8 @@ namespace FinanceTool
         // 기존 ConvertRawDocumentsToDataTable 메서드를 아래 메서드로 교체
         private DataTable ConvertRawDocumentsToDataTableWithClusterName(
             List<RawDataDocument> documents,
-            Dictionary<string, string> clusterNameMapping)
+            Dictionary<string, string> clusterNameMapping,
+            Dictionary<string, string> detailClusterNameMapping = null)
         {
             DataTable dataTable = new DataTable();
 
@@ -1601,6 +1667,8 @@ namespace FinanceTool
             dataTable.Columns.Add("import_date", typeof(DateTime));
             dataTable.Columns.Add("is_hidden", typeof(bool));
             dataTable.Columns.Add("클러스터명", typeof(string)); // 클러스터명 컬럼을 먼저 추가
+                                                            // *** 여기에 추가 ***
+            dataTable.Columns.Add("세부클러스터명", typeof(string)); // 세부클러스터명 컬럼 추가
 
             // 첫 번째 문서의 데이터를 기반으로 동적 컬럼 추가
             if (documents.Count > 0 && documents[0].Data != null)
@@ -1636,6 +1704,18 @@ namespace FinanceTool
                 {
                     row["클러스터명"] = ""; // 매핑되지 않은 경우 빈 문자열
                 }
+                // *** 여기에 추가 ***
+                // 세부클러스터명 설정 로직 (ClusterSubID 기반)
+                // *** 추가: 세부클러스터명 매핑 ***
+                // 세부클러스터명 매핑
+                if (detailClusterNameMapping != null && detailClusterNameMapping.TryGetValue(doc.Id, out string detailClusterName))
+                {
+                    row["세부클러스터명"] = detailClusterName;
+                }
+                else
+                {
+                    row["세부클러스터명"] = ""; // 매핑되지 않은 경우 빈 문자열
+                }
 
                 // 동적 데이터 필드 추가
                 if (doc.Data != null)
@@ -1651,203 +1731,14 @@ namespace FinanceTool
 
                 dataTable.Rows.Add(row);
             }
+            
 
             Debug.WriteLine($"클러스터명이 포함된 DataTable 생성 완료: {dataTable.Rows.Count}행, {mappedCount}개 행에 클러스터명 매핑됨 ({(double)mappedCount / totalCount * 100:F1}%)");
             return dataTable;
         }
 
-        // MongoDB ProcessDataDocument를 DataTable로 변환
-        // DataTable에 컬럼 정확히 처리하도록 변환 함수 개선
-        private DataTable ConvertProcessDocumentsToDataTable(List<ProcessDataDocument> documents)
-        {
-            DataTable dataTable = new DataTable();
-
-            Debug.WriteLine($"ConvertProcessDocumentsToDataTable 시작 (문서 수: {documents.Count})");
-
-            // 기본 컬럼 추가
-            dataTable.Columns.Add("id", typeof(string));
-            dataTable.Columns.Add("raw_data_id", typeof(string));
-            dataTable.Columns.Add("import_date", typeof(DateTime));
-            dataTable.Columns.Add("processed_date", typeof(DateTime));
-            dataTable.Columns.Add("cluster_id", typeof(int));
-            dataTable.Columns.Add("cluster_name", typeof(string));
-            dataTable.Columns.Add("클러스터명", typeof(string)); // 클러스터명 컬럼 추가
-
-            // 동적 컬럼 수집 - 모든 문서의 Data 필드를 검사하여 컬럼 통합
-            HashSet<string> columnSet = new HashSet<string>();
-
-            foreach (var doc in documents)
-            {
-                if (doc.Data != null)
-                {
-                    foreach (var key in doc.Data.Keys)
-                    {
-                        columnSet.Add(key);
-                    }
-                }
-            }
-
-            Debug.WriteLine($"동적 컬럼 수집 완료: {columnSet.Count}개 컬럼 발견");
-
-            // 컬럼 추가
-            foreach (var columnName in columnSet)
-            {
-                if (!dataTable.Columns.Contains(columnName))
-                {
-                    dataTable.Columns.Add(columnName);
-                    Debug.WriteLine($"컬럼 추가: {columnName}");
-                }
-            }
-
-            // 문서 데이터를 DataTable에 추가
-            foreach (var doc in documents)
-            {
-                DataRow row = dataTable.NewRow();
-                row["id"] = doc.Id;
-                row["raw_data_id"] = doc.RawDataId;
-                row["import_date"] = doc.ImportDate;
-                row["processed_date"] = doc.ProcessedDate;
-
-                // 클러스터 정보
-                if (doc.ClusterId.HasValue)
-                {
-                    row["cluster_id"] = doc.ClusterId.Value;
-                }
-                else
-                {
-                    row["cluster_id"] = DBNull.Value;
-                }
-
-                row["cluster_name"] = doc.ClusterName ?? "";
-                row["클러스터명"] = doc.ClusterName ?? "";
-
-                // 동적 데이터 필드 추가
-                if (doc.Data != null)
-                {
-                    foreach (var kvp in doc.Data)
-                    {
-                        if (dataTable.Columns.Contains(kvp.Key))
-                        {
-                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
-                        }
-                    }
-                }
-
-                dataTable.Rows.Add(row);
-            }
-
-            Debug.WriteLine($"ConvertProcessDocumentsToDataTable 완료: {dataTable.Rows.Count}행, {dataTable.Columns.Count}열");
-            return dataTable;
-        }
-
-
-        // DataTable에 클러스터링 정보 추가
-        private async Task<DataTable> AddClusteringInfoToDataTableAsync(DataTable dataTable)
-        {
-            try
-            {
-                // 클러스터명 컬럼이 없으면 추가
-                if (!dataTable.Columns.Contains("클러스터명"))
-                {
-                    dataTable.Columns.Add("클러스터명", typeof(string));
-                }
-
-                // 메모리 캐싱된 클러스터링 데이터 활용
-                DataTable clusteringData;
-                if (DataHandler.finalClusteringData != null && DataHandler.finalClusteringData.Rows.Count > 0)
-                {
-                    Debug.WriteLine("메모리에 캐싱된 클러스터링 데이터 사용");
-                    clusteringData = DataHandler.finalClusteringData;
-                }
-                else
-                {
-                    // MongoDB에서 클러스터링 데이터 가져오기
-                    Debug.WriteLine("MongoDB에서 클러스터링 데이터 로드");
-                    var clusteringRepo = new ClusteringRepository();
-                    clusteringData = await clusteringRepo.ToDataTableAsync();
-
-                    // 데이터를 메모리에 캐싱
-                    DataHandler.finalClusteringData = clusteringData.Copy();
-                }
-
-                // 클러스터 ID와 이름 매핑 생성
-                Dictionary<int, string> clusterNameMap = new Dictionary<int, string>();
-                foreach (DataRow row in clusteringData.Rows)
-                {
-                    if (row["ID"] != DBNull.Value && row["ClusterID"] != DBNull.Value)
-                    {
-                        int id = Convert.ToInt32(row["ID"]);
-                        int clusterId = Convert.ToInt32(row["ClusterID"]);
-
-                        if (id == clusterId) // ID와 ClusterID가 일치하는 경우만
-                        {
-                            string clusterName = row["클러스터명"]?.ToString();
-                            if (!string.IsNullOrEmpty(clusterName))
-                            {
-                                clusterNameMap[id] = clusterName;
-                            }
-                        }
-                    }
-                }
-
-                // 클러스터 ID와 dataIndex 매핑 생성
-                Dictionary<int, HashSet<string>> clusterDataIndices = new Dictionary<int, HashSet<string>>();
-                foreach (DataRow row in clusteringData.Rows)
-                {
-                    if (row["ClusterID"] != DBNull.Value)
-                    {
-                        int clusterId = Convert.ToInt32(row["ClusterID"]);
-                        string dataIndices = row["dataIndex"]?.ToString();
-
-                        if (!string.IsNullOrEmpty(dataIndices))
-                        {
-                            if (!clusterDataIndices.ContainsKey(clusterId))
-                            {
-                                clusterDataIndices[clusterId] = new HashSet<string>();
-                            }
-
-                            foreach (string index in dataIndices.Split(',').Select(s => s.Trim()))
-                            {
-                                if (!string.IsNullOrEmpty(index))
-                                {
-                                    clusterDataIndices[clusterId].Add(index);
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // dataTable의 각 행에 클러스터명 설정
-                foreach (DataRow row in dataTable.Rows)
-                {
-                    if (row["raw_data_id"] != DBNull.Value)
-                    {
-                        string rawDataId = row["raw_data_id"].ToString();
-
-                        // 각 클러스터 ID에 대해 확인
-                        foreach (var entry in clusterDataIndices)
-                        {
-                            int clusterId = entry.Key;
-                            var dataIndices = entry.Value;
-
-                            if (dataIndices.Contains(rawDataId) && clusterNameMap.ContainsKey(clusterId))
-                            {
-                                row["클러스터명"] = clusterNameMap[clusterId];
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                return dataTable;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"클러스터링 정보 추가 중 오류: {ex.Message}");
-                return dataTable; // 오류 시 원본 데이터 반환
-            }
-        }
-
+       
+       
         // DataGridView 설정 및 구성
         // DataGridView 설정 함수 개선 (컬럼 가시성 유지)
         public void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)

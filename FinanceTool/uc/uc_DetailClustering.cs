@@ -433,6 +433,16 @@ namespace FinanceTool
                     return;
                 }
 
+                // *** 추가: 부모 클러스터 데이터 제거 ***
+                var rowsToRemove = _detailClusteringData.AsEnumerable()
+                    .Where(row => Convert.ToInt32(row["ID"]) == _parentClusterId)
+                    .ToList();
+
+                foreach (var row in rowsToRemove)
+                {
+                    _detailClusteringData.Rows.Remove(row);
+                }
+
                 // *** 2. RawData 정보로 보강 (로컬 데이터 사용) ***
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(_detailClusteringData);
 

@@ -159,6 +159,11 @@ namespace FinanceTool
         {
             LoadUserControl(userControlHandler.uc_multiFileUpload);
         }
+
+        private void subClusteringToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            LoadUserControl(userControlHandler.uc_detailClustering);
+        }
     }
 
 }
