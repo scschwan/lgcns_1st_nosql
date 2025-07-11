@@ -303,6 +303,7 @@ namespace FinanceTool.Repositories
             var dataTable = new DataTable();
             dataTable.Columns.Add("ID", typeof(int));         // ClusterNumber로 매핑
             dataTable.Columns.Add("ClusterID", typeof(int));  // ClusterId로 매핑
+            dataTable.Columns.Add("ClusterSubID", typeof(int));  // ClusterId로 매핑
             dataTable.Columns.Add("클러스터명", typeof(string));
             dataTable.Columns.Add("키워드목록", typeof(string));
             dataTable.Columns.Add("Count", typeof(int));
@@ -315,6 +316,7 @@ namespace FinanceTool.Repositories
                 var row = dataTable.NewRow();
                 row["ID"] = cluster.ClusterNumber;
                 row["ClusterID"] = cluster.ClusterId;
+                row["ClusterSubID"] = -1;
                 row["클러스터명"] = cluster.ClusterName;
                 row["키워드목록"] = string.Join(",", cluster.Keywords);
                 row["Count"] = cluster.Count;

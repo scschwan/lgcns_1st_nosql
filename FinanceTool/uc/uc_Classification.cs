@@ -108,6 +108,15 @@ namespace FinanceTool
         {
             try
             {
+                // *** 컬럼 정보 전체 출력 ***
+                Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 행 수: {DataHandler.finalClusteringData.Rows.Count}");
+                Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 컬럼 수: {DataHandler.finalClusteringData.Columns.Count}");
+                for (int i = 0; i < DataHandler.finalClusteringData.Columns.Count; i++)
+                {
+                    Debug.WriteLine($"  컬럼 {i}: Name='{DataHandler.finalClusteringData.Columns[i].ColumnName}'" +
+                        $", DataType='{DataHandler.finalClusteringData.Columns[i].DataType}'");
+                }
+
                 // 세부 클러스터링 화면 초기화 (부모 클러스터 정보 전달)
                 userControlHandler.uc_detailClustering.initUI(parentClusterId, parentClusterName);
 
@@ -200,6 +209,15 @@ namespace FinanceTool
 
                     InitializeContextMenu();
 
+                    // *** 컬럼 정보 전체 출력 ***
+                    Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 행 수: {DataHandler.finalClusteringData.Rows.Count}");
+                    Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 컬럼 수: {DataHandler.finalClusteringData.Columns.Count}");
+                    for (int i = 0; i < DataHandler.finalClusteringData.Columns.Count; i++)
+                    {
+                        Debug.WriteLine($"  컬럼 {i}: Name='{DataHandler.finalClusteringData.Columns[i].ColumnName}'" +
+                            $", DataType='{DataHandler.finalClusteringData.Columns[i].DataType}'");
+                    }
+
                     await progressForm.UpdateProgressHandler(100, "초기화 완료");
                     await Task.Delay(100);
                     progressForm.Close();
@@ -245,6 +263,11 @@ namespace FinanceTool
 
             if (!enhancedTable.Columns.Contains(DataHandler.dept_col_name))
                 enhancedTable.Columns.Add(DataHandler.dept_col_name, typeof(string));
+
+            if (!enhancedTable.Columns.Contains("ClusterSubID"))
+                enhancedTable.Columns.Add("ClusterSubID");
+
+            enhancedTable.Columns.Add("세부클러스터명");
 
             // 3. 클러스터별 dataIndex 수집
             Dictionary<int, List<string>> clusterToDataIndices = new Dictionary<int, List<string>>();
@@ -317,10 +340,69 @@ namespace FinanceTool
                         row[DataHandler.prod_col_name] = combinedProds;
                         row[DataHandler.dept_col_name] = combinedDepts;
                     }
+                    if (row.IsNull("ClusterSubID"))
+                    {
+                        row["ClusterSubID"] = -1;
+                    }
+
+                    
+                    int clusterSubId = row["ClusterSubID"] != DBNull.Value ? Convert.ToInt32(row["ClusterSubID"]) : -1;
+                    int id = Convert.ToInt32(row["ID"]);
+                    string originalClusterName = row["클러스터명"].ToString();
+
+                    // 클러스터명과 세부클러스터명 설정
+                    if (clusterSubId == id && clusterSubId > 0)
+                    {
+                        // 세부 상위 클러스터인 경우
+                        // 부모 클러스터명 찾기
+                        var parentCluster = enhancedTable.AsEnumerable()
+                            .FirstOrDefault(r => Convert.ToInt32(r["ID"]) == clusterId);
+
+                        row["클러스터명"] = parentCluster?["클러스터명"]?.ToString() ?? "";
+                        row["세부클러스터명"] = originalClusterName;
+                    }
+                    else
+                    {
+                        // 일반 병합 클러스터인 경우
+                        row["클러스터명"] = originalClusterName;
+                        row["세부클러스터명"] = "";
+                    }
                 }
             }
 
-            return enhancedTable;
+
+            // CreateEnhancedClusteringDataAsync 함수 마지막에
+            // 커스텀 정렬: 병합 클러스터 다음에 세부 클러스터들이 오도록
+            var sortedRows = enhancedTable.AsEnumerable()
+                .OrderBy(row =>
+                {
+                    int clusterId = Convert.ToInt32(row["ClusterID"]);
+                    int clusterSubId = row["클러스터SubID"] != DBNull.Value ? Convert.ToInt32(row["클러스터SubID"]) : -1;
+                    int id = Convert.ToInt32(row["ID"]);
+
+                    // 정렬 키: "부모클러스터ID_세부여부_ID"
+                    if (clusterSubId == id && clusterSubId > 0)
+                    {
+                        // 세부 클러스터: 부모 ID를 기준으로 하되 세부 표시
+                        return $"{clusterId:D10}_1_{id:D10}";
+                    }
+                    else
+                    {
+                        // 일반 클러스터: ID를 기준으로 정렬
+                        return $"{id:D10}_0_{id:D10}";
+                    }
+                })
+                .ToList();
+
+            // 정렬된 결과로 새 테이블 생성
+            DataTable sortedTable = enhancedTable.Clone();
+            foreach (var row in sortedRows)
+            {
+                sortedTable.ImportRow(row);
+            }
+
+            //return enhancedTable;
+            return sortedTable;
         }
 
 
@@ -374,51 +456,82 @@ namespace FinanceTool
             // 조건에 맞는 데이터만 필터링
             var filteredData = dt.AsEnumerable()
                 .Where(row =>
-                    Convert.ToInt32(row["ClusterID"]) <= 0 ||
-                    Convert.ToInt32(row["ClusterID"]) == Convert.ToInt32(row["ID"]))
-                .CopyToDataTable();
+                {
+                    int clusterId = Convert.ToInt32(row["ClusterID"]);
+                    int id = Convert.ToInt32(row["ID"]);
+                    int clusterSubId = row["ClusterSubID"] != DBNull.Value ? Convert.ToInt32(row["ClusterSubID"]) : -1;
 
-            dgv.DataSource = filteredData;
+                    // 일반 클러스터링 결과만 표시 (세부 클러스터링 결과 제외)
+                    //return clusterSubId == -1 && (clusterId <= 0 || clusterId == id);
+                    return clusterSubId == id || clusterId == id;
+                });
+            Debug.WriteLine($"[CreateCheckDataGridView] filteredData 갯수: {filteredData.ToList().Count} ");
 
-            // ID 컬럼 숨기기
-            dgv.Columns["ID"].Visible = false;
-            // ClusterID 컬럼 숨기기
-            dgv.Columns["ClusterID"].Visible = false;
-
-            // dataIndex 컬럼 숨기기
-            dgv.Columns["dataIndex"].Visible = false;
-
-            if (dgv.Columns["Count"] != null)
+            if (filteredData.ToList().Count > 0)
             {
-                dgv.Columns["Count"].DefaultCellStyle.Format = "N0"; // 천 단위 구분자
-                dgv.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                DataTable filteredTable = filteredData.CopyToDataTable();
+                dgv.DataSource = filteredTable;
 
+                // 컬럼 정보 확인
+                Debug.WriteLine($"원본 DataTable 컬럼: {string.Join(", ", dt.Columns.Cast<DataColumn>().Select(c => c.ColumnName))}");
+                Debug.WriteLine($"DataGridView 컬럼: {string.Join(", ", dgv.Columns.Cast<DataGridViewColumn>().Select(c => c.Name))}");
+
+
+                // ID 컬럼 숨기기
+                if (dgv.Columns.Contains("ID"))
+                {
+                    dgv.Columns["ID"].Visible = false;
+                }
+
+                // ID 컬럼 숨기기
+                if (dgv.Columns.Contains("ClusterSubID"))
+                {
+                    dgv.Columns["ClusterSubID"].Visible = false;
+                }
+
+                // ClusterID 컬럼 숨기기
+                dgv.Columns["ClusterID"].Visible = false;
+
+                // dataIndex 컬럼 숨기기
+                dgv.Columns["dataIndex"].Visible = false;
+
+                if (dgv.Columns["Count"] != null)
+                {
+                    dgv.Columns["Count"].DefaultCellStyle.Format = "N0"; // 천 단위 구분자
+                    dgv.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+
+                }
+
+                if (dgv.Columns["합산금액"] != null)
+                {
+                    dgv.Columns["합산금액"].DefaultCellStyle.Format = "N0"; // 천 단위 구분자
+                    dgv.Columns["합산금액"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                }
+
+                // DataGridView 속성 설정
+                dgv.AllowUserToAddRows = false;
+                //dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+                dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+
+                // 나머지 컬럼들은 읽기 전용으로 설정
+                for (int i = 1; i < dgv.Columns.Count; i++)
+                {
+                    dgv.Columns[i].ReadOnly = true;
+                }
+
+                dgv.Columns["클러스터명"].ReadOnly = false;  // 클러스터명 편집 가능
+                                                        //dgv.CellEndEdit += DataGridView_CellEndEdit;
+                                                        //dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dgv.Font = new System.Drawing.Font("맑은 고딕", 9F);
+                // "클러스터명" 컬럼의 배경색을 연노란색으로 설정
+                dgv.Columns["클러스터명"].DefaultCellStyle.BackColor = System.Drawing.Color.LightYellow;
             }
-
-            if (dgv.Columns["합산금액"] != null)
+            else
             {
-                dgv.Columns["합산금액"].DefaultCellStyle.Format = "N0"; // 천 단위 구분자
-                dgv.Columns["합산금액"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                Debug.WriteLine("[CreateCheckDataGridView] 조회 조건 데이터가 없음");
             }
-
-            // DataGridView 속성 설정
-            dgv.AllowUserToAddRows = false;
-            //dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dgv.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-            dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-
-            // 나머지 컬럼들은 읽기 전용으로 설정
-            for (int i = 1; i < dgv.Columns.Count; i++)
-            {
-                dgv.Columns[i].ReadOnly = true;
-            }
-
-            dgv.Columns["클러스터명"].ReadOnly = false;  // 클러스터명 편집 가능
-            //dgv.CellEndEdit += DataGridView_CellEndEdit;
-            //dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-            dgv.Font = new System.Drawing.Font("맑은 고딕", 9F);
-            // "클러스터명" 컬럼의 배경색을 연노란색으로 설정
-            dgv.Columns["클러스터명"].DefaultCellStyle.BackColor = System.Drawing.Color.LightYellow;
+            
         }
 
 

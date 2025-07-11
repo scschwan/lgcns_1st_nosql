@@ -251,68 +251,7 @@ public class ClusterDataManager
         return baseParts.Any(b => targetParts.Contains(b));
     }
 
-    /// <summary>
-    /// 병합 상태에 따른 키워드 필터링 (ExtractUniqueKeywords 대체)
-    /// </summary>
-    public List<string> FilterValuesByMergeStatus(List<string> values, string columnName, bool mergedOnly = false)
-    {
-        try
-        {
-            if (!_columnIndexes.ContainsKey(columnName))
-            {
-                return new List<string>();
-            }
-
-            var columnIndex = _columnIndexes[columnName];
-            var filteredValues = new HashSet<string>();
-
-            foreach (string value in values)
-            {
-                if (!columnIndex.ContainsKey(value)) continue;
-
-                var clusterIds = columnIndex[value];
-                foreach (int clusterId in clusterIds)
-                {
-                    var row = GetClusterRow(clusterId);
-                    if (row == null) continue;
-
-                    // 병합 상태 확인
-                    if (!row.IsNull("ClusterID") && !row.IsNull("ID"))
-                    {
-                        int clusterIdValue = Convert.ToInt32(row["ClusterID"]);
-                        int idValue = Convert.ToInt32(row["ID"]);
-
-                        if (mergedOnly)
-                        {
-                            // 병합된 클러스터만: ClusterID > 0 && ClusterID == ID
-                            if (clusterIdValue > 0 && clusterIdValue == idValue)
-                            {
-                                filteredValues.Add(value);
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            // 병합되지 않은 클러스터만: ClusterID <= 0 || ClusterID == ID
-                            if (clusterIdValue <= 0 || clusterIdValue == idValue)
-                            {
-                                filteredValues.Add(value);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            return filteredValues.OrderBy(v => v).ToList();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"FilterValuesByMergeStatus 오류: {ex.Message}");
-            return new List<string>();
-        }
-    }
-
+    
 
 
     /// <summary>
@@ -618,7 +557,7 @@ public class ClusterSearchEngine
     }
 
     // 기존 ExecuteSearchAsync는 하위 호환성을 위해 유지하되 내부적으로 새 방식 사용
-    public async Task<SearchResult> ExecuteSearchAsync(SearchCriteria criteria)
+    public async Task<SearchResult> ExecuteSearchAsync(SearchCriteria criteria , bool subClusterYN = false)
     {
         return await Task.Run(() =>
         {
@@ -675,7 +614,7 @@ public class ClusterSearchEngine
                 }
 
                 // 병합 상태 필터링
-                var filteredIds = FilterByMergeStatus(candidateIds ?? new HashSet<int>());
+                var filteredIds = FilterByMergeStatus(candidateIds ?? new HashSet<int>() , subClusterYN);
 
                 // 결과 DataTable 생성
                 DataTable resultTable = CreateResultDataTable(filteredIds);
@@ -731,8 +670,10 @@ public class ClusterSearchEngine
         return candidateIds;
     }
 
-    private List<int> FilterByMergeStatus(HashSet<int> candidateIds)
+    private List<int> FilterByMergeStatus(HashSet<int> candidateIds , bool useSubClustering = false)
     {
+        string clusterIdColumn = useSubClustering ? "ClusterSubID" : "ClusterID";
+
         return candidateIds.AsParallel()
             .Where(id =>
             {
@@ -741,7 +682,8 @@ public class ClusterSearchEngine
 
                 if (!row.IsNull("ClusterID") && !row.IsNull("ID"))
                 {
-                    int clusterId = Convert.ToInt32(row["ClusterID"]);
+                    //int clusterId = Convert.ToInt32(row["ClusterID"]);
+                    int clusterId = Convert.ToInt32(row[clusterIdColumn]);
                     int rowId = Convert.ToInt32(row["ID"]);
                     return clusterId == -1 || (clusterId != rowId && clusterId < 0);
                 }
@@ -1166,6 +1108,7 @@ public class ClusterDisplayManager
         //if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = true;
         if (_targetGrid.Columns["ID"] != null) _targetGrid.Columns["ID"].Visible = false;
         if (_targetGrid.Columns["ClusterID"] != null) _targetGrid.Columns["ClusterID"].Visible = false;
+        if (_targetGrid.Columns["ClusterSubID"] != null) _targetGrid.Columns["ClusterSubID"].Visible = false;
         if (_targetGrid.Columns["_id"] != null) _targetGrid.Columns["_id"].Visible = false;
         if (_targetGrid.Columns["is_hidden"] != null) _targetGrid.Columns["is_hidden"].Visible = false;
         if (_targetGrid.Columns["dataIndex"] != null) _targetGrid.Columns["dataIndex"].Visible = false;
@@ -1252,7 +1195,9 @@ public class SearchCriteria
     public bool IsSubSearchMode { get; set; } = false;
     public List<int> BaseSearchResults { get; set; } = new List<int>();
 
-   
+    public bool UseSubClustering { get; set; } = false; // 기본값 false
+
+
     public static SearchCriteria FromMultiColumn(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords = null)
     {
         var criteria = new SearchCriteria
@@ -1346,10 +1291,10 @@ public class ClusteringManager
     /// <summary>
     /// 다중 컬럼 검색 (새로 추가)
     /// </summary>
-    public async Task<SearchResult> SearchMultipleColumnsAsync(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords = null)
+    public async Task<SearchResult> SearchMultipleColumnsAsync(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords = null , bool clusterSubIDYN = false)
     {
         var criteria = SearchCriteria.FromMultiColumn(columnCriteria, excludeKeywords);
-        var result = await _searchEngine.ExecuteSearchAsync(criteria);
+        var result = await _searchEngine.ExecuteSearchAsync(criteria , clusterSubIDYN);
         await _displayManager.DisplaySearchResultAsync(result);
         return result;
     }
@@ -1403,7 +1348,7 @@ public class ClusteringManager
     /// </summary>
     public async Task InitializeAsync(DataTable clusterData, DataGridView grid,
                                     NumericUpDown pageNum, ComboBox pageSize,
-                                    Button prevBtn, Button nextBtn, Label paginationLbl, CheckBox selectAll)
+                                    Button prevBtn, Button nextBtn, Label paginationLbl, CheckBox selectAll , bool subClusterYN = false)
     {
         // 데이터 로딩 및 인덱싱
         await _dataManager.LoadAndIndexDataAsync(clusterData);
@@ -1412,7 +1357,7 @@ public class ClusteringManager
         _displayManager.Initialize(grid, pageNum, pageSize, prevBtn, nextBtn, paginationLbl, selectAll);
 
         // 초기 전체 데이터 표시
-        var initialResult = await _searchEngine.ExecuteSearchAsync(new SearchCriteria());
+        var initialResult = await _searchEngine.ExecuteSearchAsync(new SearchCriteria() , subClusterYN);
         await _displayManager.DisplaySearchResultAsync(initialResult);
     }
 
@@ -1428,9 +1373,9 @@ public class ClusteringManager
     /// <summary>
     /// 기존 방식 검색 (하위 호환성)
     /// </summary>
-    public async Task<SearchResult> SearchAsync(SearchCriteria criteria)
+    public async Task<SearchResult> SearchAsync(SearchCriteria criteria, bool subClusterYN = false)
     {
-        var result = await _searchEngine.ExecuteSearchAsync(criteria);
+        var result = await _searchEngine.ExecuteSearchAsync(criteria, subClusterYN);
         await _displayManager.DisplaySearchResultAsync(result);
         return result;
     }

@@ -999,7 +999,6 @@
             // 
             // merge_cancel_button
             // 
-            merge_cancel_button.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             merge_cancel_button.AutoSize = true;
             merge_cancel_button.BackColor = Color.Crimson;
             merge_cancel_button.FlatStyle = FlatStyle.Flat;

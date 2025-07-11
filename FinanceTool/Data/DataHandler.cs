@@ -768,6 +768,7 @@ namespace FinanceTool
             DataTable resultTable = new DataTable();
             resultTable.Columns.Add("ID", typeof(int));
             resultTable.Columns.Add("ClusterID", typeof(int));
+            resultTable.Columns.Add("ClusterSubID", typeof(int));
             resultTable.Columns.Add("클러스터명", typeof(string));
             resultTable.Columns.Add("키워드목록", typeof(string));
             resultTable.Columns.Add("Count", typeof(int));
@@ -1103,6 +1104,7 @@ namespace FinanceTool
                         // 모든 컬럼에 값 명시적 할당
                         newRow["ID"] = groupValue.ID;
                         newRow["ClusterID"] = -1;
+                        newRow["ClusterSubID"] = -1;
                         newRow["클러스터명"] = string.Join("_", elements);
                         newRow["키워드목록"] = setKey;
                         newRow["Count"] = groupValue.Count;

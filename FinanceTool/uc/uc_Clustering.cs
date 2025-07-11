@@ -429,6 +429,14 @@ namespace FinanceTool
                     }
                 }
 
+                Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 컬럼 수: {DataHandler.finalClusteringData.Columns.Count}");
+                for (int i = 0; i < DataHandler.finalClusteringData.Columns.Count; i++)
+                {
+                    Debug.WriteLine($"  컬럼 {i}: Name='{DataHandler.finalClusteringData.Columns[i].ColumnName}'" +
+                        $", DataType='{DataHandler.finalClusteringData.Columns[i].DataType}'");
+                }
+
+
                 // RawData 정보로 보강
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
 
@@ -2213,6 +2221,11 @@ namespace FinanceTool
                             DataRow newRow = dataTable.NewRow();
                             newRow["ID"] = newCluster.ClusterNumber;
                             newRow["ClusterID"] = newCluster.ClusterId;
+                            // *** ClusterSubID 컬럼이 있으면 설정, 없으면 무시 ***
+                            if (dataTable.Columns.Contains("ClusterSubID"))
+                            {
+                                newRow["ClusterSubID"] = newCluster.ClusterSubId;
+                            }
                             newRow["클러스터명"] = newCluster.ClusterName;
                             newRow["키워드목록"] = string.Join(",", newCluster.Keywords);
                             newRow["Count"] = newCluster.Count;
@@ -3798,6 +3811,10 @@ namespace FinanceTool
                     DataRow newRow = DataHandler.finalClusteringData.NewRow();
                     newRow["ID"] = newClusterNumber;
                     newRow["ClusterID"] = newClusterNumber;
+                    if (DataHandler.finalClusteringData.Columns.Contains("ClusterSubID"))
+                    {
+                        newRow["ClusterSubID"] = -1;
+                    }
                     newRow["클러스터명"] = combinedClusterName;
                     newRow["키워드목록"] = string.Join(",", keywordSet);
                     newRow["Count"] = totalCount;
