@@ -554,40 +554,45 @@ namespace FinanceTool
                 // 새 DataTable 생성
                 DataTable result = new DataTable();
 
-                // 열 정보 가져오기
-                List<int> columnsToKeep = new List<int>();
-                List<int> decimalColumns = new List<int>();
-
-                for (int i = 0; i < dgv.Columns.Count; i++)
-                {
-                    // 1, 0, 1, 6번 컬럼 제외 (인덱스 기준)
-                    if (i != 0 && i != 1 && i != 6)
+                // 제외할 컬럼들 (컬럼명 기반)
+                HashSet<string> excludedColumns = new HashSet<string>
                     {
-                        columnsToKeep.Add(i);
+                        "ID", "ClusterID", "ClusterSubID", "dataIndex"
+                    };
 
-                        // 4, 5번 컬럼은 decimal로 변환 (인덱스 기준)
-                        if (i == 4 || i == 5)
+                // Decimal 타입으로 변환할 컬럼들
+                HashSet<string> decimalColumns = new HashSet<string>
+                    {
+                        "Count", "합산금액"
+                    };
+
+                // 32767자 제한을 적용할 컬럼들 (긴 텍스트 컬럼)
+                HashSet<string> textLimitColumns = new HashSet<string>
+                    {
+                        "세부클러스터명", "키워드목록"
+                    };
+
+                // 포함할 컬럼들 수집 및 DataTable에 추가
+                List<string> includedColumns = new List<string>();
+
+                foreach (DataGridViewColumn column in dgv.Columns)
+                {
+                    string columnName = column.HeaderText; // HeaderText 사용
+
+                    // 제외 컬럼이 아닌 경우에만 추가
+                    if (!excludedColumns.Contains(columnName))
+                    {
+                        includedColumns.Add(columnName);
+
+                        // 컬럼 타입 결정
+                        Type columnType = typeof(string); // 기본값
+                        if (decimalColumns.Contains(columnName))
                         {
-                            decimalColumns.Add(i);
+                            columnType = typeof(decimal);
                         }
+
+                        result.Columns.Add(columnName, columnType);
                     }
-                }
-
-                // 유지할 열 추가
-                int newColIndex = 0;
-                foreach (int originalIndex in columnsToKeep)
-                {
-                    DataGridViewColumn originalColumn = dgv.Columns[originalIndex];
-                    Type dataType = typeof(string); // 기본 타입은 string
-
-                    // decimal로 변환할 열 처리
-                    if (decimalColumns.Contains(originalIndex))
-                    {
-                        dataType = typeof(decimal);
-                    }
-
-                    result.Columns.Add(originalColumn.HeaderText, dataType);
-                    newColIndex++;
                 }
 
                 // 행 데이터 추가
@@ -596,57 +601,76 @@ namespace FinanceTool
                     if (!row.IsNewRow)
                     {
                         DataRow newRow = result.NewRow();
-                        newColIndex = 0;
 
-                        foreach (int originalIndex in columnsToKeep)
+                        for (int i = 0; i < includedColumns.Count; i++)
                         {
-                            object cellValue = row.Cells[originalIndex].Value;
+                            string columnName = includedColumns[i];
 
-                            // 2번, 3번 컬럼의 경우 100자로 제한
-                            if (originalIndex == 2 || originalIndex == 3)
+                            // 원본 DataGridView에서 해당 컬럼 찾기
+                            DataGridViewColumn sourceColumn = dgv.Columns.Cast<DataGridViewColumn>()
+                                .FirstOrDefault(c => c.HeaderText == columnName);
+
+                            if (sourceColumn != null)
                             {
-                                if (cellValue != null && cellValue != DBNull.Value)
+                                object cellValue = row.Cells[sourceColumn.Index].Value;
+
+                                // 32767자 제한 적용 (긴 텍스트 컬럼)
+                                if (textLimitColumns.Contains(columnName))
                                 {
-                                    string strValue = cellValue.ToString();
-                                    if (strValue.Length > 100)
+                                    if (cellValue != null && cellValue != DBNull.Value)
                                     {
-                                        cellValue = strValue.Substring(0, 97) + "...";
+                                        string strValue = cellValue.ToString();
+                                        if (strValue.Length > 32767)
+                                        {
+                                            cellValue = strValue.Substring(0, 32760) + "...";
+                                        }
                                     }
                                 }
-                            }
 
-
-                            // decimal 컬럼 처리
-                            if (decimalColumns.Contains(originalIndex))
-                            {
-                                if (cellValue != null && cellValue != DBNull.Value)
+                                // Decimal 컬럼 처리
+                                if (decimalColumns.Contains(columnName))
                                 {
-                                    // 숫자로 변환 시도
-                                    if (decimal.TryParse(cellValue.ToString(), out decimal decValue))
+                                    if (cellValue != null && cellValue != DBNull.Value)
                                     {
-                                        newRow[newColIndex] = decValue;
+                                        if (decimal.TryParse(cellValue.ToString().Replace(",", ""), out decimal decValue))
+                                        {
+                                            newRow[i] = decValue;
+                                        }
+                                        else
+                                        {
+                                            newRow[i] = 0m;
+                                        }
                                     }
                                     else
                                     {
-                                        newRow[newColIndex] = 0m; // 변환 실패 시 0으로 설정
+                                        newRow[i] = 0m;
                                     }
                                 }
                                 else
                                 {
-                                    newRow[newColIndex] = 0m;
+                                    newRow[i] = cellValue ?? DBNull.Value;
                                 }
                             }
                             else
                             {
-                                newRow[newColIndex] = cellValue ?? DBNull.Value;
+                                // 컬럼을 찾지 못한 경우 기본값
+                                if (decimalColumns.Contains(columnName))
+                                {
+                                    newRow[i] = 0m;
+                                }
+                                else
+                                {
+                                    newRow[i] = DBNull.Value;
+                                }
                             }
-
-                            newColIndex++;
                         }
 
                         result.Rows.Add(newRow);
                     }
                 }
+
+                Debug.WriteLine($"ConvertDataGridViewToCustomDataTable 완료: {result.Rows.Count}행, {result.Columns.Count}컬럼");
+                Debug.WriteLine($"포함된 컬럼: {string.Join(", ", includedColumns)}");
 
                 return result;
             }
@@ -660,8 +684,9 @@ namespace FinanceTool
         /// <summary>
         /// Excel로 데이터를 내보내는 함수 - MongoDB 버전으로 개선
         /// </summary>
-        public async Task ExportToExcelAsync(List<string> columnList, bool hiddenTableYN = false)
+        public async Task<string> ExportToExcelAsync(List<string> columnList, bool hiddenTableYN = false)
         {
+            string savedFilePath = null;
             try
             {
                 using (var progress = new ProcessProgressForm())
@@ -725,6 +750,8 @@ namespace FinanceTool
                             await progress.UpdateProgressHandler(60, "클러스터 정보 추가 중...");
                             await AddClusterInfoToExportDataAsync(export_result);
 
+                           
+
                             await progress.UpdateProgressHandler(70, "데이터 내보내기 준비 완료");
                         }
                         catch (Exception ex)
@@ -740,22 +767,27 @@ namespace FinanceTool
 
                     // 3단계: Excel 저장
                     await progress.UpdateProgressHandler(90, "Excel 파일 저장 중...");
-                    DataHandler.SaveDataTableToExcel(cluster_result, export_result);
+                    // DataHandler.SaveDataTableToExcel 메서드를 수정하여 저장 경로 반환
+                    savedFilePath = DataHandler.SaveDataTableToExcel(cluster_result, export_result);
 
                     await progress.UpdateProgressHandler(100, "Excel 파일 저장 완료");
                     await Task.Delay(500); // 완료 메시지 표시
                 }
 
                 // 저장 완료 메시지
+                /*
                 MessageBox.Show("Excel 파일로 내보내기가 완료되었습니다.", "내보내기 완료",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
+                */
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Excel 파일 저장 중 오류 발생: {ex.Message}");
                 MessageBox.Show($"Excel 파일 저장 중 오류 발생: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return savedFilePath;
             }
+            return savedFilePath;
         }
 
         /// <summary>
@@ -765,18 +797,11 @@ namespace FinanceTool
         {
             DataTable dataTable = new DataTable();
 
-            // 기본 컬럼 추가
-            dataTable.Columns.Add("id", typeof(string));
-            dataTable.Columns.Add("import_date", typeof(DateTime));
 
-            // columnList에 명시된 컬럼만 추가
-            foreach (string columnName in columnList)
-            {
-                if (!dataTable.Columns.Contains(columnName))
-                {
-                    dataTable.Columns.Add(columnName);
-                }
-            }
+
+            // 기본 컬럼 추가
+            //dataTable.Columns.Add("id", typeof(string));
+            //dataTable.Columns.Add("import_date", typeof(DateTime));
 
             // 클러스터명 컬럼 추가 (없을 경우)
             if (!dataTable.Columns.Contains("클러스터명"))
@@ -784,12 +809,30 @@ namespace FinanceTool
                 dataTable.Columns.Add("클러스터명", typeof(string));
             }
 
+            // 세부클러스터명 컬럼 추가
+            if (!dataTable.Columns.Contains("세부클러스터명"))
+            {
+                dataTable.Columns.Add("세부클러스터명", typeof(string));
+            }
+
+            // columnList에 명시된 컬럼만 추가
+            foreach (string columnName in columnList)
+            {
+                Debug.WriteLine($" 표기하는 컬럼 정보 : {columnName}");
+                if (!dataTable.Columns.Contains(columnName))
+                {
+                    dataTable.Columns.Add(columnName);
+                }
+            }
+
+            
+
             // 문서 데이터를 DataTable에 추가
             foreach (var doc in documents)
             {
                 DataRow row = dataTable.NewRow();
-                row["id"] = doc.Id;
-                row["import_date"] = doc.ImportDate;
+                //row["id"] = doc.Id;
+                //row["import_date"] = doc.ImportDate;
 
                 // 동적 데이터 필드 추가 (columnList에 있는 것만)
                 if (doc.Data != null)
@@ -805,6 +848,7 @@ namespace FinanceTool
 
                 // 일단 클러스터명은 비워둠 (나중에 채울 예정)
                 row["클러스터명"] = "";
+                row["세부클러스터명"] = "";
 
                 dataTable.Rows.Add(row);
             }
@@ -826,74 +870,272 @@ namespace FinanceTool
                 var clusteringRepo = new ClusteringRepository();
                 var allClusters = await clusteringRepo.GetAllAsync();
 
-                // 클러스터 ID별 이름 매핑 생성
+                // 클러스터 ID별 이름 매핑 생성 (일반 클러스터)
                 Dictionary<int, string> clusterNameMap = new Dictionary<int, string>();
-                foreach (var cluster in allClusters.Where(c => c.ClusterId == c.ClusterNumber)) // 상위 클러스터만 선택
+                foreach (var cluster in allClusters.Where(c => c.ClusterId == c.ClusterNumber))
                 {
                     clusterNameMap[cluster.ClusterNumber] = cluster.ClusterName;
                 }
 
+                // 세부클러스터 ID별 이름 매핑 생성 (세부 클러스터)
+                Dictionary<int, string> detailClusterNameMap = new Dictionary<int, string>();
+                foreach (var cluster in allClusters.Where(c => c.ClusterSubId == c.ClusterNumber && c.ClusterSubId > 0))
+                {
+                    detailClusterNameMap[cluster.ClusterNumber] = cluster.ClusterName;
+                }
+
                 // 문서 ID별 클러스터 매핑 생성
                 Dictionary<string, int> docIdToClusterMap = new Dictionary<string, int>();
+                Dictionary<string, int> docIdToDetailClusterMap = new Dictionary<string, int>();
+
                 foreach (var cluster in allClusters)
                 {
                     if (cluster.DataIndices != null)
                     {
                         foreach (var docId in cluster.DataIndices)
                         {
-                            // 클러스터가 다른 클러스터에 병합된 경우 최상위 클러스터 ID 사용
-                            int topClusterId = cluster.ClusterId > 0 ? cluster.ClusterId : cluster.ClusterNumber;
-                            docIdToClusterMap[docId] = topClusterId;
+                            // 일반 클러스터 매핑
+                            if (!docIdToClusterMap.ContainsKey(docId))
+                            {
+                                int topClusterId = cluster.ClusterId > 0 ? cluster.ClusterId : cluster.ClusterNumber;
+                                docIdToClusterMap[docId] = topClusterId;
+                            }
+
+                            // 세부 클러스터 매핑 (세부 클러스터가 있는 경우)
+                            if (cluster.ClusterSubId > 0 && cluster.ClusterSubId == cluster.ClusterNumber)
+                            {
+                                docIdToDetailClusterMap[docId] = cluster.ClusterNumber;
+                            }
                         }
                     }
                 }
-
+                var rawDataRepo = new RawDataRepository();
                 // exportData의 각 행에 클러스터 정보 추가
-                foreach (DataRow row in exportData.Rows)
-                {
-                    if (row["id"] != DBNull.Value)
-                    {
-                        string docId = row["id"].ToString();
+                // 현재 사용 중인 documents의 ID를 추적하기 위한 변수
+                var documents = await rawDataRepo.GetAllAsync(); // 모든 문서 가져오기
+                var docIdLookup = documents.ToDictionary(d => d.Id, d => d.Id);
 
+                for (int i = 0; i < exportData.Rows.Count; i++)
+                {
+                    var row = exportData.Rows[i];
+
+                    // documents의 인덱스를 사용해서 ID 매핑
+                    if (i < documents.Count)
+                    {
+                        string docId = documents[i].Id;
+
+                        // 클러스터명 매핑
                         if (docIdToClusterMap.TryGetValue(docId, out int clusterId) &&
                             clusterNameMap.TryGetValue(clusterId, out string clusterName))
                         {
                             row["클러스터명"] = clusterName;
                         }
+
+                        // 세부클러스터명 매핑
+                        if (docIdToDetailClusterMap.TryGetValue(docId, out int detailClusterId) &&
+                            detailClusterNameMap.TryGetValue(detailClusterId, out string detailClusterName))
+                        {
+                            row["세부클러스터명"] = detailClusterName;
+                        }
                     }
                 }
 
-                Debug.WriteLine($"클러스터 정보 추가 완료: {exportData.Rows.Count}행");
+                Debug.WriteLine($"클러스터 정보 및 세부클러스터 정보 추가 완료: {exportData.Rows.Count}행");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"클러스터 정보 추가 중 오류: {ex.Message}");
-                // 오류 발생해도 계속 진행 (부분적으로라도 내보내기 위함)
             }
         }
 
         private async void btn_save_excel_Click(object sender, EventArgs e)
         {
             DialogResult result = MessageBox.Show(
-               $"Excel File을 생성하시겠습니까?",
-               "Excel 생성",
-               MessageBoxButtons.YesNo,
-               MessageBoxIcon.Question
-           );
+       $"Excel File을 생성하시겠습니까?",
+       "Excel 생성",
+       MessageBoxButtons.YesNo,
+       MessageBoxIcon.Question
+    );
 
             if (result == DialogResult.Yes)
             {
-                
+                try
+                {
+                    using (var progressForm = new ProcessProgressForm())
+                    {
+                        progressForm.Show();
+                        await progressForm.UpdateProgressHandler(5, "Excel 파일 생성 준비 중...");
 
-                await ExportToExcelAsync(process_col_list, DataHandler.hiddenData);
+                        // 1. Excel 파일 생성
+                        await progressForm.UpdateProgressHandler(10, "데이터 내보내기 시작...");
+                        string userSavedPath = await ExportToExcelAsync(process_col_list, DataHandler.hiddenData);
+
+                        if (!string.IsNullOrEmpty(userSavedPath))
+                        {
+                            await progressForm.UpdateProgressHandler(60, "Excel 파일 생성 완료");
+
+                            // 2. 서버 백업 경로에 파일 복사
+                            await progressForm.UpdateProgressHandler(65, "서버 백업 생성 중...");
+                            string backupPath = await CreateServerBackupAsync(userSavedPath);
+
+                            if (!string.IsNullOrEmpty(backupPath))
+                            {
+                                await progressForm.UpdateProgressHandler(85, "서버 백업 완료");
+
+                                // 3. 세션 정보 업데이트
+                                await progressForm.UpdateProgressHandler(90, "세션 정보 업데이트 중...");
+                                bool updateResult = await UpdateSessionCompletionAsync(backupPath);
+
+                                if (updateResult)
+                                {
+                                    await progressForm.UpdateProgressHandler(95, "세션 정보 업데이트 완료");
+
+                                    // 4. 현재 세션 ID 초기화 (선택사항)
+                                    await progressForm.UpdateProgressHandler(98, "정리 작업 중...");
+                                    // DataHandler.ClearCurrentSessionId(); // 필요시 활성화
+
+                                    await progressForm.UpdateProgressHandler(100, "모든 작업 완료");
+                                    await Task.Delay(500);
+
+                                    MessageBox.Show(
+                                        "Excel 파일 생성, 서버 백업 및 세션 상태 업데이트가 모두 완료되었습니다.\n\n",
+                                        "완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                }
+                                else
+                                {
+                                    await progressForm.UpdateProgressHandler(95, "세션 정보 업데이트 실패");
+                                    await Task.Delay(300);
+
+                                    MessageBox.Show(
+                                        "Excel 파일 생성 및 백업은 완료되었으나, 세션 정보 업데이트에 실패했습니다.\n\n" +
+                                        $"사용자 저장 경로: {userSavedPath}\n" +
+                                        $"서버 백업 경로: {backupPath}",
+                                        "일부 완료", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                }
+                            }
+                            else
+                            {
+                                await progressForm.UpdateProgressHandler(85, "서버 백업 실패");
+                                await Task.Delay(300);
+
+                                MessageBox.Show(
+                                    "Excel 파일 생성은 완료되었으나, 서버 백업에 실패했습니다.\n\n" +
+                                    $"사용자 저장 경로: {userSavedPath}",
+                                    "일부 완료", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            }
+                        }
+                        else
+                        {
+                            await progressForm.UpdateProgressHandler(60, "Excel 파일 생성 실패");
+                            await Task.Delay(300);
+
+                            MessageBox.Show("Excel 파일 생성이 취소되었거나 실패했습니다.", "실패",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Excel 파일 생성 프로세스 중 오류: {ex.Message}");
+                    MessageBox.Show($"Excel 파일 생성 중 오류가 발생했습니다:\n{ex.Message}", "오류",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
-            else
-            {
-                return;
-            }
-
-
         }
+
+        /// <summary>
+        /// 세션 완료 정보 업데이트
+        /// </summary>
+        private async Task<bool> UpdateSessionCompletionAsync(string resultFilePath)
+        {
+            try
+            {
+                ObjectId currentSessionId = DataHandler.GetCurrentSessionId();
+
+                if (currentSessionId == ObjectId.Empty)
+                {
+                    Debug.WriteLine("현재 세션 ID가 설정되지 않아 세션 업데이트를 건너뜁니다.");
+                    return false;
+                }
+
+                var fileSessionRepo = new FileSessionRepository();
+
+                // 세션 정보 업데이트
+                bool updateResult = await fileSessionRepo.UpdateSessionCompletionAsync(
+                    currentSessionId,
+                    "completed",
+                    DateTime.UtcNow,
+                    resultFilePath
+                );
+
+                if (updateResult)
+                {
+                    Debug.WriteLine($"세션 완료 정보 업데이트 성공: {currentSessionId}");
+                    Debug.WriteLine($"결과 파일 경로: {resultFilePath}");
+                    return true;
+                }
+                else
+                {
+                    Debug.WriteLine($"세션 완료 정보 업데이트 실패: {currentSessionId}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 완료 정보 업데이트 중 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 서버 백업 경로에 파일 복사 (개선된 버전)
+        /// </summary>
+        private async Task<string> CreateServerBackupAsync(string originalFilePath)
+        {
+            try
+            {
+                ObjectId currentSessionId = DataHandler.GetCurrentSessionId();
+
+                if (currentSessionId == ObjectId.Empty)
+                {
+                    Debug.WriteLine("현재 세션 ID가 설정되지 않았습니다.");
+                    return null;
+                }
+
+                // 원본 파일명 추출
+                string originalFileName = Path.GetFileName(originalFilePath);
+
+                // DataHandler를 통해 백업 파일 경로 생성
+                string backupPath = DataHandler.GenerateExcelCompletedFilePath(currentSessionId, originalFileName);
+
+                if (string.IsNullOrEmpty(backupPath))
+                {
+                    Debug.WriteLine("백업 파일 경로 생성에 실패했습니다.");
+                    return null;
+                }
+
+                // 파일 복사
+                await Task.Run(() => File.Copy(originalFilePath, backupPath, true));
+
+                Debug.WriteLine($"서버 백업 완료: {backupPath}");
+                return backupPath;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"서버 백업 중 오류: {ex.Message}");
+                return null;
+            }
+        }
+
+
+        /// <summary>
+        /// 현재 세션 ID 가져오기 (구현 필요)
+        /// </summary>
+        private ObjectId GetCurrentSessionId()
+        {
+            return DataHandler.GetCurrentSessionId();
+        }
+
 
         // MongoDB에서 visible 컬럼 목록 가져오기
         private async Task GetColumnListAsync()
@@ -1042,7 +1284,8 @@ namespace FinanceTool
                         // 부서명, 공급업체명, 세목명, 타겟열, 클러스터명은 제외
                         if (column.Name.Equals(DataHandler.dept_col_name) ||
                             column.Name.Equals(DataHandler.prod_col_name) ||
-                            column.Name.Equals(DataHandler.sub_acc_col_name))
+                            column.Name.Equals(DataHandler.sub_acc_col_name) ||
+                            column.Name.Equals("세부클러스터명"))  // *** 추가 ***
                         {
                             column.Visible = true;
                             continue;
@@ -1626,7 +1869,7 @@ namespace FinanceTool
             // 클러스터명 추가
             essentialColumns.Add("클러스터명");
 
-            // 클러스터명 추가
+            // 세부클러스터명 추가
             essentialColumns.Add("세부클러스터명");
 
             // 데이터 처리 관련 필수 컬럼 추가

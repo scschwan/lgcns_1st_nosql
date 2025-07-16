@@ -51,7 +51,6 @@ namespace FinanceTool
         private RawDataRepository rawDataRepo = new RawDataRepository();
 
         //공급업체명 표준화 관련 멤버 변수
-        private List<string> _numericColumns = new List<string>();
         private List<string> _allColumns = new List<string>();
         private DataTable _standardMappingData = null;
 
@@ -1558,7 +1557,7 @@ namespace FinanceTool
                 // 2. Key 콤보박스 설정 (숫자형 컬럼만)
                 comboBox_standard_key.Items.Clear();
                 comboBox_standard_key.Items.Add("-- Key 컬럼 선택 --");
-                foreach (string column in _numericColumns)
+                foreach (string column in _allColumns)
                 {
                     comboBox_standard_key.Items.Add(column);
                 }
@@ -1581,7 +1580,7 @@ namespace FinanceTool
                 comboBox_standard_target.SelectedIndexChanged += ComboBox_standard_target_SelectedIndexChanged;
                 standard_btn.Click += Standard_btn_Click;
 
-                Debug.WriteLine($"컬럼 로드 완료 - 숫자형: {_numericColumns.Count}개, 전체: {_allColumns.Count}개");
+                Debug.WriteLine($"컬럼 로드 완료 -  전체: {_allColumns.Count}개");
             }
             catch (Exception ex)
             {
@@ -1596,10 +1595,9 @@ namespace FinanceTool
         {
             try
             {
-                _numericColumns.Clear();
                 _allColumns.Clear();
 
-                // 샘플 데이터로 컬럼 분석 (성능 최적화)
+                // 샘플 데이터로 컬럼 분석
                 var pipeline = new[]
                 {
             new BsonDocument("$sample", new BsonDocument("size", 1000)),
@@ -1610,10 +1608,9 @@ namespace FinanceTool
                 var collection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
                 var sampleDocs = await collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
 
-                var numericColumnSet = new HashSet<string>();
                 var allColumnSet = new HashSet<string>();
 
-                // 샘플 데이터에서 컬럼 분석
+                // 샘플 데이터에서 모든 컬럼 추출
                 foreach (var doc in sampleDocs)
                 {
                     if (doc.Contains("data") && doc["data"].IsBsonDocument)
@@ -1621,22 +1618,14 @@ namespace FinanceTool
                         var dataDoc = doc["data"].AsBsonDocument;
                         foreach (var element in dataDoc.Elements)
                         {
-                            string columnName = element.Name;
-                            allColumnSet.Add(columnName);
-
-                            // 숫자형 컬럼 판별
-                            if (IsNumericColumn(element.Value))
-                            {
-                                numericColumnSet.Add(columnName);
-                            }
+                            allColumnSet.Add(element.Name);
                         }
                     }
                 }
 
-                _numericColumns = numericColumnSet.OrderBy(x => x).ToList();
                 _allColumns = allColumnSet.OrderBy(x => x).ToList();
 
-                Debug.WriteLine($"컬럼 분석 완료 - 숫자형: {_numericColumns.Count}개, 전체: {_allColumns.Count}개");
+                Debug.WriteLine($"컬럼 분석 완료 - 전체: {_allColumns.Count}개");
             }
             catch (Exception ex)
             {
@@ -1644,45 +1633,7 @@ namespace FinanceTool
             }
         }
 
-        /// <summary>
-        /// BsonValue가 숫자형인지 판별
-        /// </summary>
-        private bool IsNumericColumn(BsonValue value)
-        {
-            try
-            {
-                // 1. 직접적인 숫자 타입들
-                if (value.IsNumeric)
-                    return true;
-
-                // 2. 복합 타입 (_t, _v 구조) 검사
-                if (value.IsBsonDocument)
-                {
-                    var doc = value.AsBsonDocument;
-                    if (doc.Contains("_t") && doc.Contains("_v"))
-                    {
-                        string type = doc["_t"].AsString;
-                        return type.Contains("Decimal") || type.Contains("Int") || type.Contains("Double");
-                    }
-                }
-
-                // 3. 문자열이지만 숫자로 변환 가능한 경우
-                if (value.IsString)
-                {
-                    string strValue = value.AsString;
-                    return decimal.TryParse(strValue, out _) ||
-                           double.TryParse(strValue, out _) ||
-                           long.TryParse(strValue, out _);
-                }
-
-                return false;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
+       
         /// <summary>
         /// 표준화 DataGridView 초기화
         /// </summary>
@@ -2127,8 +2078,8 @@ namespace FinanceTool
                     Debug.WriteLine($"=== Key '{keyValue}' 처리 시작 ===");
 
                     // 단순하게 문자열 매칭으로 변경
-                    var filterJson = $@"{{ 'data.{keyColumn}._v.$numberDecimal': '{keyValue}' }}";
-                    var filter = new JsonFilterDefinition<BsonDocument>(filterJson);
+                    // 복합 타입을 고려한 필터 (매핑 분석과 동일한 방식)
+                    var filter = CreateUniversalFilter(keyColumn, keyValue);
 
                     // 업데이트 전 매칭되는 문서 수 확인
                     long matchCount = await collection.CountDocumentsAsync(filter);
@@ -2161,6 +2112,29 @@ namespace FinanceTool
         }
 
         /// <summary>
+        /// 복합 타입과 문자열 타입을 모두 처리하는 통합 필터 생성
+        /// </summary>
+        private FilterDefinition<BsonDocument> CreateUniversalFilter(string fieldName, string value)
+        {
+            var filters = new List<FilterDefinition<BsonDocument>>();
+
+            // 1. 문자열 직접 매칭
+            filters.Add(Builders<BsonDocument>.Filter.Eq($"data.{fieldName}", value));
+
+            // 2. 복합 타입 (_v 필드) 매칭 - 문자열로
+            filters.Add(Builders<BsonDocument>.Filter.Eq($"data.{fieldName}._v", value));
+
+            // 3. 숫자로 변환 가능한 경우 숫자 매칭
+            if (decimal.TryParse(value, out decimal numericValue))
+            {
+                filters.Add(Builders<BsonDocument>.Filter.Eq($"data.{fieldName}._v", numericValue));
+            }
+
+            // OR 조건으로 결합
+            return Builders<BsonDocument>.Filter.Or(filters);
+        }
+
+        /// <summary>
         /// 특정 키값의 존재 여부를 정확히 확인하는 디버깅 함수
         /// </summary>
         private async Task DebugSpecificKey(string keyColumn, string keyValue)
@@ -2176,15 +2150,17 @@ namespace FinanceTool
                 Debug.WriteLine($"=== '{keyValue}' 키값 존재 여부 확인 ===");
 
                 // 해당 키값을 가진 문서 직접 검색
-                var specificFilter = Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$numberDecimal", keyValue);
-                var specificCount = await collection.CountDocumentsAsync(specificFilter);
+                //var specificFilter = Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$numberDecimal", keyValue);
+                //var specificFilter = Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$", keyValue);
+                var filter = CreateUniversalFilter(keyColumn, keyValue);
+                var specificCount = await collection.CountDocumentsAsync(filter);
 
                 Debug.WriteLine($"정확한 필터로 찾은 '{keyValue}' 문서 수: {specificCount}개");
 
                 if (specificCount > 0)
                 {
                     // 실제 문서 몇 개 조회해서 구조 확인
-                    var specificDocs = await collection.Find(specificFilter).Limit(3).ToListAsync();
+                    var specificDocs = await collection.Find(filter).Limit(3).ToListAsync();
                     Debug.WriteLine($"'{keyValue}' 키값을 가진 실제 문서들:");
                     foreach (var doc in specificDocs)
                     {
@@ -2200,19 +2176,27 @@ namespace FinanceTool
                 {
                     // 전체 고유 키값들 조회 (처음 20개만)
                     var uniqueKeysPipeline = new[]
-                    {
-                           new BsonDocument("$project", new BsonDocument
+                        {
+                        new BsonDocument("$project", new BsonDocument
+                        {
+                            ["keyValue"] = new BsonDocument("$cond", new BsonArray
                             {
-                                ["keyValue"] = $"$data.{keyColumn}._v.$numberDecimal"
-                            }),
-                            new BsonDocument("$group", new BsonDocument
-                            {
-                                ["_id"] = "$keyValue",
-                                ["count"] = new BsonDocument("$sum", 1)
-                            }),
-                            new BsonDocument("$sort", new BsonDocument("count", -1)),
-                            new BsonDocument("$limit", 20)
-                                                };
+                                // 복합 타입인지 확인
+                                new BsonDocument("$eq", new BsonArray { new BsonDocument("$type", $"$data.{keyColumn}"), "object" }),
+                                // 복합 타입이면 _v 값 사용
+                                $"$data.{keyColumn}._v",
+                                // 아니면 직접 값 사용
+                                $"$data.{keyColumn}"
+                            })
+                        }),
+                        new BsonDocument("$group", new BsonDocument
+                        {
+                            ["_id"] = "$keyValue",
+                            ["count"] = new BsonDocument("$sum", 1)
+                        }),
+                        new BsonDocument("$sort", new BsonDocument("count", -1)),
+                        new BsonDocument("$limit", 20)
+                    };
 
                     var uniqueKeys = await collection.Aggregate<BsonDocument>(uniqueKeysPipeline).ToListAsync();
                     Debug.WriteLine($"실제 데이터베이스의 상위 20개 {keyColumn} 값들:");
@@ -2242,11 +2226,11 @@ namespace FinanceTool
                 string keyColumn = comboBox_standard_key.SelectedItem.ToString();
                 string targetColumn = comboBox_standard_target.SelectedItem.ToString();
 
-                // 해당 Key와 기존 Target 값을 가진 문서들 찾기
+                var keyFilter = CreateUniversalFilter(keyColumn, keyValue);
                 var filter = Builders<BsonDocument>.Filter.And(
-                            Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$numberDecimal", keyValue),
-                            Builders<BsonDocument>.Filter.Eq($"data.{targetColumn}", oldTargetValue)
-                        );
+                    keyFilter,
+                    Builders<BsonDocument>.Filter.Eq($"data.{targetColumn}", oldTargetValue)
+                );
 
                 var update = Builders<BsonDocument>.Update.Set($"data.{targetColumn}", newTargetValue);
 

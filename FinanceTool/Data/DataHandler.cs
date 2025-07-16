@@ -8,6 +8,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Newtonsoft.Json
     ;
+using SharpCompress.Common;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -42,6 +43,8 @@ namespace FinanceTool
         public static DataTable secondClusteringData = new DataTable();
         public static DataTable finalClusteringData = new DataTable();
 
+        private static ObjectId _currentSessionId = ObjectId.Empty;
+        private const string EXCEL_COMPLETED_FOLDER = @"C:\Dmillions\excel_completed";
 
         public static int moneyIndex = 0;
         public static List<int> levelList = new List<int>();
@@ -589,8 +592,9 @@ namespace FinanceTool
 
 
 
-        public static void SaveDataTableToExcel(DataTable firstTable, DataTable secondTable = null)
+        public static string SaveDataTableToExcel(DataTable firstTable, DataTable secondTable = null)
         {
+            string fileName = "";
             try
             {
                 // SaveFileDialog 생성
@@ -624,15 +628,19 @@ namespace FinanceTool
                             string message = secondTable != null ?
                                 "Excel file이 두 개의 시트로 생성되었습니다." :
                                 "Excel file이 생성되었습니다.";
-                            */
+                            
                             string message = "Excel file이 생성되었습니다.";
                             MessageBox.Show($"{message}\n{filePath}",
                                            "Success",
                                            MessageBoxButtons.OK,
                                            MessageBoxIcon.Information);
+                            */
                         }
+                        fileName = filePath;
                     }
+                    
                 }
+               
             }
             catch (Exception ex)
             {
@@ -640,7 +648,9 @@ namespace FinanceTool
                                "Error",
                                MessageBoxButtons.OK,
                                MessageBoxIcon.Error);
+                return fileName;
             }
+            return fileName;
         }
 
         public static DataTable ExtractColumnToNewTable(DataTable inputTable, int index)
@@ -1620,5 +1630,100 @@ namespace FinanceTool
 
             return dataTable;
         }
+
+        //2025.07.16
+        //엑셀 파일 관련 함수
+        /// <summary>
+        /// 현재 세션 ID 설정
+        /// </summary>
+        public static void SetCurrentSessionId(ObjectId sessionId)
+        {
+            _currentSessionId = sessionId;
+            Debug.WriteLine($"현재 세션 ID 설정: {sessionId}");
+        }
+
+        /// <summary>
+        /// 현재 세션 ID 가져오기
+        /// </summary>
+        public static ObjectId GetCurrentSessionId()
+        {
+            return _currentSessionId;
+        }
+
+        /// <summary>
+        /// 현재 세션 ID 초기화
+        /// </summary>
+        public static void ClearCurrentSessionId()
+        {
+            _currentSessionId = ObjectId.Empty;
+            Debug.WriteLine("현재 세션 ID 초기화");
+        }
+
+        /// <summary>
+        /// Excel 완료 폴더 존재 확인 및 생성
+        /// </summary>
+        public static void EnsureExcelCompletedFolderExists()
+        {
+            try
+            {
+                if (!Directory.Exists(EXCEL_COMPLETED_FOLDER))
+                {
+                    Directory.CreateDirectory(EXCEL_COMPLETED_FOLDER);
+                    Debug.WriteLine($"Excel 완료 폴더 생성: {EXCEL_COMPLETED_FOLDER}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Excel 완료 폴더 생성 오류: {ex.Message}");
+                MessageBox.Show($"Excel 완료 폴더 생성 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Excel 완료 파일 경로 생성
+        /// </summary>
+        public static string GenerateExcelCompletedFilePath(ObjectId sessionId, string originalFileName = null)
+        {
+            try
+            {
+                // 폴더 존재 확인
+                EnsureExcelCompletedFolderExists();
+
+                // 파일명 생성: 세션ID 앞 8자리 + 타임스탬프
+                string sessionIdPrefix = sessionId.ToString().Substring(0, 8);
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                string fileName;
+                if (!string.IsNullOrEmpty(originalFileName))
+                {
+                    string nameWithoutExt = Path.GetFileNameWithoutExtension(originalFileName);
+                    fileName = $"{sessionIdPrefix}_{timestamp}_{nameWithoutExt}.xlsx";
+                }
+                else
+                {
+                    fileName = $"{sessionIdPrefix}_{timestamp}_결과.xlsx";
+                }
+
+                string fullPath = Path.Combine(EXCEL_COMPLETED_FOLDER, fileName);
+                Debug.WriteLine($"Excel 완료 파일 경로 생성: {fullPath}");
+
+                return fullPath;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Excel 완료 파일 경로 생성 오류: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Excel 완료 폴더 경로 가져오기
+        /// </summary>
+        public static string GetExcelCompletedFolderPath()
+        {
+            return EXCEL_COMPLETED_FOLDER;
+        }
     }
+
 }

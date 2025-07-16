@@ -43,9 +43,31 @@ namespace FinanceTool
             if (this.Visible)
             {
                 // 화면이 보여질 때만 레이아웃 재계산
-                RefreshLayouts();
+                //RefreshLayouts();
+                RefreshDataAndLayouts();
+
             }
         }
+
+        /// <summary>
+        /// 데이터 새로고침 및 레이아웃 재계산
+        /// </summary>
+        private async void RefreshDataAndLayouts()
+        {
+            try
+            {
+                // 1단계: 레이아웃 재계산 (기존 로직)
+                RefreshLayouts();
+
+                // 2단계: 데이터 새로고침
+                await RefreshAllData();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"데이터 및 레이아웃 새로고침 오류: {ex.Message}");
+            }
+        }
+
 
         private void RefreshLayouts()
         {
@@ -61,6 +83,217 @@ namespace FinanceTool
 
             this.ResumeLayout(true);
             this.PerformLayout();
+        }
+
+        /// <summary>
+        /// 모든 데이터 새로고침 (파일 목록 + 세션 목록)
+        /// </summary>
+        private async Task RefreshAllData()
+        {
+            try
+            {
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(20, "파일 목록 새로고침 중...");
+
+                    // 파일 목록 새로고침
+                    await RefreshFilesList();
+
+                    await progressForm.UpdateProgressHandler(70, "세션 목록 새로고침 중...");
+
+                    // 세션 목록 새로고침
+                    await RefreshSessionsList();
+
+                    await progressForm.UpdateProgressHandler(100, "새로고침 완료");
+                    await Task.Delay(300);
+                }
+
+                Debug.WriteLine("데이터 새로고침 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"데이터 새로고침 오류: {ex.Message}");
+                MessageBox.Show($"데이터 새로고침 중 오류가 발생했습니다.\n{ex.Message}",
+                    "새로고침 오류", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        /// <summary>
+        /// 파일 목록 새로고침
+        /// </summary>
+        private async Task RefreshFilesList()
+        {
+            try
+            {
+                // 현재 선택된 콤보박스 상태 백업
+                var comboBoxStates = BackupComboBoxStates();
+
+                // MongoDB에서 최신 파일 목록 조회
+                var uploadedFiles = await _uploadedFileRepository.GetAllAsync();
+                var displayDataList = new List<FileDisplayData>();
+
+                foreach (var file in uploadedFiles)
+                {
+                    var displayData = CreateFileDisplayData(file);
+                    displayDataList.Add(displayData);
+                }
+
+                // DataGridView 업데이트
+                dgv_files.DataSource = displayDataList;
+
+                // 콤보박스 아이템 재설정
+                UpdateComboBoxItems();
+
+                // 백업된 콤보박스 상태 복원
+                await RestoreComboBoxStates(comboBoxStates);
+
+                Debug.WriteLine($"파일 목록 새로고침 완료: {displayDataList.Count}개 파일");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"파일 목록 새로고침 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 세션 목록 새로고침
+        /// </summary>
+        private async Task RefreshSessionsList()
+        {
+            try
+            {
+                // MongoDB에서 최신 세션 목록 조회
+                var sessions = await _fileSessionRepository.GetAllAsync();
+                var sessionDisplayList = new List<SessionDisplayData>();
+
+                foreach (var session in sessions)
+                {
+                    var displayData = CreateSessionDisplayData(session);
+                    sessionDisplayList.Add(displayData);
+                }
+
+                // DataGridView 업데이트
+                dgv_sessions.DataSource = sessionDisplayList;
+
+                Debug.WriteLine($"세션 목록 새로고침 완료: {sessionDisplayList.Count}개 세션");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 목록 새로고침 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 현재 콤보박스 상태 백업
+        /// </summary>
+        private Dictionary<ObjectId, (string AccountColumn, string AmountColumn)> BackupComboBoxStates()
+        {
+            var comboBoxStates = new Dictionary<ObjectId, (string AccountColumn, string AmountColumn)>();
+
+            try
+            {
+                var currentList = dgv_files.DataSource as List<FileDisplayData>;
+                if (currentList != null)
+                {
+                    foreach (var fileData in currentList)
+                    {
+                        comboBoxStates[fileData.Id] = (
+                            fileData.AccountColumnName ?? "",
+                            fileData.AmountColumnName ?? ""
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"콤보박스 상태 백업 오류: {ex.Message}");
+            }
+
+            return comboBoxStates;
+        }
+
+        /// <summary>
+        /// 백업된 콤보박스 상태 복원
+        /// </summary>
+        private async Task RestoreComboBoxStates(Dictionary<ObjectId, (string AccountColumn, string AmountColumn)> comboBoxStates)
+        {
+            try
+            {
+                await Task.Delay(100); // UI 업데이트 대기
+
+                foreach (DataGridViewRow row in dgv_files.Rows)
+                {
+                    var fileData = row.DataBoundItem as FileDisplayData;
+                    if (fileData != null && comboBoxStates.ContainsKey(fileData.Id))
+                    {
+                        var (accountColumn, amountColumn) = comboBoxStates[fileData.Id];
+
+                        // 콤보박스 값 복원
+                        if (!string.IsNullOrEmpty(accountColumn))
+                        {
+                            SetComboBoxValueSafe(row, "AccountColumn", accountColumn);
+                            fileData.AccountColumnName = accountColumn;
+                        }
+                        if (!string.IsNullOrEmpty(amountColumn))
+                        {
+                            SetComboBoxValueSafe(row, "AmountColumn", amountColumn);
+                            fileData.AmountColumnName = amountColumn;
+                        }
+                    }
+                }
+
+                Debug.WriteLine("콤보박스 상태 복원 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"콤보박스 상태 복원 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// SessionDisplayData 생성 (기존 CreateFileDisplayData와 유사)
+        /// </summary>
+        private SessionDisplayData CreateSessionDisplayData(FileSessionDocument session)
+        {
+            return new SessionDisplayData
+            {
+                Id = session.Id,
+                SessionName = session.SessionName,
+                AccountColumnName = session.AccountColumnName,
+                AmountColumnName = session.AmountColumnName,
+                AccountName = session.AccountName,
+                //AccountNameFormatted = session.AccountName ?? "",
+                TotalAmount = session.TotalAmount,
+                TotalAmountFormatted = session.TotalAmount.ToString("N0") + " 원",
+                TotalRows = session.TotalRows,
+                TotalRowsFormatted = session.TotalRows.ToString("N0"),
+                FileCount = session.FileIds?.Count ?? 0,
+                Status = session.Status,
+                StatusDisplay = GetStatusDisplay(session.Status),
+                CreatedDate = session.CreatedDate,
+                CreatedDateFormatted = session.CreatedDate.ToString("yyyy-MM-dd HH:mm"),
+                CompletedDate = session.CompletedDate,
+                CompletedDateFormatted = session.CompletedDate?.ToString("yyyy-MM-dd HH:mm") ?? "",
+                ResultFilePath = session.ResultFilePath,
+                IsSelected = false
+            };
+        }
+
+        /// <summary>
+        /// 상태 표시 텍스트 변환
+        /// </summary>
+        private string GetStatusDisplay(string status)
+        {
+            return status switch
+            {
+                "processing" => "처리중",
+                "completed" => "완료",
+                "failed" => "실패",
+                _ => status
+            };
         }
 
         private UploadedFileRepository _uploadedFileRepository;
@@ -2459,18 +2692,26 @@ namespace FinanceTool
                     {
                         var cell = dgv_sessions.Rows[e.RowIndex].Cells[e.ColumnIndex];
 
-                        // result_file_path가 없으면 비활성화
-                        if (string.IsNullOrEmpty(sessionData.ResultFilePath))
+                        // 완료 상태이고 결과 파일 경로가 있으면 활성화
+                        if (sessionData.Status == "completed" && !string.IsNullOrEmpty(sessionData.ResultFilePath))
                         {
-                            cell.Style.ForeColor = System.Drawing.Color.Gray;
-                            cell.Style.BackColor = System.Drawing.Color.LightGray;
-                            cell.ToolTipText = "다운로드할 결과 파일이 없습니다.";
+                            cell.Style.ForeColor = System.Drawing.Color.Blue;
+                            cell.Style.BackColor = System.Drawing.Color.LightBlue;
+                            cell.ToolTipText = "클릭하여 결과 파일을 다운로드하세요.";
                         }
                         else
                         {
-                            cell.Style.ForeColor = System.Drawing.Color.Black;
-                            cell.Style.BackColor = System.Drawing.Color.White;
-                            cell.ToolTipText = "결과 파일 다운로드";
+                            cell.Style.ForeColor = System.Drawing.Color.Gray;
+                            cell.Style.BackColor = System.Drawing.Color.LightGray;
+
+                            if (sessionData.Status != "completed")
+                            {
+                                cell.ToolTipText = "세션이 완료된 후 다운로드할 수 있습니다.";
+                            }
+                            else
+                            {
+                                cell.ToolTipText = "다운로드할 결과 파일이 없습니다.";
+                            }
                         }
                     }
                 }
@@ -2501,6 +2742,7 @@ namespace FinanceTool
                 // 다운로드 버튼 클릭
                 else if (dgv_sessions.Columns[e.ColumnIndex].Name == "DownloadButton")
                 {
+                    //await DownloadSessionResult(sessionData);
                     await DownloadSessionResult(sessionData);
                 }
             }
@@ -2692,31 +2934,221 @@ namespace FinanceTool
 
 
         /// <summary>
-        /// 세션 결과 다운로드 (추후 구현)
+        /// 세션 결과 파일 다운로드
         /// </summary>
         private async Task DownloadSessionResult(SessionDisplayData sessionData)
         {
             try
             {
-                // result_file_path가 없으면 처리하지 않음
-                if (string.IsNullOrEmpty(sessionData.ResultFilePath))
+                // 1. 세션 상태 및 결과 파일 경로 확인
+                if (sessionData.Status != "completed")
                 {
-                    MessageBox.Show("다운로드할 결과 파일이 없습니다.", "알림",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show($"'{sessionData.SessionName}' 세션이 아직 완료되지 않았습니다.\n완료된 세션만 다운로드할 수 있습니다.",
+                        "다운로드 불가", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                // TODO: 실제 파일 다운로드 로직 구현
-                MessageBox.Show($"결과 파일 다운로드:\n{sessionData.ResultFilePath}", "다운로드",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // 2. MongoDB에서 최신 세션 정보 조회
+                var sessionDoc = await _fileSessionRepository.GetByIdAsync(sessionData.Id);
+                if (sessionDoc == null)
+                {
+                    MessageBox.Show("세션 정보를 찾을 수 없습니다.", "오류",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(sessionDoc.ResultFilePath))
+                {
+                    MessageBox.Show($"'{sessionData.SessionName}' 세션의 결과 파일 경로가 설정되지 않았습니다.\n" +
+                                  "Excel 파일을 다시 생성해주세요.", "다운로드 불가",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // 3. 서버 파일 존재 여부 확인
+                if (!File.Exists(sessionDoc.ResultFilePath))
+                {
+                    MessageBox.Show($"서버에서 결과 파일을 찾을 수 없습니다.\n" +
+                                  $"파일 경로: {sessionDoc.ResultFilePath}\n\n" +
+                                  "파일이 삭제되었거나 이동되었을 수 있습니다.",
+                        "파일 없음", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                // 4. 다운로드 경로 선택
+                using (SaveFileDialog saveDialog = new SaveFileDialog())
+                {
+                    string originalFileName = Path.GetFileName(sessionDoc.ResultFilePath);
+                    string nameWithoutTimestamp = RemoveTimestampFromFileName(originalFileName);
+
+                    saveDialog.Title = "세션 결과 파일 다운로드";
+                    saveDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*";
+                    saveDialog.FileName = nameWithoutTimestamp;
+                    saveDialog.DefaultExt = "xlsx";
+                    saveDialog.AddExtension = true;
+
+                    if (saveDialog.ShowDialog() == DialogResult.OK)
+                    {
+                        string downloadPath = saveDialog.FileName;
+
+                        // 5. 파일 복사 진행
+                        using (var progressForm = new ProcessProgressForm())
+                        {
+                            progressForm.Show();
+                            await progressForm.UpdateProgressHandler(10, "다운로드 준비 중...");
+
+                            bool downloadSuccess = await PerformFileDownload(sessionDoc.ResultFilePath, downloadPath, progressForm.UpdateProgressHandler);
+
+                            if (downloadSuccess)
+                            {
+                                await progressForm.UpdateProgressHandler(100, "다운로드 완료");
+                                await Task.Delay(500);
+
+                                // 6. 다운로드 완료 후 파일 열기 여부 확인
+                                DialogResult openResult = MessageBox.Show(
+                                    $"'{sessionData.SessionName}' 세션 결과 파일이 성공적으로 다운로드되었습니다.\n\n" +
+                                    $"저장 경로: {downloadPath}\n\n" +
+                                    "다운로드된 파일을 열어보시겠습니까?",
+                                    "다운로드 완료", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                                if (openResult == DialogResult.Yes)
+                                {
+                                    try
+                                    {
+                                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
+                                        {
+                                            FileName = downloadPath,
+                                            UseShellExecute = true
+                                        });
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Debug.WriteLine($"파일 열기 실패: {ex.Message}");
+                                        MessageBox.Show($"파일을 열 수 없습니다.\n수동으로 파일을 열어주세요.\n\n경로: {downloadPath}",
+                                            "파일 열기 실패", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                MessageBox.Show("파일 다운로드에 실패했습니다.", "다운로드 실패",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"결과 다운로드 오류: {ex.Message}");
-                MessageBox.Show($"결과 다운로드 중 오류가 발생했습니다.\n{ex.Message}",
+                Debug.WriteLine($"세션 결과 다운로드 중 오류: {ex.Message}");
+                MessageBox.Show($"다운로드 중 오류가 발생했습니다.\n{ex.Message}",
                     "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        /// <summary>
+        /// 실제 파일 다운로드 수행
+        /// </summary>
+        private async Task<bool> PerformFileDownload(string sourcePath, string destinationPath, ProcessProgressForm.UpdateProgressDelegate progressCallback)
+        {
+            try
+            {
+                await progressCallback(20, "파일 정보 확인 중...");
+
+                // 파일 크기 확인
+                FileInfo sourceFileInfo = new FileInfo(sourcePath);
+                long totalBytes = sourceFileInfo.Length;
+                long copiedBytes = 0;
+
+                await progressCallback(30, "파일 복사 시작...");
+
+                // 대용량 파일을 위한 스트림 복사
+                using (var sourceStream = new FileStream(sourcePath, FileMode.Open, FileAccess.Read))
+                using (var destinationStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write))
+                {
+                    byte[] buffer = new byte[81920]; // 80KB 버퍼
+                    int bytesRead;
+
+                    while ((bytesRead = await sourceStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        await destinationStream.WriteAsync(buffer, 0, bytesRead);
+                        copiedBytes += bytesRead;
+
+                        // 진행률 계산 및 업데이트
+                        int progressPercent = (int)(30 + (copiedBytes * 60 / totalBytes));
+                        await progressCallback(progressPercent, $"파일 복사 중... ({FormatFileSize(copiedBytes)}/{FormatFileSize(totalBytes)})");
+                    }
+                }
+
+                await progressCallback(95, "다운로드 검증 중...");
+
+                // 파일 크기 검증
+                FileInfo destinationFileInfo = new FileInfo(destinationPath);
+                if (destinationFileInfo.Length != totalBytes)
+                {
+                    Debug.WriteLine($"파일 크기 불일치: 원본={totalBytes}, 복사본={destinationFileInfo.Length}");
+                    return false;
+                }
+
+                Debug.WriteLine($"파일 다운로드 성공: {sourcePath} → {destinationPath}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"파일 다운로드 중 오류: {ex.Message}");
+
+                // 실패 시 부분적으로 복사된 파일 삭제
+                try
+                {
+                    if (File.Exists(destinationPath))
+                    {
+                        File.Delete(destinationPath);
+                        Debug.WriteLine("부분적으로 복사된 파일 삭제됨");
+                    }
+                }
+                catch (Exception deleteEx)
+                {
+                    Debug.WriteLine($"부분 복사 파일 삭제 실패: {deleteEx.Message}");
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 파일명에서 타임스탬프 제거
+        /// </summary>
+        private string RemoveTimestampFromFileName(string fileName)
+        {
+            try
+            {
+                // 파일명 패턴: {sessionId}_{timestamp}_{originalName}.xlsx
+                // 예: 507f1f77_20250716_143052_결과.xlsx → 결과.xlsx
+
+                string nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+                string extension = Path.GetExtension(fileName);
+
+                // '_'로 분할하여 세션ID와 타임스탬프 부분 제거
+                string[] parts = nameWithoutExt.Split('_');
+
+                if (parts.Length >= 3)
+                {
+                    // 처음 두 부분(세션ID, 타임스탬프)을 제거하고 나머지 결합
+                    string cleanName = string.Join("_", parts.Skip(2));
+                    return cleanName + extension;
+                }
+
+                // 패턴이 맞지 않으면 원본 파일명 반환
+                return fileName;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"파일명 정리 중 오류: {ex.Message}");
+                return fileName;
+            }
+        }
+
+       
 
         /// <summary>
         /// 기존 세션들 로드
@@ -3600,6 +4032,8 @@ namespace FinanceTool
                 // 업데이트된 세션 정보로 UI 데이터 갱신
                 targetSession.SessionName = mergedSessionName;
                 targetSession.AccountColumnName = mergedAccountColumnName;
+                //targetSession.AccountColumnName = mergedAccountName;
+                targetSession.AccountName = mergedAccountName;
                 targetSession.TotalAmount = totalAmount;
                 targetSession.TotalAmountFormatted = totalAmount.ToString("N0") + " 원";
                 targetSession.TotalRows = totalRows;
@@ -3732,18 +4166,32 @@ namespace FinanceTool
                         return;
                     }
 
-                    // 2단계: 사용자 확인
-                    var confirmResult = MessageBox.Show(
-                        $"선택된 {selectedSessions.Count}개의 세션을 처리하시겠습니까?\n\n" +
-                        "처리 내용:\n" +
-                        "• 기존 raw_data, process_data 컬렉션 초기화\n" +
-                        "• 세션별 계정명 데이터 추출 및 raw_data 저장\n" +
-                        "• 자동으로 파일 로드 화면으로 이동\n\n" +
-                        "※ 이 작업은 취소할 수 없습니다.",
-                        "계정분석 시작 확인",
-                        MessageBoxButtons.YesNo,
-                        MessageBoxIcon.Question
-                    );
+                    if (selectedSessions.Count > 1)
+                    {
+                        MessageBox.Show("처리할 세션은 1개만 선택해주세요.", "알림",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    var selectedSession = selectedSessions.First();
+
+                // 현재 세션 ID를 전역 변수에 저장
+                DataHandler.SetCurrentSessionId(selectedSession.Id);
+                Debug.WriteLine($"완료 처리 대상 세션 설정: {selectedSession.SessionName} (ID: {selectedSession.Id})");
+
+
+                // 2단계: 사용자 확인
+                var confirmResult = MessageBox.Show(
+                            $"선택된 {selectedSessions.Count}개의 세션을 처리하시겠습니까?\n\n" +
+                            "처리 내용:\n" +
+                            "• 기존 raw_data, process_data 컬렉션 초기화\n" +
+                            "• 세션별 계정명 데이터 추출 및 raw_data 저장\n" +
+                            "• 자동으로 파일 로드 화면으로 이동\n\n" +
+                            "※ 이 작업은 취소할 수 없습니다.",
+                            "계정분석 시작 확인",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question
+                        );
 
                     if (confirmResult != DialogResult.Yes) return;
 

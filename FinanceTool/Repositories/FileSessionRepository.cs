@@ -12,6 +12,32 @@ namespace FinanceTool.Repositories
         {
         }
 
+        /// <summary>
+        /// 세션 완료 정보 업데이트
+        /// </summary>
+        public async Task<bool> UpdateSessionCompletionAsync(ObjectId sessionId, string status, DateTime completedDate, string resultFilePath)
+        {
+            try
+            {
+                var filter = Builders<FileSessionDocument>.Filter.Eq(s => s.Id, sessionId);
+                var update = Builders<FileSessionDocument>.Update
+                    .Set(s => s.Status, status)
+                    .Set(s => s.CompletedDate, completedDate)
+                    .Set(s => s.ResultFilePath, resultFilePath);
+
+                var result = await _collection.UpdateOneAsync(filter, update);
+
+                Debug.WriteLine($"세션 업데이트 결과 - ModifiedCount: {result.ModifiedCount}, MatchedCount: {result.MatchedCount}");
+
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 완료 정보 업데이트 중 오류: {ex.Message}");
+                return false;
+            }
+        }
+
         // <summary>
         /// 세션명 업데이트
         /// </summary>
