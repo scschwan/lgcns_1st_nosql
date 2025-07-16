@@ -3866,6 +3866,11 @@ namespace FinanceTool
 
                         userControlHandler.uc_fileLoad.GetMongoColumnList(DataHandler.excelData.Columns);
                         userControlHandler.uc_fileLoad.SetupColumnLists();
+
+                        //공급업체 표준화 로드
+                        await userControlHandler.uc_fileLoad.InitializeStandardizationControls();
+
+
                     }
                     else
                     {
@@ -3889,6 +3894,9 @@ namespace FinanceTool
 
                         userControlHandler.uc_fileLoad.GetMongoColumnList(DataHandler.excelData.Columns);
                         userControlHandler.uc_fileLoad.SetupColumnLists();
+
+                        //공급업체 표준화 로드
+                        await userControlHandler.uc_fileLoad.InitializeStandardizationControls();
                     }
                 }
             }

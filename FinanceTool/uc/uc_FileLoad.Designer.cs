@@ -38,6 +38,9 @@
             label9 = new Label();
             label8 = new Label();
             pnl_data_grids = new Panel();
+            tabControl1 = new TabControl();
+            tabPage1 = new TabPage();
+            tabPage2 = new TabPage();
             dataGridView_process = new DataGridView();
             dataGridView_target = new DataGridView();
             pnl_pagination = new Panel();
@@ -49,7 +52,6 @@
             cmb_pageSize = new ComboBox();
             lbl_pageSizeText = new Label();
             tableLayoutRight = new TableLayoutPanel();
-            groupBox3 = new GroupBox();
             restore_col_btn = new Button();
             del_col_list_allcheck = new CheckBox();
             dataGridView_delete_col = new DataGridView();
@@ -77,23 +79,32 @@
             label5 = new Label();
             label2 = new Label();
             dataGridView2 = new DataGridView();
+            dataGridView_standard = new DataGridView();
+            label11 = new Label();
+            comboBox_standard_key = new ComboBox();
+            label12 = new Label();
+            comboBox_standard_target = new ComboBox();
+            standard_btn = new Button();
             tableLayoutMain.SuspendLayout();
             pnl_header.SuspendLayout();
             tableLayoutContent.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
             pnl_data_headers.SuspendLayout();
             pnl_data_grids.SuspendLayout();
+            tabControl1.SuspendLayout();
+            tabPage1.SuspendLayout();
+            tabPage2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_process).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dataGridView_target).BeginInit();
             pnl_pagination.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)num_pageNumber).BeginInit();
             tableLayoutRight.SuspendLayout();
-            groupBox3.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_delete_col).BeginInit();
             groupBox2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_delete_data).BeginInit();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_standard).BeginInit();
             SuspendLayout();
             // 
             // tableLayoutMain
@@ -236,6 +247,50 @@
             pnl_data_grids.Size = new Size(1355, 777);
             pnl_data_grids.TabIndex = 1;
             // 
+            // tabControl1
+            // 
+            tabControl1.Controls.Add(tabPage1);
+            tabControl1.Controls.Add(tabPage2);
+            tabControl1.Location = new Point(3, 3);
+            tabControl1.Name = "tabControl1";
+            tabControl1.SelectedIndex = 0;
+            tabControl1.Size = new Size(511, 259);
+            tabControl1.TabIndex = 2;
+            // 
+            // tabPage1
+            // 
+            tabPage1.Controls.Add(restore_col_btn);
+            tabPage1.Controls.Add(label7);
+            tabPage1.Controls.Add(del_col_list_allcheck);
+            tabPage1.Controls.Add(dataGridView_delete_col);
+            tabPage1.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            tabPage1.Location = new Point(4, 24);
+            tabPage1.Name = "tabPage1";
+            tabPage1.Padding = new Padding(3);
+            tabPage1.Size = new Size(503, 231);
+            tabPage1.TabIndex = 0;
+            tabPage1.Text = "제거 열 설정";
+            tabPage1.UseVisualStyleBackColor = true;
+            // 
+            // tabPage2
+            // 
+            tabPage2.Controls.Add(delete_data_btn);
+            tabPage2.Controls.Add(dataGridView_delete_data);
+            tabPage2.Controls.Add(restore_del_data_btn);
+            tabPage2.Controls.Add(label4);
+            tabPage2.Controls.Add(del_data_list_allcheck);
+            tabPage2.Controls.Add(stand_col_combo);
+            tabPage2.Controls.Add(delete_search_keyword);
+            tabPage2.Controls.Add(delete_search_button);
+            tabPage2.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            tabPage2.Location = new Point(4, 24);
+            tabPage2.Name = "tabPage2";
+            tabPage2.Padding = new Padding(3);
+            tabPage2.Size = new Size(503, 231);
+            tabPage2.TabIndex = 1;
+            tabPage2.Text = "데이터 삭제";
+            tabPage2.UseVisualStyleBackColor = true;
+            // 
             // dataGridView_process
             // 
             dataGridView_process.AllowUserToAddRows = false;
@@ -368,7 +423,7 @@
             // 
             tableLayoutRight.ColumnCount = 1;
             tableLayoutRight.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-            tableLayoutRight.Controls.Add(groupBox3, 0, 0);
+            tableLayoutRight.Controls.Add(tabControl1, 0, 0);
             tableLayoutRight.Controls.Add(groupBox2, 0, 1);
             tableLayoutRight.Controls.Add(groupBox1, 0, 2);
             tableLayoutRight.Dock = DockStyle.Fill;
@@ -382,23 +437,6 @@
             tableLayoutRight.Size = new Size(519, 897);
             tableLayoutRight.TabIndex = 1;
             // 
-            // groupBox3
-            // 
-            groupBox3.Controls.Add(restore_col_btn);
-            groupBox3.Controls.Add(del_col_list_allcheck);
-            groupBox3.Controls.Add(dataGridView_delete_col);
-            groupBox3.Controls.Add(label7);
-            groupBox3.Dock = DockStyle.Fill;
-            groupBox3.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
-            groupBox3.Location = new Point(5, 5);
-            groupBox3.Margin = new Padding(5);
-            groupBox3.Name = "groupBox3";
-            groupBox3.Padding = new Padding(8);
-            groupBox3.Size = new Size(509, 259);
-            groupBox3.TabIndex = 43;
-            groupBox3.TabStop = false;
-            groupBox3.Text = "제거 열 설정";
-            // 
             // restore_col_btn
             // 
             restore_col_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
@@ -407,7 +445,7 @@
             restore_col_btn.FlatStyle = FlatStyle.Flat;
             restore_col_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
             restore_col_btn.ForeColor = Color.White;
-            restore_col_btn.Location = new Point(361, 210);
+            restore_col_btn.Location = new Point(357, 182);
             restore_col_btn.MinimumSize = new Size(100, 30);
             restore_col_btn.Name = "restore_col_btn";
             restore_col_btn.Size = new Size(140, 35);
@@ -421,7 +459,7 @@
             del_col_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_col_list_allcheck.AutoSize = true;
             del_col_list_allcheck.Font = new Font("맑은 고딕", 11F);
-            del_col_list_allcheck.Location = new Point(406, 50);
+            del_col_list_allcheck.Location = new Point(404, 28);
             del_col_list_allcheck.Name = "del_col_list_allcheck";
             del_col_list_allcheck.Size = new Size(93, 24);
             del_col_list_allcheck.TabIndex = 43;
@@ -438,11 +476,11 @@
             dataGridView_delete_col.BackgroundColor = Color.White;
             dataGridView_delete_col.BorderStyle = BorderStyle.Fixed3D;
             dataGridView_delete_col.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridView_delete_col.Location = new Point(8, 50);
+            dataGridView_delete_col.Location = new Point(6, 28);
             dataGridView_delete_col.MinimumSize = new Size(300, 120);
             dataGridView_delete_col.Name = "dataGridView_delete_col";
             dataGridView_delete_col.RowHeadersVisible = false;
-            dataGridView_delete_col.Size = new Size(351, 150);
+            dataGridView_delete_col.Size = new Size(348, 197);
             dataGridView_delete_col.TabIndex = 42;
             // 
             // label7
@@ -450,7 +488,7 @@
             label7.AutoSize = true;
             label7.Font = new Font("맑은 고딕", 9F, FontStyle.Bold);
             label7.ForeColor = Color.IndianRed;
-            label7.Location = new Point(8, 25);
+            label7.Location = new Point(6, 3);
             label7.Name = "label7";
             label7.Size = new Size(244, 15);
             label7.TabIndex = 44;
@@ -458,14 +496,12 @@
             // 
             // groupBox2
             // 
-            groupBox2.Controls.Add(delete_data_btn);
-            groupBox2.Controls.Add(restore_del_data_btn);
-            groupBox2.Controls.Add(del_data_list_allcheck);
-            groupBox2.Controls.Add(dataGridView_delete_data);
-            groupBox2.Controls.Add(delete_search_button);
-            groupBox2.Controls.Add(delete_search_keyword);
-            groupBox2.Controls.Add(stand_col_combo);
-            groupBox2.Controls.Add(label4);
+            groupBox2.Controls.Add(standard_btn);
+            groupBox2.Controls.Add(label12);
+            groupBox2.Controls.Add(comboBox_standard_target);
+            groupBox2.Controls.Add(label11);
+            groupBox2.Controls.Add(comboBox_standard_key);
+            groupBox2.Controls.Add(dataGridView_standard);
             groupBox2.Dock = DockStyle.Fill;
             groupBox2.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
             groupBox2.Location = new Point(5, 274);
@@ -475,7 +511,7 @@
             groupBox2.Size = new Size(509, 259);
             groupBox2.TabIndex = 16;
             groupBox2.TabStop = false;
-            groupBox2.Text = "데이터 삭제";
+            groupBox2.Text = "코스트센터/공급업체 명 표준화";
             // 
             // delete_data_btn
             // 
@@ -485,7 +521,7 @@
             delete_data_btn.FlatStyle = FlatStyle.Flat;
             delete_data_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
             delete_data_btn.ForeColor = Color.White;
-            delete_data_btn.Location = new Point(361, 210);
+            delete_data_btn.Location = new Point(357, 190);
             delete_data_btn.MinimumSize = new Size(100, 30);
             delete_data_btn.Name = "delete_data_btn";
             delete_data_btn.Size = new Size(140, 35);
@@ -502,7 +538,7 @@
             restore_del_data_btn.FlatStyle = FlatStyle.Flat;
             restore_del_data_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
             restore_del_data_btn.ForeColor = Color.White;
-            restore_del_data_btn.Location = new Point(361, 169);
+            restore_del_data_btn.Location = new Point(357, 149);
             restore_del_data_btn.MinimumSize = new Size(100, 30);
             restore_del_data_btn.Name = "restore_del_data_btn";
             restore_del_data_btn.Size = new Size(140, 35);
@@ -516,7 +552,7 @@
             del_data_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_data_list_allcheck.AutoSize = true;
             del_data_list_allcheck.Font = new Font("맑은 고딕", 11F);
-            del_data_list_allcheck.Location = new Point(406, 80);
+            del_data_list_allcheck.Location = new Point(358, 81);
             del_data_list_allcheck.Name = "del_data_list_allcheck";
             del_data_list_allcheck.Size = new Size(93, 24);
             del_data_list_allcheck.TabIndex = 44;
@@ -533,12 +569,12 @@
             dataGridView_delete_data.BackgroundColor = Color.White;
             dataGridView_delete_data.BorderStyle = BorderStyle.Fixed3D;
             dataGridView_delete_data.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridView_delete_data.Location = new Point(8, 80);
+            dataGridView_delete_data.Location = new Point(6, 81);
             dataGridView_delete_data.MinimumSize = new Size(300, 100);
             dataGridView_delete_data.Name = "dataGridView_delete_data";
             dataGridView_delete_data.ReadOnly = true;
             dataGridView_delete_data.RowHeadersVisible = false;
-            dataGridView_delete_data.Size = new Size(351, 120);
+            dataGridView_delete_data.Size = new Size(346, 144);
             dataGridView_delete_data.TabIndex = 42;
             // 
             // delete_search_button
@@ -549,7 +585,7 @@
             delete_search_button.FlatStyle = FlatStyle.Flat;
             delete_search_button.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
             delete_search_button.ForeColor = Color.White;
-            delete_search_button.Location = new Point(431, 52);
+            delete_search_button.Location = new Point(427, 39);
             delete_search_button.MinimumSize = new Size(60, 25);
             delete_search_button.Name = "delete_search_button";
             delete_search_button.Size = new Size(70, 31);
@@ -562,10 +598,10 @@
             // 
             delete_search_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             delete_search_keyword.Font = new Font("맑은 고딕", 10F);
-            delete_search_keyword.Location = new Point(260, 53);
+            delete_search_keyword.Location = new Point(245, 43);
             delete_search_keyword.Name = "delete_search_keyword";
             delete_search_keyword.PlaceholderText = "검색 키워드 입력";
-            delete_search_keyword.Size = new Size(165, 25);
+            delete_search_keyword.Size = new Size(176, 25);
             delete_search_keyword.TabIndex = 46;
             delete_search_keyword.KeyDown += delete_search_keyword_KeyDown;
             // 
@@ -574,9 +610,9 @@
             stand_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             stand_col_combo.Font = new Font("맑은 고딕", 11F);
             stand_col_combo.FormattingEnabled = true;
-            stand_col_combo.Location = new Point(115, 25);
+            stand_col_combo.Location = new Point(113, 5);
             stand_col_combo.Name = "stand_col_combo";
-            stand_col_combo.Size = new Size(386, 28);
+            stand_col_combo.Size = new Size(384, 28);
             stand_col_combo.TabIndex = 2;
             stand_col_combo.SelectedIndexChanged += stand_col_combo_SelectedIndexChanged;
             // 
@@ -584,7 +620,7 @@
             // 
             label4.AutoSize = true;
             label4.Font = new Font("맑은 고딕", 11F);
-            label4.Location = new Point(8, 28);
+            label4.Location = new Point(6, 8);
             label4.Name = "label4";
             label4.Size = new Size(102, 20);
             label4.TabIndex = 3;
@@ -751,6 +787,79 @@
             dataGridView2.TabIndex = 41;
             dataGridView2.Visible = false;
             // 
+            // dataGridView_standard
+            // 
+            dataGridView_standard.AllowUserToAddRows = false;
+            dataGridView_standard.AllowUserToDeleteRows = false;
+            dataGridView_standard.AllowUserToResizeRows = false;
+            dataGridView_standard.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+            dataGridView_standard.BackgroundColor = Color.White;
+            dataGridView_standard.BorderStyle = BorderStyle.Fixed3D;
+            dataGridView_standard.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dataGridView_standard.Location = new Point(8, 104);
+            dataGridView_standard.MinimumSize = new Size(300, 100);
+            dataGridView_standard.Name = "dataGridView_standard";
+            dataGridView_standard.ReadOnly = true;
+            dataGridView_standard.RowHeadersVisible = false;
+            dataGridView_standard.Size = new Size(346, 144);
+            dataGridView_standard.TabIndex = 47;
+            // 
+            // label11
+            // 
+            label11.AutoSize = true;
+            label11.Font = new Font("맑은 고딕", 11F);
+            label11.Location = new Point(10, 30);
+            label11.Name = "label11";
+            label11.Size = new Size(95, 20);
+            label11.TabIndex = 48;
+            label11.Text = "key 열 선택 :";
+            // 
+            // comboBox_standard_key
+            // 
+            comboBox_standard_key.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            comboBox_standard_key.Font = new Font("맑은 고딕", 11F);
+            comboBox_standard_key.FormattingEnabled = true;
+            comboBox_standard_key.Location = new Point(117, 27);
+            comboBox_standard_key.Name = "comboBox_standard_key";
+            comboBox_standard_key.Size = new Size(384, 28);
+            comboBox_standard_key.TabIndex = 47;
+            // 
+            // label12
+            // 
+            label12.AutoSize = true;
+            label12.Font = new Font("맑은 고딕", 11F);
+            label12.Location = new Point(11, 68);
+            label12.Name = "label12";
+            label12.Size = new Size(102, 20);
+            label12.TabIndex = 50;
+            label12.Text = "변경 열 선택 :";
+            // 
+            // comboBox_standard_target
+            // 
+            comboBox_standard_target.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            comboBox_standard_target.Font = new Font("맑은 고딕", 11F);
+            comboBox_standard_target.FormattingEnabled = true;
+            comboBox_standard_target.Location = new Point(118, 65);
+            comboBox_standard_target.Name = "comboBox_standard_target";
+            comboBox_standard_target.Size = new Size(384, 28);
+            comboBox_standard_target.TabIndex = 49;
+            // 
+            // standard_btn
+            // 
+            standard_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            standard_btn.AutoSize = true;
+            standard_btn.BackColor = Color.LimeGreen;
+            standard_btn.FlatStyle = FlatStyle.Flat;
+            standard_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            standard_btn.ForeColor = Color.White;
+            standard_btn.Location = new Point(359, 213);
+            standard_btn.MinimumSize = new Size(100, 30);
+            standard_btn.Name = "standard_btn";
+            standard_btn.Size = new Size(140, 35);
+            standard_btn.TabIndex = 47;
+            standard_btn.Text = "표준화 수행";
+            standard_btn.UseVisualStyleBackColor = false;
+            // 
             // uc_FileLoad
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -768,14 +877,17 @@
             tableLayoutLeft.ResumeLayout(false);
             pnl_data_headers.ResumeLayout(false);
             pnl_data_grids.ResumeLayout(false);
+            tabControl1.ResumeLayout(false);
+            tabPage1.ResumeLayout(false);
+            tabPage1.PerformLayout();
+            tabPage2.ResumeLayout(false);
+            tabPage2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_process).EndInit();
             ((System.ComponentModel.ISupportInitialize)dataGridView_target).EndInit();
             pnl_pagination.ResumeLayout(false);
             pnl_pagination.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)num_pageNumber).EndInit();
             tableLayoutRight.ResumeLayout(false);
-            groupBox3.ResumeLayout(false);
-            groupBox3.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_delete_col).EndInit();
             groupBox2.ResumeLayout(false);
             groupBox2.PerformLayout();
@@ -783,6 +895,7 @@
             groupBox1.ResumeLayout(false);
             groupBox1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_standard).EndInit();
             ResumeLayout(false);
         }
 
@@ -809,7 +922,6 @@
         private System.Windows.Forms.ComboBox cmb_pageSize;
         private System.Windows.Forms.Label lbl_pageSizeText;
         private System.Windows.Forms.TableLayoutPanel tableLayoutRight;
-        private System.Windows.Forms.GroupBox groupBox3;
         private System.Windows.Forms.Button restore_col_btn;
         private System.Windows.Forms.CheckBox del_col_list_allcheck;
         public System.Windows.Forms.DataGridView dataGridView_delete_col;
@@ -837,5 +949,14 @@
         private System.Windows.Forms.Label label5;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.DataGridView dataGridView2;
+        private TabControl tabControl1;
+        private TabPage tabPage1;
+        private TabPage tabPage2;
+        private Button standard_btn;
+        private Label label12;
+        private ComboBox comboBox_standard_target;
+        private Label label11;
+        private ComboBox comboBox_standard_key;
+        private DataGridView dataGridView_standard;
     }
 }

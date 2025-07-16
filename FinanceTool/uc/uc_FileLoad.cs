@@ -50,6 +50,11 @@ namespace FinanceTool
         // MongoDB Repository 객체
         private RawDataRepository rawDataRepo = new RawDataRepository();
 
+        //공급업체명 표준화 관련 멤버 변수
+        private List<string> _numericColumns = new List<string>();
+        private List<string> _allColumns = new List<string>();
+        private DataTable _standardMappingData = null;
+
         public uc_FileLoad()
         {
             InitializeComponent();
@@ -596,10 +601,12 @@ namespace FinanceTool
                 // ComboBox에 열 이름 추가 (공통 로직)
                 SetupComboBox(stand_col_combo, "데이터 삭제 기준 열 선택");
                 SetupComboBox(sub_acc_col_combo, "세목 열 선택");
-                SetupComboBox(dept_col_combo, "부서 열 선택");
+                SetupComboBox(dept_col_combo, "코스트센터 열 선택");
                 SetupComboBox(prod_col_combo, "공급업체 열 선택");
                 SetupComboBox(cmb_target, "키워드 대상 열 선택");
                 SetupComboBox(cmb_money, "금액 열 선택");
+
+               
             }
             catch (Exception ex)
             {
@@ -1533,7 +1540,757 @@ namespace FinanceTool
             }
         }
 
-       
+        //2025.07.16
+        //공급업체 표준화 함수
+
+        /// <summary>
+        /// 공급업체명 표준화 관련 컨트롤 초기화
+        /// </summary>
+        public async Task InitializeStandardizationControls()
+        {
+            try
+            {
+                Debug.WriteLine("공급업체명 표준화 컨트롤 초기화 시작");
+
+                // 1. 숫자형 컬럼과 전체 컬럼 목록 로드
+                await LoadColumnListsAsync();
+
+                // 2. Key 콤보박스 설정 (숫자형 컬럼만)
+                comboBox_standard_key.Items.Clear();
+                comboBox_standard_key.Items.Add("-- Key 컬럼 선택 --");
+                foreach (string column in _numericColumns)
+                {
+                    comboBox_standard_key.Items.Add(column);
+                }
+                comboBox_standard_key.SelectedIndex = 0;
+
+                // 3. Target 콤보박스 설정 (전체 컬럼)
+                comboBox_standard_target.Items.Clear();
+                comboBox_standard_target.Items.Add("-- 대상 컬럼 선택 --");
+                foreach (string column in _allColumns)
+                {
+                    comboBox_standard_target.Items.Add(column);
+                }
+                comboBox_standard_target.SelectedIndex = 0;
+
+                // 4. DataGridView 초기화
+                InitializeStandardDataGridView();
+
+                // 5. 이벤트 핸들러 등록
+                comboBox_standard_key.SelectedIndexChanged += ComboBox_standard_key_SelectedIndexChanged;
+                comboBox_standard_target.SelectedIndexChanged += ComboBox_standard_target_SelectedIndexChanged;
+                standard_btn.Click += Standard_btn_Click;
+
+                Debug.WriteLine($"컬럼 로드 완료 - 숫자형: {_numericColumns.Count}개, 전체: {_allColumns.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"표준화 컨트롤 초기화 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// MongoDB에서 컬럼 목록 로드 (숫자형 컬럼 자동 감지)
+        /// </summary>
+        private async Task LoadColumnListsAsync()
+        {
+            try
+            {
+                _numericColumns.Clear();
+                _allColumns.Clear();
+
+                // 샘플 데이터로 컬럼 분석 (성능 최적화)
+                var pipeline = new[]
+                {
+            new BsonDocument("$sample", new BsonDocument("size", 1000)),
+            new BsonDocument("$project", new BsonDocument("data", 1))
+        };
+
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var collection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
+                var sampleDocs = await collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
+
+                var numericColumnSet = new HashSet<string>();
+                var allColumnSet = new HashSet<string>();
+
+                // 샘플 데이터에서 컬럼 분석
+                foreach (var doc in sampleDocs)
+                {
+                    if (doc.Contains("data") && doc["data"].IsBsonDocument)
+                    {
+                        var dataDoc = doc["data"].AsBsonDocument;
+                        foreach (var element in dataDoc.Elements)
+                        {
+                            string columnName = element.Name;
+                            allColumnSet.Add(columnName);
+
+                            // 숫자형 컬럼 판별
+                            if (IsNumericColumn(element.Value))
+                            {
+                                numericColumnSet.Add(columnName);
+                            }
+                        }
+                    }
+                }
+
+                _numericColumns = numericColumnSet.OrderBy(x => x).ToList();
+                _allColumns = allColumnSet.OrderBy(x => x).ToList();
+
+                Debug.WriteLine($"컬럼 분석 완료 - 숫자형: {_numericColumns.Count}개, 전체: {_allColumns.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 목록 로드 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// BsonValue가 숫자형인지 판별
+        /// </summary>
+        private bool IsNumericColumn(BsonValue value)
+        {
+            try
+            {
+                // 1. 직접적인 숫자 타입들
+                if (value.IsNumeric)
+                    return true;
+
+                // 2. 복합 타입 (_t, _v 구조) 검사
+                if (value.IsBsonDocument)
+                {
+                    var doc = value.AsBsonDocument;
+                    if (doc.Contains("_t") && doc.Contains("_v"))
+                    {
+                        string type = doc["_t"].AsString;
+                        return type.Contains("Decimal") || type.Contains("Int") || type.Contains("Double");
+                    }
+                }
+
+                // 3. 문자열이지만 숫자로 변환 가능한 경우
+                if (value.IsString)
+                {
+                    string strValue = value.AsString;
+                    return decimal.TryParse(strValue, out _) ||
+                           double.TryParse(strValue, out _) ||
+                           long.TryParse(strValue, out _);
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 표준화 DataGridView 초기화
+        /// </summary>
+        private void InitializeStandardDataGridView()
+        {
+            try
+            {
+                dataGridView_standard.Columns.Clear();
+                dataGridView_standard.Rows.Clear();
+
+                // 컬럼 설정
+                dataGridView_standard.Columns.Add("KeyValue", "Key 값");
+                dataGridView_standard.Columns.Add("TargetValue", "대상값");
+                dataGridView_standard.Columns.Add("Count", "Count");
+                
+                // 대상값 컬럼만 편집 가능하도록 설정 (uc_clustering 패턴)
+                dataGridView_standard.Columns["KeyValue"].ReadOnly = true;
+                dataGridView_standard.Columns["TargetValue"].ReadOnly = false;
+                dataGridView_standard.Columns["Count"].ReadOnly = true;
+
+                // DataGridView 속성 설정
+                dataGridView_standard.AllowUserToAddRows = false;
+                dataGridView_standard.AllowUserToDeleteRows = false;
+                dataGridView_standard.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+                dataGridView_standard.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+                dataGridView_standard.Font = new System.Drawing.Font("맑은 고딕", 12F);
+
+                // Count 컬럼 숫자 포맷 설정
+                dataGridView_standard.Columns["Count"].DefaultCellStyle.Format = "N0";
+                dataGridView_standard.Columns["Count"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+
+                // 편집 완료 이벤트 등록
+                dataGridView_standard.CellEndEdit += DataGridView_standard_CellEndEdit;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"표준화 DataGridView 초기화 오류: {ex.Message}");
+            }
+        }
+
+
+
+        // 이벤트 핸들러
+
+        /// <summary>
+        /// Key 콤보박스 선택 변경
+        /// </summary>
+        private async void ComboBox_standard_key_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (comboBox_standard_key.SelectedIndex > 0 && comboBox_standard_target.SelectedIndex > 0)
+            {
+                await AnalyzeKeyTargetMapping();
+            }
+        }
+
+        /// <summary>
+        /// Target 콤보박스 선택 변경
+        /// </summary>
+        private async void ComboBox_standard_target_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (comboBox_standard_key.SelectedIndex > 0 && comboBox_standard_target.SelectedIndex > 0)
+            {
+                await AnalyzeKeyTargetMapping();
+            }
+        }
+
+        /// <summary>
+        /// 표준화 수행 버튼 클릭
+        /// </summary>
+        private async void Standard_btn_Click(object sender, EventArgs e)
+        {
+            await PerformStandardization();
+        }
+
+        /// <summary>
+        /// DataGridView 편집 완료 (uc_clustering 패턴)
+        /// </summary>
+        private async void DataGridView_standard_CellEndEdit(object sender, DataGridViewCellEventArgs e)
+        {
+            try
+            {
+                if (e.ColumnIndex == 1) // TargetValue 컬럼
+                {
+                    var row = dataGridView_standard.Rows[e.RowIndex];
+                    string keyValue = row.Cells["KeyValue"].Value?.ToString();
+                    string oldTargetValue = _standardMappingData.Rows[e.RowIndex]["TargetValue"].ToString();
+                    string newTargetValue = row.Cells["TargetValue"].Value?.ToString();
+
+                    if (!string.IsNullOrEmpty(newTargetValue) && newTargetValue != oldTargetValue)
+                    {
+                        using (var progressForm = new ProcessProgressForm())
+                        {
+                            progressForm.Show();
+                            await progressForm.UpdateProgressHandler(10, "대상값 변경 중...");
+
+                            // MongoDB에서 해당 값 일괄 변경
+                            await UpdateTargetValueInMongoDB(keyValue, oldTargetValue, newTargetValue);
+
+                            await progressForm.UpdateProgressHandler(50, "매핑 데이터 재분석 중...");
+
+                            // 매핑 데이터 재분석
+                            await AnalyzeKeyTargetMapping();
+
+                            await progressForm.UpdateProgressHandler(80, "페이징 데이터 새로고침 중...");
+
+                            // 페이징 데이터 새로고침
+                            await LoadMongoPagedDataAsync();
+
+                            await progressForm.UpdateProgressHandler(100, "완료");
+                        }
+
+                        MessageBox.Show($"'{oldTargetValue}'를 '{newTargetValue}'로 변경 완료", "변경 완료",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"편집 완료 처리 오류: {ex.Message}");
+                MessageBox.Show($"변경 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+      
+
+        // 핵심 분석 및 처리 함수
+
+        /// <summary>
+        /// Key-Target 매핑 분석 및 표시
+        /// </summary>
+        private async Task AnalyzeKeyTargetMapping()
+        {
+            try
+            {
+                if (!ValidateStandardizationSelection())
+                    return;
+
+                string keyColumn = comboBox_standard_key.SelectedItem.ToString();
+                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
+
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "매핑 분석 중...");
+
+                    // MongoDB 집계 파이프라인으로 매핑 분석
+                    _standardMappingData = await GetKeyTargetMappingDataAsync_Simple(keyColumn, targetColumn);
+
+                    await progressForm.UpdateProgressHandler(80, "결과 표시 중...");
+
+                    // DataGridView에 결과 표시
+                    DisplayMappingResults();
+
+                    await progressForm.UpdateProgressHandler(100, "완료");
+                }
+
+                Debug.WriteLine($"매핑 분석 완료: {_standardMappingData.Rows.Count}개 결과");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"매핑 분석 오류: {ex.Message}");
+                MessageBox.Show($"매핑 분석 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// MongoDB에서 Key-Target 매핑 데이터 조회
+        /// </summary>
+        /// <summary>
+        /// 단순화된 Key-Target 매핑 데이터 조회 (안전 버전)
+        /// </summary>
+        private async Task<DataTable> GetKeyTargetMappingDataAsync_Simple(string keyColumn, string targetColumn)
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var collection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
+
+                // 단순한 집계 파이프라인
+                var pipeline = new[]
+                {
+            // 1단계: 필요한 필드만 추출
+            new BsonDocument("$project", new BsonDocument
+            {
+                ["keyValue"] = $"$data.{keyColumn}",
+                ["targetValue"] = $"$data.{targetColumn}"
+            }),
+
+            // 2단계: null 값 제외
+            new BsonDocument("$match", new BsonDocument
+            {
+                ["keyValue"] = new BsonDocument("$ne", BsonNull.Value),
+                ["targetValue"] = new BsonDocument("$ne", BsonNull.Value)
+            })
+        };
+
+                var results = await collection.Aggregate<BsonDocument>(pipeline).ToListAsync();
+
+                // C# 코드에서 복합 타입 처리 및 그룹화
+                var mappingDict = new Dictionary<(string key, string target), int>();
+
+                foreach (var doc in results)
+                {
+                    try
+                    {
+                        // Key 값 추출
+                        string keyValue = ExtractValue(doc["keyValue"]);
+                        string targetValue = ExtractValue(doc["targetValue"]);
+
+                        if (!string.IsNullOrEmpty(keyValue) && !string.IsNullOrEmpty(targetValue))
+                        {
+                            var key = (keyValue, targetValue);
+                            if (mappingDict.ContainsKey(key))
+                                mappingDict[key]++;
+                            else
+                                mappingDict[key] = 1;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"문서 처리 중 오류: {ex.Message}");
+                        continue;
+                    }
+                }
+
+                // DataTable 생성
+                DataTable dataTable = new DataTable();
+                dataTable.Columns.Add("KeyValue", typeof(string));
+                dataTable.Columns.Add("TargetValue", typeof(string));
+                dataTable.Columns.Add("Count", typeof(int));
+                
+
+                // Key별 그룹화 및 순위 계산
+                var groupedByKey = mappingDict.GroupBy(kvp => kvp.Key.key);
+
+                foreach (var keyGroup in groupedByKey)
+                {                   
+                    var sortedTargets = keyGroup.OrderByDescending(kvp => kvp.Value);
+
+                    foreach (var item in sortedTargets)
+                    {
+                        DataRow row = dataTable.NewRow();
+                        row["KeyValue"] = keyGroup.Key;
+                        row["TargetValue"] = item.Key.target;
+                        row["Count"] = item.Value;                       
+                        dataTable.Rows.Add(row);
+                    }
+                }
+
+                return dataTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"단순 매핑 데이터 조회 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// BsonValue에서 실제 값 추출 (복합 타입 처리)
+        /// </summary>
+        private string ExtractValue(BsonValue bsonValue)
+        {
+            try
+            {
+                if (bsonValue.IsString)
+                    return bsonValue.AsString;
+
+                if (bsonValue.IsNumeric)
+                    return bsonValue.ToString();
+
+                // 복합 타입 (_t, _v 구조) 처리
+                if (bsonValue.IsBsonDocument)
+                {
+                    var doc = bsonValue.AsBsonDocument;
+                    if (doc.Contains("_v"))
+                    {
+                        var valueDoc = doc["_v"];
+                        if (valueDoc.IsBsonDocument && valueDoc.AsBsonDocument.Contains("$numberDecimal"))
+                        {
+                            return valueDoc.AsBsonDocument["$numberDecimal"].AsString;
+                        }
+                        else if (valueDoc.IsNumeric)
+                        {
+                            return valueDoc.ToString();
+                        }
+                        else if (valueDoc.IsString)
+                        {
+                            return valueDoc.AsString;
+                        }
+                    }
+                }
+
+                return bsonValue.ToString();
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// 매핑 결과를 DataGridView에 표시
+        /// </summary>
+        private void DisplayMappingResults()
+        {
+            try
+            {
+                dataGridView_standard.Rows.Clear();
+
+                if (_standardMappingData != null && _standardMappingData.Rows.Count > 0)
+                {
+                    foreach (DataRow row in _standardMappingData.Rows)
+                    {
+                        int rowIndex = dataGridView_standard.Rows.Add();
+                        dataGridView_standard.Rows[rowIndex].Cells["KeyValue"].Value = row["KeyValue"];
+                        dataGridView_standard.Rows[rowIndex].Cells["TargetValue"].Value = row["TargetValue"];
+                        dataGridView_standard.Rows[rowIndex].Cells["Count"].Value = row["Count"];
+                       
+                    }
+
+                    // 컬럼 폭 자동 조정
+                    dataGridView_standard.AutoResizeColumns();
+                }
+
+                Debug.WriteLine($"매핑 결과 표시 완료: {_standardMappingData?.Rows.Count ?? 0}개 항목");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"결과 표시 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 표준화 수행 (최다 빈도 값으로 통일)
+        /// </summary>
+        private async Task PerformStandardization()
+        {
+            try
+            {
+                if (_standardMappingData == null || _standardMappingData.Rows.Count == 0)
+                {
+                    MessageBox.Show("먼저 매핑 분석을 수행해주세요.", "알림",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                DialogResult result = MessageBox.Show(
+                    "표준화를 수행하면 각 Key 값별로 최다 빈도의 대상값으로 통일됩니다.\n" +
+                    "이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+                    "표준화 수행 확인",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (result != DialogResult.Yes)
+                    return;
+
+                string keyColumn = comboBox_standard_key.SelectedItem.ToString();
+                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
+
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(10, "표준화 대상 분석 중...");
+
+                    // Key별 최다 빈도 값 추출
+                    var standardValues = GetStandardValuesFromMapping();
+
+                    await progressForm.UpdateProgressHandler(30, "MongoDB 일괄 업데이트 중...");
+
+                    // MongoDB 일괄 업데이트 수행
+                    int updatedCount = await PerformBulkStandardization(keyColumn, targetColumn, standardValues);
+
+                    await progressForm.UpdateProgressHandler(70, "매핑 데이터 재분석 중...");
+
+                    // 매핑 데이터 재분석
+                    await AnalyzeKeyTargetMapping();
+
+                    await progressForm.UpdateProgressHandler(90, "페이징 데이터 새로고침 중...");
+
+                    // 페이징 데이터 새로고침
+                    await LoadMongoPagedDataAsync();
+
+                    await progressForm.UpdateProgressHandler(100, "완료");
+
+                    MessageBox.Show($"표준화 완료: {updatedCount}개 문서 업데이트", "완료",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+
+                
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"표준화 수행 오류: {ex.Message}");
+                MessageBox.Show($"표준화 중 오류 발생: {ex.Message}", "오류",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 매핑 데이터에서 Key별 표준값(최다 빈도) 추출
+        /// </summary>
+        private Dictionary<string, string> GetStandardValuesFromMapping()
+        {
+            var standardValues = new Dictionary<string, string>();
+
+            var keyGroups = _standardMappingData.AsEnumerable()
+                .GroupBy(row => row["KeyValue"].ToString());
+
+            foreach (var keyGroup in keyGroups)
+            {
+                // 각 Key별로 Count가 가장 높은 항목을 표준값으로 설정
+                var standardRow = keyGroup.OrderByDescending(row => Convert.ToInt32(row["Count"])).FirstOrDefault();
+                if (standardRow != null)
+                {
+                    standardValues[keyGroup.Key] = standardRow["TargetValue"].ToString();
+                }
+            }
+
+            return standardValues;
+        }
+
+        /// <summary>
+        /// MongoDB 일괄 표준화 수행
+        /// </summary>
+        private async Task<int> PerformBulkStandardization(string keyColumn, string targetColumn, Dictionary<string, string> standardValues)
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("raw_data");
+                int totalUpdated = 0;
+
+                // Key별로 배치 업데이트 수행
+                foreach (var kvp in standardValues)
+                {
+                    string keyValue = kvp.Key;
+                    string standardTarget = kvp.Value;
+
+                    Debug.WriteLine($"=== Key '{keyValue}' 처리 시작 ===");
+
+                    // 단순하게 문자열 매칭으로 변경
+                    var filterJson = $@"{{ 'data.{keyColumn}._v.$numberDecimal': '{keyValue}' }}";
+                    var filter = new JsonFilterDefinition<BsonDocument>(filterJson);
+
+                    // 업데이트 전 매칭되는 문서 수 확인
+                    long matchCount = await collection.CountDocumentsAsync(filter);
+                    Debug.WriteLine($"Key '{keyValue}' 매칭 문서 수: {matchCount}개");
+
+                    if (matchCount > 0)
+                    {
+                        var update = Builders<BsonDocument>.Update.Set($"data.{targetColumn}", standardTarget);
+                        var updateResult = await collection.UpdateManyAsync(filter, update);
+                        totalUpdated += (int)updateResult.ModifiedCount;
+
+                        Debug.WriteLine($"Key '{keyValue}' 표준화 완료: {updateResult.ModifiedCount}개 문서 업데이트");
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"Key '{keyValue}' 매칭되는 문서가 없습니다.");
+
+                        // 해당 키값이 실제로 존재하는지 확인
+                        await DebugSpecificKey(keyColumn, keyValue);
+                    }
+                }
+
+                return totalUpdated;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"일괄 표준화 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 특정 키값의 존재 여부를 정확히 확인하는 디버깅 함수
+        /// </summary>
+        private async Task DebugSpecificKey(string keyColumn, string keyValue)
+        {
+            try
+            {
+                // 함수 시작 부분에 추가
+                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
+
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("raw_data");
+
+                Debug.WriteLine($"=== '{keyValue}' 키값 존재 여부 확인 ===");
+
+                // 해당 키값을 가진 문서 직접 검색
+                var specificFilter = Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$numberDecimal", keyValue);
+                var specificCount = await collection.CountDocumentsAsync(specificFilter);
+
+                Debug.WriteLine($"정확한 필터로 찾은 '{keyValue}' 문서 수: {specificCount}개");
+
+                if (specificCount > 0)
+                {
+                    // 실제 문서 몇 개 조회해서 구조 확인
+                    var specificDocs = await collection.Find(specificFilter).Limit(3).ToListAsync();
+                    Debug.WriteLine($"'{keyValue}' 키값을 가진 실제 문서들:");
+                    foreach (var doc in specificDocs)
+                    {
+                        Debug.WriteLine($"  - {keyColumn}: {doc["data"][keyColumn]}");
+                        if (doc["data"].AsBsonDocument.Contains(targetColumn))
+                        {
+                            Debug.WriteLine($"  - {targetColumn}: {doc["data"][targetColumn]}");
+                        }
+                        Debug.WriteLine("  ---");
+                    }
+                }
+                else
+                {
+                    // 전체 고유 키값들 조회 (처음 20개만)
+                    var uniqueKeysPipeline = new[]
+                    {
+                           new BsonDocument("$project", new BsonDocument
+                            {
+                                ["keyValue"] = $"$data.{keyColumn}._v.$numberDecimal"
+                            }),
+                            new BsonDocument("$group", new BsonDocument
+                            {
+                                ["_id"] = "$keyValue",
+                                ["count"] = new BsonDocument("$sum", 1)
+                            }),
+                            new BsonDocument("$sort", new BsonDocument("count", -1)),
+                            new BsonDocument("$limit", 20)
+                                                };
+
+                    var uniqueKeys = await collection.Aggregate<BsonDocument>(uniqueKeysPipeline).ToListAsync();
+                    Debug.WriteLine($"실제 데이터베이스의 상위 20개 {keyColumn} 값들:");
+                    foreach (var keyDoc in uniqueKeys)
+                    {
+                        Debug.WriteLine($"  - {keyDoc["_id"]} (문서 수: {keyDoc["count"]})");
+                    }
+                }
+
+                Debug.WriteLine("=== 키값 확인 완료 ===");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"특정 키값 디버깅 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// MongoDB에서 특정 Target 값 일괄 변경
+        /// </summary>
+        private async Task UpdateTargetValueInMongoDB(string keyValue, string oldTargetValue, string newTargetValue)
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("raw_data");
+                string keyColumn = comboBox_standard_key.SelectedItem.ToString();
+                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
+
+                // 해당 Key와 기존 Target 값을 가진 문서들 찾기
+                var filter = Builders<BsonDocument>.Filter.And(
+                            Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$numberDecimal", keyValue),
+                            Builders<BsonDocument>.Filter.Eq($"data.{targetColumn}", oldTargetValue)
+                        );
+
+                var update = Builders<BsonDocument>.Update.Set($"data.{targetColumn}", newTargetValue);
+
+                var result = await collection.UpdateManyAsync(filter, update);
+
+                Debug.WriteLine($"Target 값 변경 완료: {result.ModifiedCount}개 문서 업데이트 ({oldTargetValue} → {newTargetValue})");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Target 값 변경 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 표준화 선택 유효성 검사
+        /// </summary>
+        private bool ValidateStandardizationSelection()
+        {
+            if (comboBox_standard_key.SelectedIndex <= 0)
+            {
+                MessageBox.Show("Key 컬럼을 선택해주세요.", "알림",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (comboBox_standard_target.SelectedIndex <= 0)
+            {
+                MessageBox.Show("대상 컬럼을 선택해주세요.", "알림",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            if (comboBox_standard_key.SelectedItem.ToString() == comboBox_standard_target.SelectedItem.ToString())
+            {
+                MessageBox.Show("Key 컬럼과 대상 컬럼은 다르게 선택해주세요.", "알림",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+
     }
 
     
