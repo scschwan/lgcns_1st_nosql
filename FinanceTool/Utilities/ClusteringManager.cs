@@ -78,6 +78,47 @@ public class ClusterDataManager
     }
 
     /// <summary>
+    /// 정확한 값 검색 - 클러스터 ID 반환으로 수정
+    /// </summary>
+    public List<int> SearchExactClusterIds(string columnName, string keyword)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(keyword) || !_columnIndexes.ContainsKey(columnName))
+            {
+                return new List<int>();
+            }
+
+            var columnIndex = _columnIndexes[columnName];
+            var clusterIds = new HashSet<int>();
+
+            // 영어 검색인지 확인
+            bool isEnglishSearch = IsEnglishText(keyword);
+
+            // 매칭되는 키워드들 찾기
+            var matchingKeys = FindExactMatches(columnIndex, keyword, isEnglishSearch);
+
+            // 각 매칭 키워드의 클러스터 ID들 수집
+            foreach (string matchingKey in matchingKeys)
+            {
+                if (columnIndex.TryGetValue(matchingKey, out HashSet<int> ids))
+                {
+                    clusterIds.UnionWith(ids);
+                }
+            }
+
+            return clusterIds.ToList();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"SearchExactClusterIds 오류: {ex.Message}");
+            return new List<int>();
+        }
+    }
+
+
+
+    /// <summary>
     /// 부분 문자열 검색 (DataHandler.FindMachKeyword 대체)
     /// </summary>
     public List<string> SearchContainsValues(string columnName, string keyword)
@@ -153,6 +194,30 @@ public class ClusterDataManager
             return new List<string>();
         }
     }
+
+    /// <summary>
+    /// 키워드 목록으로 클러스터 ID 조회
+    /// </summary>
+    public List<int> GetClusterIdsByKeywords(string columnName, List<string> keywords)
+    {
+        var clusterIds = new HashSet<int>();
+
+        if (!_columnIndexes.ContainsKey(columnName))
+            return new List<int>();
+
+        var columnIndex = _columnIndexes[columnName];
+
+        foreach (string keyword in keywords)
+        {
+            if (columnIndex.TryGetValue(keyword, out HashSet<int> ids))
+            {
+                clusterIds.UnionWith(ids);
+            }
+        }
+
+        return clusterIds.ToList();
+    }
+
 
     /// <summary>
     /// 영어 텍스트인지 확인
@@ -437,13 +502,13 @@ public class ClusterDataManager
     }
 
 
-/// <summary>
-/// 모든 클러스터 ID 조회
-/// </summary>
-public HashSet<int> GetAllClusterIds()
-    {
-        return new HashSet<int>(_clusterRowIndex.Keys);
-    }
+    /// <summary>
+    /// 모든 클러스터 ID 조회
+    /// </summary>
+    public HashSet<int> GetAllClusterIds()
+        {
+            return new HashSet<int>(_clusterRowIndex.Keys);
+        }
 
     /// <summary>
     /// 클러스터 ID로 DataRow 조회
@@ -1221,6 +1286,12 @@ public class SearchResult
     public string Error { get; set; }
 }
 
+// 새로운 클래스 추가 (uc_Clustering.cs 내부)
+public class ParsedKeywords
+{
+    public List<string> AndKeywords { get; set; } = new List<string>();
+    public List<string> OrKeywords { get; set; } = new List<string>();
+}
 // =====================================
 // 통합 관리자 (Facade 패턴)
 // =====================================
@@ -1420,6 +1491,18 @@ public class ClusteringManager
     }
 
     /// <summary>
+    /// 정확한 값 검색 - 클러스터 ID 반환
+    /// </summary>
+    public List<int> SearchExactClusterIds(string columnName, string keyword)
+    {
+        var matchingKeywords = _dataManager.SearchExactValues(columnName, keyword);
+        return _dataManager.GetClusterIdsByKeywords(columnName, matchingKeywords);
+    }
+
+
+
+    
+    /// <summary>
     /// 부분 문자열 검색 (DataHandler.FindMachKeyword 대체)
     /// </summary>
     public List<string> SearchContains(string columnName, string keyword)
@@ -1427,7 +1510,125 @@ public class ClusteringManager
         return _dataManager.SearchContainsValues(columnName, keyword);
     }
 
-   
+    /// <summary>
+    /// 부분 문자열 검색 - 클러스터 ID 반환
+    /// </summary>
+    public List<int> SearchContainsClusterIds(string columnName, string keyword)
+    {
+        var matchingKeywords = _dataManager.SearchContainsValues(columnName, keyword);
+        return _dataManager.GetClusterIdsByKeywords(columnName, matchingKeywords);
+    }
+
+
+
+
+
+
+    // ClusteringManager 클래스에 추가할 메서드
+    public List<int> SearchWithComplexConditions(string columnName, ParsedKeywords parsedKeywords, bool exactMatch)
+    {
+        // AND 조건만 있는 경우
+        if (parsedKeywords.AndKeywords.Count > 0 && parsedKeywords.OrKeywords.Count == 0)
+        {
+            return ProcessAndConditions(columnName, parsedKeywords.AndKeywords, exactMatch);
+        }
+
+        // OR 조건만 있는 경우  
+        if (parsedKeywords.AndKeywords.Count == 0 && parsedKeywords.OrKeywords.Count > 0)
+        {
+            return ProcessOrConditions(columnName, parsedKeywords.OrKeywords, exactMatch);
+        }
+
+        // AND + OR 조건이 모두 있는 경우 (A,B|C = A AND (B OR C))
+        if (parsedKeywords.AndKeywords.Count > 0 && parsedKeywords.OrKeywords.Count > 0)
+        {
+            var andResults = ProcessAndConditions(columnName, parsedKeywords.AndKeywords, exactMatch);
+            var orResults = ProcessOrConditions(columnName, parsedKeywords.OrKeywords, exactMatch);
+
+            // AND 결과와 OR 결과의 교집합
+            return andResults.Intersect(orResults).ToList();
+        }
+
+        return new List<int>();
+    }
+
+    private List<int> ProcessAndConditions(string columnName, List<string> andKeywords, bool exactMatch)
+    {
+        var result = new HashSet<int>();
+        bool firstKeyword = true;
+
+        foreach (string keyword in andKeywords)
+        {
+            //List<string> currentResults;
+            List<int> currentResults; // ← int로 변경
+            if (exactMatch)
+            {
+                //currentResults = SearchExact(columnName, keyword);
+                currentResults = SearchExactClusterIds(columnName, keyword);
+            }
+            else
+            {
+                //currentResults = SearchContains(columnName, keyword);
+                currentResults = SearchContainsClusterIds(columnName, keyword);
+            }
+        
+
+            Debug.WriteLine($"AND 키워드 '{keyword}' 검색 결과: {currentResults.Count}건");
+
+            if (firstKeyword)
+            {
+                //result = new HashSet<string>(currentResults);
+                result = new HashSet<int>(currentResults);
+                firstKeyword = false;
+            }
+            else
+            {
+                // 교집합 처리
+                result.IntersectWith(currentResults);
+            }
+
+            Debug.WriteLine($"AND 누적 결과: {result.Count}건");
+        }
+
+        return result.ToList();
+    }
+
+    private List<int> ProcessOrConditions(string columnName, List<string> orKeywords, bool exactMatch)
+    {
+        var result = new HashSet<int>();
+
+        foreach (string keyword in orKeywords)
+        {
+            //List<string> currentResults;
+            List<int> currentResults; // ← int로 변경
+            if (exactMatch)
+            {
+                //currentResults = SearchExact(columnName, keyword);
+                currentResults = SearchExactClusterIds(columnName, keyword);
+            }
+            else
+            {
+                //currentResults = SearchContains(columnName, keyword);
+                currentResults = SearchContainsClusterIds(columnName, keyword);
+            }
+
+            Debug.WriteLine($"OR 키워드 '{keyword}' 검색 결과: {currentResults.Count}건");
+
+            // 합집합 처리
+            result.UnionWith(currentResults);
+
+            Debug.WriteLine($"OR 누적 결과: {result.Count}건");
+        }
+
+        return result.ToList();
+    }
+
+    public DataRow GetClusterRow(int clusterId)
+    {
+        return _dataManager.GetClusterRow(clusterId);
+    }
+
+
 
 
     /// <summary>

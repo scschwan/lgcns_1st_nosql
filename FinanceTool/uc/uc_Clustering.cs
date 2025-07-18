@@ -1204,11 +1204,23 @@ namespace FinanceTool
                     return;
                 }
 
+                // 키워드 파싱
+                var parsedKeywords = ParseComplexKeywords(target_keyword);
+                Debug.WriteLine($"파싱 결과 - AND: [{string.Join(", ", parsedKeywords.AndKeywords)}], OR: [{string.Join(", ", parsedKeywords.OrKeywords)}]");
+
+                // 파싱된 키워드가 없으면 전체 검색
+                if (parsedKeywords.AndKeywords.Count == 0 && parsedKeywords.OrKeywords.Count == 0)
+                {
+                    await PerformSearchWithCriteria(new Dictionary<string, SearchColumnCriteria>(), isAlreadyProgress);
+                    return;
+                }
+
 
                 // *** 핵심 변경: 기존 DataHandler 함수 대신 ClusteringManager 사용 ***
                 string searchColumn = GetSelectedSearchColumn();
                 List<string> matchingKeywords;
 
+                /*
                 if (equalsSearchYN)
                 {
                     // 완전일치 검색 - ClusteringManager 사용
@@ -1221,25 +1233,53 @@ namespace FinanceTool
                     matchingKeywords = _clusteringManager.SearchContains(searchColumn, target_keyword);
                     Debug.WriteLine($"부분일치 검색 결과: {matchingKeywords.Count}개 키워드");
                 }
-
-                // AND/OR 검색 조건 파싱
+                 // AND/OR 검색 조건 파싱
                 bool useAndSearch = andSearchYN;
 
                 Debug.WriteLine($"검색 실행 - 컬럼: {searchColumn}, 키워드: {target_keyword}, 완전일치: {equalsSearchYN}, AND: {useAndSearch}");
+
+                */
+
+                // 복합 조건 검색 수행
+                //matchingKeywords = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+                // 복합 조건 검색 수행
+                var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+
+                Debug.WriteLine($"복합 조건 검색 결과: {matchingClusterIds.Count}개 클러스터");
+
+                // 클러스터 ID를 통해 키워드 목록 재구성 (기존 로직 호환을 위해)
+                //matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn);
+                // 클러스터 ID를 통해 원래 검색 키워드와 매칭되는 키워드만 재구성
+                matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn, parsedKeywords, equalsSearchYN);
+
+                Debug.WriteLine($"복합 조건 검색 결과: {matchingKeywords.Count}개 키워드");
+                Debug.WriteLine($"매칭된 키워드 목록: [{string.Join(", ", matchingKeywords)}]");
+
 
                 // 다중 컬럼 검색 조건 구성
                 var columnCriteria = new Dictionary<string, SearchColumnCriteria>();
 
                 if (matchingKeywords.Count > 0)
                 {
+                    /*
                     columnCriteria[searchColumn] = new SearchColumnCriteria
                     {
                         Keywords = matchingKeywords,
                         ExactMatch = true, // 이미 매칭된 키워드들이므로 정확 매칭
-                        UseAnd = useAndSearch
+                        //UseAnd = useAndSearch
+                        UseAnd = false
                     };
 
                     await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+                    */
+                    // PerformSearchWithCriteria 우회하고 직접 결과 표시
+                    await _clusteringManager.DisplaySpecificClustersAsync(matchingClusterIds);
+
+                    // 선택 상태 초기화
+                    merge_all_check.Checked = false;
+                    change_row_count();
+
+                    Debug.WriteLine($"복합 조건 검색 완료: {matchingClusterIds.Count}개 클러스터 표시");
                 } 
                 else
                 {
@@ -1278,6 +1318,23 @@ namespace FinanceTool
                         progressForm.Close();
                         return;
                     }
+                    // 키워드 파싱
+                    var parsedKeywords = ParseComplexKeywords(target_keyword);
+                    Debug.WriteLine($"파싱 결과 - AND: [{string.Join(", ", parsedKeywords.AndKeywords)}], OR: [{string.Join(", ", parsedKeywords.OrKeywords)}]");
+
+                    // 파싱된 키워드가 없으면 전체 검색
+                    if (parsedKeywords.AndKeywords.Count == 0 && parsedKeywords.OrKeywords.Count == 0)
+                    {
+                        await progressForm.UpdateProgressHandler(40, "전체 데이터 검색 중...");
+                        await Task.Delay(10);
+
+                        await PerformSearchWithCriteria(new Dictionary<string, SearchColumnCriteria>(), isAlreadyProgress);
+
+                        await progressForm.UpdateProgressHandler(100, "전체 데이터 검색 완료");
+                        await Task.Delay(10);
+                        progressForm.Close();
+                        return;
+                    }
 
                     // *** 핵심 변경: 기존 DataHandler 함수 대신 ClusteringManager 사용 ***
                     string searchColumn = GetSelectedSearchColumn();
@@ -1285,7 +1342,7 @@ namespace FinanceTool
 
                     await progressForm.UpdateProgressHandler(20, $"'{searchColumn}' 컬럼에서 검색 중...");
                     await Task.Delay(10);
-
+                    /*
                     if (equalsSearchYN)
                     {
                         // 완전일치 검색 - ClusteringManager 사용
@@ -1303,23 +1360,49 @@ namespace FinanceTool
                     bool useAndSearch = andSearchYN;
 
                     Debug.WriteLine($"검색 실행 - 컬럼: {searchColumn}, 키워드: {target_keyword}, 완전일치: {equalsSearchYN}, AND: {useAndSearch}");
+                    */
 
+                    // 복합 조건 검색 수행
+                    //matchingKeywords = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+                    // 복합 조건 검색 수행
+                    var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+
+                    Debug.WriteLine($"복합 조건 검색 결과: {matchingClusterIds.Count}개 클러스터");
+
+                    // 클러스터 ID를 통해 키워드 목록 재구성 (기존 로직 호환을 위해)
+                    //matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn);
+                    // 클러스터 ID를 통해 원래 검색 키워드와 매칭되는 키워드만 재구성
+                    matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn, parsedKeywords, equalsSearchYN);
+
+                    Debug.WriteLine($"복합 조건 검색 결과: {matchingKeywords.Count}개 키워드");
+                    Debug.WriteLine($"매칭된 키워드 목록: [{string.Join(", ", matchingKeywords)}]");
                     // 다중 컬럼 검색 조건 구성
                     var columnCriteria = new Dictionary<string, SearchColumnCriteria>();
 
                     if (matchingKeywords.Count > 0)
                     {
+                        /*
                         columnCriteria[searchColumn] = new SearchColumnCriteria
                         {
                             Keywords = matchingKeywords,
                             ExactMatch = true, // 이미 매칭된 키워드들이므로 정확 매칭
-                            UseAnd = useAndSearch
+                            //UseAnd = useAndSearch
+                            UseAnd = false
                         };
+                        */
 
                         await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
                         await Task.Delay(10);
 
-                        await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+                        //await PerformSearchWithCriteria(columnCriteria, isAlreadyProgress);
+
+                        await _clusteringManager.DisplaySpecificClustersAsync(matchingClusterIds);
+
+                        // 선택 상태 초기화
+                        merge_all_check.Checked = false;
+                        change_row_count();
+
+                        Debug.WriteLine($"복합 조건 검색 완료: {matchingClusterIds.Count}개 클러스터 표시");
                     }
                     else
                     {
@@ -1339,6 +1422,73 @@ namespace FinanceTool
                 }
             }
 
+        }
+
+
+        /// <summary>
+        /// 클러스터 ID들로부터 원래 검색 키워드와 매칭되는 키워드만 추출
+        /// </summary>
+        private List<string> GetKeywordsByClusterIds(List<int> clusterIds, string columnName, ParsedKeywords originalKeywords, bool exactMatch)
+        {
+            var keywords = new HashSet<string>();
+
+            // 원래 검색한 모든 키워드 목록
+            var originalSearchKeywords = new HashSet<string>();
+            originalSearchKeywords.UnionWith(originalKeywords.AndKeywords);
+            originalSearchKeywords.UnionWith(originalKeywords.OrKeywords);
+
+            foreach (int clusterId in clusterIds)
+            {
+                var row = _clusteringManager.GetClusterRow(clusterId);
+                if (row != null && row.Table.Columns.Contains(columnName))
+                {
+                    string columnValue = row[columnName]?.ToString();
+                    if (!string.IsNullOrEmpty(columnValue))
+                    {
+                        // 컬럼 값을 분리하여 처리
+                        IEnumerable<string> values;
+                        if (columnName == "키워드목록" || columnName == DataHandler.prod_col_name)
+                        {
+                            values = columnValue.Split(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v));
+                        }
+                        else
+                        {
+                            values = new[] { columnValue.Trim() };
+                        }
+
+                        // 원래 검색 키워드와 매칭되는 것만 추가
+                        foreach (string value in values)
+                        {
+                            foreach (string originalKeyword in originalSearchKeywords)
+                            {
+                                bool isMatch = false;
+
+                                if (exactMatch)
+                                {
+                                    // 완전 일치 검색
+                                    isMatch = string.Equals(value, originalKeyword, StringComparison.OrdinalIgnoreCase);
+                                }
+                                else
+                                {
+                                    // 부분 포함 검색
+                                    isMatch = value.Contains(originalKeyword, StringComparison.OrdinalIgnoreCase);
+                                }
+
+                                if (isMatch)
+                                {
+                                    keywords.Add(value);
+                                    break; // 하나라도 매칭되면 추가하고 다음 value로
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Debug.WriteLine($"클러스터 ID {clusterIds.Count}개 → 매칭 키워드 {keywords.Count}개 추출");
+            Debug.WriteLine($"추출된 키워드: [{string.Join(", ", keywords.Take(10))}]");
+
+            return keywords.ToList();
         }
 
         /// <summary>
@@ -4090,11 +4240,54 @@ namespace FinanceTool
         }
 
         /////////////////////////////검색 헬퍼 메서드///////////////////////////////////
-       
 
        
+        // 키워드 파싱 메서드 추가
+        private ParsedKeywords ParseComplexKeywords(string searchText)
+        {
+            var result = new ParsedKeywords();
 
-       
+            if (string.IsNullOrEmpty(searchText))
+                return result;
+
+            // | 기준으로 먼저 분리
+            string[] orParts = searchText.Split('|');
+
+            if (orParts.Length == 1)
+            {
+                // | 없음: A,B → AND 조건
+                result.AndKeywords = searchText.Split(',')
+                    .Select(k => k.Trim())
+                    .Where(k => !string.IsNullOrEmpty(k))
+                    .ToList();
+            }
+            else
+            {
+                // | 있음: A,B|C,D → A AND (B OR C OR D)
+                // 첫 번째 부분에서 마지막 키워드 제외하고 AND
+                var firstPart = orParts[0].Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)).ToList();
+                if (firstPart.Count > 1)
+                {
+                    result.AndKeywords.AddRange(firstPart.Take(firstPart.Count - 1));
+                    result.OrKeywords.Add(firstPart.Last());
+                }
+                else
+                {
+                    result.OrKeywords.AddRange(firstPart);
+                }
+
+                // 나머지 부분들은 모두 OR
+                for (int i = 1; i < orParts.Length; i++)
+                {
+                    var keywords = orParts[i].Split(',')
+                        .Select(k => k.Trim())
+                        .Where(k => !string.IsNullOrEmpty(k));
+                    result.OrKeywords.AddRange(keywords);
+                }
+            }
+
+            return result;
+        }
 
     }
 }
