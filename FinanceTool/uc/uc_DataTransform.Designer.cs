@@ -160,7 +160,7 @@
             // 
             label10.Anchor = AnchorStyles.None;
             label10.BackColor = Color.SteelBlue;
-            label10.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label10.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label10.ForeColor = Color.White;
             label10.Location = new Point(383, 0);
             label10.Name = "label10";
@@ -215,7 +215,7 @@
             // 
             btn_nextPage.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_nextPage.AutoSize = true;
-            btn_nextPage.Font = new Font("맑은 고딕", 14.25F);
+            btn_nextPage.Font = new Font("Pretendard", 14.25F);
             btn_nextPage.Location = new Point(1014, 8);
             btn_nextPage.Name = "btn_nextPage";
             btn_nextPage.Size = new Size(86, 35);
@@ -226,7 +226,7 @@
             // btn_prevPage
             // 
             btn_prevPage.AutoSize = true;
-            btn_prevPage.Font = new Font("맑은 고딕", 14.25F);
+            btn_prevPage.Font = new Font("Pretendard", 14.25F);
             btn_prevPage.Location = new Point(450, 7);
             btn_prevPage.Name = "btn_prevPage";
             btn_prevPage.Size = new Size(86, 35);
@@ -236,48 +236,48 @@
             // 
             // cmb_pageSize
             // 
-            cmb_pageSize.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            cmb_pageSize.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             cmb_pageSize.FormattingEnabled = true;
             cmb_pageSize.Location = new Point(135, 10);
             cmb_pageSize.Name = "cmb_pageSize";
-            cmb_pageSize.Size = new Size(121, 33);
+            cmb_pageSize.Size = new Size(121, 31);
             cmb_pageSize.TabIndex = 58;
             // 
             // lbl_pageSizeText
             // 
             lbl_pageSizeText.AutoSize = true;
-            lbl_pageSizeText.Font = new Font("맑은 고딕", 14F);
+            lbl_pageSizeText.Font = new Font("Pretendard", 14F);
             lbl_pageSizeText.Location = new Point(4, 13);
             lbl_pageSizeText.Name = "lbl_pageSizeText";
-            lbl_pageSizeText.Size = new Size(125, 25);
+            lbl_pageSizeText.Size = new Size(105, 23);
             lbl_pageSizeText.TabIndex = 57;
             lbl_pageSizeText.Text = "페이지 크기 :";
             // 
             // lbl_pagination
             // 
             lbl_pagination.AutoSize = true;
-            lbl_pagination.Font = new Font("맑은 고딕", 14F);
+            lbl_pagination.Font = new Font("Pretendard", 14F);
             lbl_pagination.Location = new Point(542, 12);
             lbl_pagination.Name = "lbl_pagination";
-            lbl_pagination.Size = new Size(80, 25);
+            lbl_pagination.Size = new Size(68, 23);
             lbl_pagination.TabIndex = 54;
             lbl_pagination.Text = "페이지 :";
             // 
             // num_pageNumber
             // 
-            num_pageNumber.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            num_pageNumber.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             num_pageNumber.Location = new Point(635, 10);
             num_pageNumber.Name = "num_pageNumber";
-            num_pageNumber.Size = new Size(52, 33);
+            num_pageNumber.Size = new Size(52, 30);
             num_pageNumber.TabIndex = 56;
             // 
             // lbl_pagination2
             // 
             lbl_pagination2.AutoSize = true;
-            lbl_pagination2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            lbl_pagination2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             lbl_pagination2.Location = new Point(693, 13);
             lbl_pagination2.Name = "lbl_pagination2";
-            lbl_pagination2.Size = new Size(118, 25);
+            lbl_pagination2.Size = new Size(102, 23);
             lbl_pagination2.TabIndex = 55;
             lbl_pagination2.Text = "/ 0 (총 0 행)";
             // 
@@ -294,7 +294,7 @@
             // 
             label1.Anchor = AnchorStyles.None;
             label1.BackColor = Color.SteelBlue;
-            label1.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label1.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label1.ForeColor = Color.White;
             label1.Location = new Point(383, 4);
             label1.Name = "label1";
@@ -349,7 +349,7 @@
             // 
             btn_nextPage2.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_nextPage2.AutoSize = true;
-            btn_nextPage2.Font = new Font("맑은 고딕", 14.25F);
+            btn_nextPage2.Font = new Font("Pretendard", 14.25F);
             btn_nextPage2.Location = new Point(1014, 8);
             btn_nextPage2.Name = "btn_nextPage2";
             btn_nextPage2.Size = new Size(86, 35);
@@ -360,7 +360,7 @@
             // btn_prevPage2
             // 
             btn_prevPage2.AutoSize = true;
-            btn_prevPage2.Font = new Font("맑은 고딕", 14.25F);
+            btn_prevPage2.Font = new Font("Pretendard", 14.25F);
             btn_prevPage2.Location = new Point(450, 7);
             btn_prevPage2.Name = "btn_prevPage2";
             btn_prevPage2.Size = new Size(86, 35);
@@ -370,48 +370,48 @@
             // 
             // cmb_pageSize2
             // 
-            cmb_pageSize2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            cmb_pageSize2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             cmb_pageSize2.FormattingEnabled = true;
             cmb_pageSize2.Location = new Point(135, 10);
             cmb_pageSize2.Name = "cmb_pageSize2";
-            cmb_pageSize2.Size = new Size(121, 33);
+            cmb_pageSize2.Size = new Size(121, 31);
             cmb_pageSize2.TabIndex = 65;
             // 
             // label6
             // 
             label6.AutoSize = true;
-            label6.Font = new Font("맑은 고딕", 14F);
+            label6.Font = new Font("Pretendard", 14F);
             label6.Location = new Point(4, 13);
             label6.Name = "label6";
-            label6.Size = new Size(125, 25);
+            label6.Size = new Size(105, 23);
             label6.TabIndex = 64;
             label6.Text = "페이지 크기 :";
             // 
             // lbl_pagination3
             // 
             lbl_pagination3.AutoSize = true;
-            lbl_pagination3.Font = new Font("맑은 고딕", 14F);
+            lbl_pagination3.Font = new Font("Pretendard", 14F);
             lbl_pagination3.Location = new Point(542, 12);
             lbl_pagination3.Name = "lbl_pagination3";
-            lbl_pagination3.Size = new Size(80, 25);
+            lbl_pagination3.Size = new Size(68, 23);
             lbl_pagination3.TabIndex = 61;
             lbl_pagination3.Text = "페이지 :";
             // 
             // num_pageNumber2
             // 
-            num_pageNumber2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            num_pageNumber2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             num_pageNumber2.Location = new Point(635, 10);
             num_pageNumber2.Name = "num_pageNumber2";
-            num_pageNumber2.Size = new Size(52, 33);
+            num_pageNumber2.Size = new Size(52, 30);
             num_pageNumber2.TabIndex = 63;
             // 
             // lbl_pagination4
             // 
             lbl_pagination4.AutoSize = true;
-            lbl_pagination4.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            lbl_pagination4.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             lbl_pagination4.Location = new Point(693, 13);
             lbl_pagination4.Name = "lbl_pagination4";
-            lbl_pagination4.Size = new Size(118, 25);
+            lbl_pagination4.Size = new Size(102, 23);
             lbl_pagination4.TabIndex = 62;
             lbl_pagination4.Text = "/ 0 (총 0 행)";
             // 
@@ -448,7 +448,7 @@
             groupBox1.Controls.Add(label5);
             groupBox1.Controls.Add(decimal_combo);
             groupBox1.Dock = DockStyle.Fill;
-            groupBox1.Font = new Font("맑은 고딕", 15.75F);
+            groupBox1.Font = new Font("Pretendard", 15.75F);
             groupBox1.Location = new Point(5, 5);
             groupBox1.Margin = new Padding(5);
             groupBox1.Name = "groupBox1";
@@ -467,7 +467,7 @@
             sum_keyword_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle1.BackColor = SystemColors.Window;
-            dataGridViewCellStyle1.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle1.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             dataGridViewCellStyle1.ForeColor = SystemColors.ControlText;
             dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
@@ -486,21 +486,21 @@
             // label5
             // 
             label5.AutoSize = true;
-            label5.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            label5.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             label5.Location = new Point(10, 40);
             label5.Name = "label5";
-            label5.Size = new Size(50, 25);
+            label5.Size = new Size(42, 23);
             label5.TabIndex = 35;
             label5.Text = "단위";
             // 
             // decimal_combo
             // 
-            decimal_combo.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            decimal_combo.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             decimal_combo.FormattingEnabled = true;
             decimal_combo.Items.AddRange(new object[] { "원", "천원", "백만원", "억원" });
             decimal_combo.Location = new Point(70, 37);
             decimal_combo.Name = "decimal_combo";
-            decimal_combo.Size = new Size(100, 33);
+            decimal_combo.Size = new Size(100, 31);
             decimal_combo.TabIndex = 24;
             // 
             // groupbox2
@@ -513,7 +513,7 @@
             groupbox2.Controls.Add(keyword_search_button);
             groupbox2.Controls.Add(match_keyword_table);
             groupbox2.Dock = DockStyle.Fill;
-            groupbox2.Font = new Font("맑은 고딕", 15.75F);
+            groupbox2.Font = new Font("Pretendard", 15.75F);
             groupbox2.Location = new Point(5, 430);
             groupbox2.Margin = new Padding(5);
             groupbox2.Name = "groupbox2";
@@ -525,42 +525,40 @@
             // modified_keyword
             // 
             modified_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            modified_keyword.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            modified_keyword.Location = new Point(350, 34);
+            modified_keyword.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            modified_keyword.Location = new Point(354, 75);
             modified_keyword.Name = "modified_keyword";
-            modified_keyword.PlaceholderText = "키워드 입력 가능";
-            modified_keyword.Size = new Size(280, 33);
+            modified_keyword.PlaceholderText = "변환 키워드 입력";
+            modified_keyword.Size = new Size(280, 30);
             modified_keyword.TabIndex = 34;
             // 
             // label4
             // 
             label4.AutoSize = true;
-            label4.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            label4.Location = new Point(150, 81);
+            label4.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            label4.Location = new Point(185, 81);
             label4.Name = "label4";
-            label4.Size = new Size(178, 25);
+            label4.Size = new Size(148, 23);
             label4.TabIndex = 30;
             label4.Text = "다음 키워드로 변경";
             // 
             // search_keyword
             // 
-            search_keyword.Enabled = false;
-            search_keyword.Font = new Font("맑은 고딕", 14.25F);
-            search_keyword.Location = new Point(350, 73);
+            search_keyword.Font = new Font("Pretendard", 14.25F);
+            search_keyword.Location = new Point(354, 34);
             search_keyword.Name = "search_keyword";
-            search_keyword.PlaceholderText = "키워드 입력";
-            search_keyword.Size = new Size(280, 33);
+            search_keyword.PlaceholderText = "검색 키워드 입력";
+            search_keyword.Size = new Size(280, 30);
             search_keyword.TabIndex = 30;
-            search_keyword.Visible = false;
             search_keyword.KeyDown += search_keyword_KeyDown;
             // 
             // check_all_keyword_list
             // 
             check_all_keyword_list.AutoSize = true;
-            check_all_keyword_list.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            check_all_keyword_list.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             check_all_keyword_list.Location = new Point(10, 81);
             check_all_keyword_list.Name = "check_all_keyword_list";
-            check_all_keyword_list.Size = new Size(114, 29);
+            check_all_keyword_list.Size = new Size(98, 27);
             check_all_keyword_list.TabIndex = 29;
             check_all_keyword_list.Text = "전체 선택";
             check_all_keyword_list.UseVisualStyleBackColor = true;
@@ -572,7 +570,7 @@
             change_keyword.AutoSize = true;
             change_keyword.BackColor = Color.Orange;
             change_keyword.FlatStyle = FlatStyle.Flat;
-            change_keyword.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            change_keyword.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             change_keyword.ForeColor = Color.White;
             change_keyword.Location = new Point(650, 74);
             change_keyword.Name = "change_keyword";
@@ -588,7 +586,7 @@
             keyword_search_button.AutoSize = true;
             keyword_search_button.BackColor = Color.DodgerBlue;
             keyword_search_button.FlatStyle = FlatStyle.Flat;
-            keyword_search_button.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            keyword_search_button.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             keyword_search_button.ForeColor = Color.White;
             keyword_search_button.Location = new Point(650, 33);
             keyword_search_button.Name = "keyword_search_button";
@@ -608,7 +606,7 @@
             match_keyword_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle2.BackColor = SystemColors.Window;
-            dataGridViewCellStyle2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             dataGridViewCellStyle2.ForeColor = SystemColors.ControlText;
             dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
@@ -632,7 +630,7 @@
             groupBox3.Controls.Add(button2);
             groupBox3.Controls.Add(dept_col_check);
             groupBox3.Dock = DockStyle.Fill;
-            groupBox3.Font = new Font("맑은 고딕", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            groupBox3.Font = new Font("Pretendard", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
             groupBox3.Location = new Point(5, 901);
             groupBox3.Margin = new Padding(5);
             groupBox3.Name = "groupBox3";
@@ -646,10 +644,10 @@
             prod_col_check.AutoSize = true;
             prod_col_check.Checked = true;
             prod_col_check.CheckState = CheckState.Checked;
-            prod_col_check.Font = new Font("맑은 고딕", 14.25F);
+            prod_col_check.Font = new Font("Pretendard", 14.25F);
             prod_col_check.Location = new Point(240, 35);
             prod_col_check.Name = "prod_col_check";
-            prod_col_check.Size = new Size(107, 29);
+            prod_col_check.Size = new Size(93, 27);
             prod_col_check.TabIndex = 29;
             prod_col_check.Text = "공급업체";
             prod_col_check.UseVisualStyleBackColor = true;
@@ -661,7 +659,7 @@
             button5.AutoSize = true;
             button5.BackColor = Color.LimeGreen;
             button5.FlatStyle = FlatStyle.Flat;
-            button5.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button5.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             button5.ForeColor = Color.White;
             button5.Location = new Point(600, 30);
             button5.Name = "button5";
@@ -674,10 +672,10 @@
             // label3
             // 
             label3.AutoSize = true;
-            label3.Font = new Font("맑은 고딕", 14.25F);
+            label3.Font = new Font("Pretendard", 14.25F);
             label3.Location = new Point(10, 37);
             label3.Name = "label3";
-            label3.Size = new Size(95, 25);
+            label3.Size = new Size(79, 23);
             label3.TabIndex = 26;
             label3.Text = "필수 포함";
             // 
@@ -686,7 +684,7 @@
             button2.AutoSize = true;
             button2.BackColor = Color.Magenta;
             button2.FlatStyle = FlatStyle.Flat;
-            button2.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button2.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             button2.ForeColor = Color.White;
             button2.Location = new Point(450, 30);
             button2.Name = "button2";
@@ -701,10 +699,10 @@
             dept_col_check.AutoSize = true;
             dept_col_check.Checked = true;
             dept_col_check.CheckState = CheckState.Checked;
-            dept_col_check.Font = new Font("맑은 고딕", 14.25F);
+            dept_col_check.Font = new Font("Pretendard", 14.25F);
             dept_col_check.Location = new Point(115, 35);
             dept_col_check.Name = "dept_col_check";
-            dept_col_check.Size = new Size(126, 29);
+            dept_col_check.Size = new Size(109, 27);
             dept_col_check.TabIndex = 28;
             dept_col_check.Text = "코스트센터";
             dept_col_check.UseVisualStyleBackColor = true;

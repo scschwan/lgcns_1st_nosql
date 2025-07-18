@@ -542,7 +542,7 @@ namespace FinanceTool
 
             targetDgv.Columns["Data"].ReadOnly = true;
             targetDgv.Columns["CheckBox"].ReadOnly = false;
-            targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            targetDgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
             // 컬럼 추가
             foreach (DataColumn column in columns)
@@ -711,10 +711,10 @@ namespace FinanceTool
                 dgv.EnableHeadersVisualStyles = false;
                 dgv.ColumnHeadersDefaultCellStyle.BackColor = System.Drawing.Color.LightSteelBlue;
                 dgv.ColumnHeadersDefaultCellStyle.ForeColor = System.Drawing.Color.Black;
-                dgv.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("맑은 고딕", 9.0f, FontStyle.Bold);
+                dgv.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("Pretendard", 9.0f, FontStyle.Bold);
 
                 // 셀 폰트 설정
-                dgv.DefaultCellStyle.Font = new System.Drawing.Font("맑은 고딕", 9.0f);
+                dgv.DefaultCellStyle.Font = new System.Drawing.Font("Pretendard", 9.0f);
             }
         }
 
@@ -1117,7 +1117,7 @@ namespace FinanceTool
                 dataGridView_delete_data.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 dataGridView_delete_data.ReadOnly = false;
                 dataGridView_delete_data.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-                dataGridView_delete_data.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_delete_data.Font = new System.Drawing.Font("Pretendard", 14.25F);
             }
             catch (Exception ex)
             {
@@ -1524,7 +1524,7 @@ namespace FinanceTool
             dataGridView_delete_data.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dataGridView_delete_data.ReadOnly = false;
             dataGridView_delete_data.Columns["CheckBox"].ReadOnly = false;
-            dataGridView_delete_data.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            dataGridView_delete_data.Font = new System.Drawing.Font("Pretendard", 14.25F);
         }
 
         // 필터링된 결과로 DataGridView 채우기
@@ -1659,7 +1659,7 @@ namespace FinanceTool
                 dataGridView_standard.AllowUserToDeleteRows = false;
                 dataGridView_standard.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 dataGridView_standard.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-                dataGridView_standard.Font = new System.Drawing.Font("맑은 고딕", 12F);
+                dataGridView_standard.Font = new System.Drawing.Font("Pretendard", 12F);
 
                 // Count 컬럼 숫자 포맷 설정
                 dataGridView_standard.Columns["Count"].DefaultCellStyle.Format = "N0";
@@ -2303,7 +2303,7 @@ namespace FinanceTool
             messageLabel.Size = new Size(280, 60);
             messageLabel.Location = new Point(10, 20);
             messageLabel.TextAlign = ContentAlignment.MiddleCenter;
-            messageLabel.Font = new System.Drawing.Font("맑은 고딕", 12F, FontStyle.Regular);
+            messageLabel.Font = new System.Drawing.Font("Pretendard", 12F, FontStyle.Regular);
 
             this.Controls.Add(messageLabel);
         }

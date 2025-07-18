@@ -140,7 +140,7 @@
             btn_add_to_session.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_add_to_session.BackColor = Color.IndianRed;
             btn_add_to_session.FlatStyle = FlatStyle.Flat;
-            btn_add_to_session.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_add_to_session.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_add_to_session.ForeColor = Color.White;
             btn_add_to_session.Location = new Point(794, 62);
             btn_add_to_session.Margin = new Padding(3, 4, 3, 4);
@@ -158,7 +158,7 @@
             btn_create_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_create_sessions.BackColor = Color.Orange;
             btn_create_sessions.FlatStyle = FlatStyle.Flat;
-            btn_create_sessions.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_create_sessions.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_create_sessions.ForeColor = Color.White;
             btn_create_sessions.Location = new Point(950, 62);
             btn_create_sessions.Margin = new Padding(3, 4, 3, 4);
@@ -175,7 +175,7 @@
             btn_upload_files.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_upload_files.BackColor = Color.DodgerBlue;
             btn_upload_files.FlatStyle = FlatStyle.Flat;
-            btn_upload_files.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_upload_files.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_upload_files.ForeColor = Color.White;
             btn_upload_files.Location = new Point(8, 62);
             btn_upload_files.Margin = new Padding(3, 4, 3, 4);
@@ -190,7 +190,7 @@
             // lbl_instruction
             // 
             lbl_instruction.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            lbl_instruction.Font = new Font("맑은 고딕", 10F);
+            lbl_instruction.Font = new Font("Pretendard", 10F);
             lbl_instruction.ForeColor = Color.Gray;
             lbl_instruction.Location = new Point(194, 12);
             lbl_instruction.Name = "lbl_instruction";
@@ -202,7 +202,7 @@
             // lbl_title
             // 
             lbl_title.AutoSize = true;
-            lbl_title.Font = new Font("맑은 고딕", 16F, FontStyle.Bold);
+            lbl_title.Font = new Font("Pretendard", 16F, FontStyle.Bold);
             lbl_title.ForeColor = Color.DarkSlateGray;
             lbl_title.Location = new Point(5, 12);
             lbl_title.Name = "lbl_title";
@@ -226,7 +226,7 @@
             btn_merge_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_merge_sessions.BackColor = Color.IndianRed;
             btn_merge_sessions.FlatStyle = FlatStyle.Flat;
-            btn_merge_sessions.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_merge_sessions.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_merge_sessions.ForeColor = Color.White;
             btn_merge_sessions.Location = new Point(367, 62);
             btn_merge_sessions.Margin = new Padding(3, 4, 3, 4);
@@ -243,7 +243,7 @@
             btn_complete.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_complete.BackColor = Color.LimeGreen;
             btn_complete.FlatStyle = FlatStyle.Flat;
-            btn_complete.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_complete.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_complete.ForeColor = Color.White;
             btn_complete.Location = new Point(574, 62);
             btn_complete.Margin = new Padding(3, 4, 3, 4);
@@ -293,7 +293,7 @@
             dgv_files.BorderStyle = BorderStyle.Fixed3D;
             dataGridViewCellStyle14.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCellStyle14.BackColor = Color.LightSteelBlue;
-            dataGridViewCellStyle14.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle14.Font = new Font("Pretendard", 10F, FontStyle.Bold);
             dataGridViewCellStyle14.ForeColor = Color.Black;
             dataGridViewCellStyle14.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle14.SelectionForeColor = SystemColors.HighlightText;
@@ -304,7 +304,7 @@
             dgv_files.Columns.AddRange(new DataGridViewColumn[] { col_file_check, col_filename, col_row_count, col_account_column, col_amount_column, col_total_amount });
             dataGridViewCellStyle15.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle15.BackColor = SystemColors.Window;
-            dataGridViewCellStyle15.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle15.Font = new Font("Pretendard", 9F);
             dataGridViewCellStyle15.ForeColor = SystemColors.ControlText;
             dataGridViewCellStyle15.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle15.SelectionForeColor = SystemColors.HighlightText;
@@ -380,7 +380,7 @@
             // 
             lbl_files.BackColor = Color.SteelBlue;
             lbl_files.Dock = DockStyle.Top;
-            lbl_files.Font = new Font("맑은 고딕", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            lbl_files.Font = new Font("Pretendard", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
             lbl_files.ForeColor = Color.White;
             lbl_files.Location = new Point(0, 0);
             lbl_files.Name = "lbl_files";
@@ -411,7 +411,7 @@
             dgv_sessions.BorderStyle = BorderStyle.Fixed3D;
             dataGridViewCellStyle17.Alignment = DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCellStyle17.BackColor = Color.LightSteelBlue;
-            dataGridViewCellStyle17.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            dataGridViewCellStyle17.Font = new Font("Pretendard", 10F, FontStyle.Bold);
             dataGridViewCellStyle17.ForeColor = Color.Black;
             dataGridViewCellStyle17.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle17.SelectionForeColor = SystemColors.HighlightText;
@@ -422,7 +422,7 @@
             dgv_sessions.Columns.AddRange(new DataGridViewColumn[] { col_session_name, col_file_list, col_session_account, col_session_rows, col_session_amount, col_session_status, col_download });
             dataGridViewCellStyle18.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle18.BackColor = SystemColors.Window;
-            dataGridViewCellStyle18.Font = new Font("맑은 고딕", 9F);
+            dataGridViewCellStyle18.Font = new Font("Pretendard", 9F);
             dataGridViewCellStyle18.ForeColor = SystemColors.ControlText;
             dataGridViewCellStyle18.SelectionBackColor = SystemColors.Highlight;
             dataGridViewCellStyle18.SelectionForeColor = SystemColors.HighlightText;
@@ -505,7 +505,7 @@
             // 
             lbl_sessions.BackColor = Color.SteelBlue;
             lbl_sessions.Dock = DockStyle.Top;
-            lbl_sessions.Font = new Font("맑은 고딕", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            lbl_sessions.Font = new Font("Pretendard", 12F, FontStyle.Bold, GraphicsUnit.Point, 129);
             lbl_sessions.ForeColor = Color.White;
             lbl_sessions.Location = new Point(0, 0);
             lbl_sessions.Name = "lbl_sessions";

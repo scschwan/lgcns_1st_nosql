@@ -285,45 +285,7 @@ namespace FinanceTool
             }
         }
 
-        /// <summary>
-        /// 고성능 객체 풀 구현 (메모리 재사용)
-        /// </summary>
-        public class HighPerformanceObjectPool<T> where T : class, new()
-        {
-            private readonly ConcurrentQueue<T> _objects = new ConcurrentQueue<T>();
-            private readonly Func<T> _objectGenerator;
-            private readonly Action<T> _resetAction;
-            private int _currentCount = 0;
-            private readonly int _maxObjects;
-
-            public HighPerformanceObjectPool(int maxObjects = 1000, Func<T> objectGenerator = null, Action<T> resetAction = null)
-            {
-                _maxObjects = maxObjects;
-                _objectGenerator = objectGenerator ?? (() => new T());
-                _resetAction = resetAction;
-            }
-
-            public T Get()
-            {
-                if (_objects.TryDequeue(out T item))
-                {
-                    Interlocked.Decrement(ref _currentCount);
-                    return item;
-                }
-                return _objectGenerator();
-            }
-
-            public void Return(T item)
-            {
-                if (_currentCount < _maxObjects)
-                {
-                    _resetAction?.Invoke(item);
-                    _objects.Enqueue(item);
-                    Interlocked.Increment(ref _currentCount);
-                }
-            }
-        }
-
+       
 
 
         public uc_Clustering()
@@ -602,7 +564,7 @@ namespace FinanceTool
                         dataGridView_modified.AllowUserToAddRows = false;
                         dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                         dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                        dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                        dataGridView_modified.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                         // 나머지 컬럼들은 읽기 전용으로 설정
                         for (int i = 2; i < dataGridView_modified.Columns.Count; i++)
@@ -647,7 +609,7 @@ namespace FinanceTool
                 dataGridView_supply_summary.AllowUserToAddRows = false;
                 dataGridView_supply_summary.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                 dataGridView_supply_summary.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                dataGridView_supply_summary.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_supply_summary.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                 // 나머지 컬럼들은 읽기 전용으로 설정
                 for (int i = 2; i < dataGridView_supply_summary.Columns.Count; i++)
@@ -927,7 +889,7 @@ namespace FinanceTool
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.Columns["Data"].ReadOnly = true;  // 체크박스 컬럼만 편집 가능
             dgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-            dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
             Debug.WriteLine("lv1 table init complete");
 
@@ -1630,70 +1592,7 @@ namespace FinanceTool
 
         }
 
-        //checkFlag = 0 : merge table combo box
-        //checkFlag = 1 : check table combo box
-        public List<string> ExtractUniqueKeywords(DataTable dataTable, int checkFlag)
-        {
-            HashSet<string> uniqueKeywords = new HashSet<string>();
-
-            foreach (DataRow row in dataTable.Rows)
-            {
-                if (!row.IsNull("ClusterID") && !row.IsNull("ID"))
-                {
-                    int clusterId = Convert.ToInt32(row["ClusterID"]);
-                    int id = Convert.ToInt32(row["ID"]);
-
-                    //*** 핵심 수정: checkFlag = 0일 때 병합되지 않은 클러스터만 포함 ***
-                    if (checkFlag == 0)
-                    {
-                        // 병합되지 않은 클러스터만 포함: ClusterID <= 0 또는 ClusterID == ID
-                        if (clusterId > 0 && clusterId != id)
-                        {
-                            // 이미 다른 클러스터에 병합된 하위 클러스터는 제외
-                            continue;
-                        }
-                    }
-                    else if (checkFlag == 1)
-                    {
-                        // 병합된 클러스터만 포함: ClusterID > 0 && ClusterID == ID
-                        if (clusterId <= 0 || clusterId != id)
-                        {
-                            continue;
-                        }
-                    }
-                }
-                else
-                {
-                    // ClusterID나 ID가 없는 데이터 처리
-                    if (checkFlag == 1)
-                    {
-                        // check table에서는 클러스터 정보가 없는 데이터는 skip
-                        continue;
-                    }
-                }
-
-                // 키워드목록 컬럼의 데이터 가져오기 (null 체크 포함)
-                string keywordList = row["키워드목록"]?.ToString();
-
-                if (!string.IsNullOrEmpty(keywordList))
-                {
-                    // 쉼표로 구분된 키워드를 분리하고 각각 HashSet에 추가
-                    string[] keywords = keywordList.Split(',');
-                    foreach (string keyword in keywords)
-                    {
-                        // 앞뒤 공백 제거 후 추가
-                        string trimmedKeyword = keyword.Trim();
-                        if (!string.IsNullOrEmpty(trimmedKeyword))
-                        {
-                            uniqueKeywords.Add(trimmedKeyword);
-                        }
-                    }
-                }
-            }
-
-            // HashSet을 List로 변환하여 반환 (정렬된 상태로)
-            return uniqueKeywords.OrderBy(k => k).ToList();
-        }
+      
 
         // 공급업체 키워드 추출 함수
         public List<string> ExtractUniqueSupplierKeywords(DataTable dataTable, int checkFlag)
@@ -1908,7 +1807,7 @@ namespace FinanceTool
             dgv.CellEndEdit += DataGridView_CellEndEdit;
             dgv.CellBeginEdit -= DataGridView_CellBeginEdit; // 중복 등록 방지
             dgv.CellBeginEdit += DataGridView_CellBeginEdit;
-            //dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            //dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
             // "클러스터명" 컬럼의 배경색을 연노란색으로 설정
             dgv.Columns["클러스터명"].DefaultCellStyle.BackColor = System.Drawing.Color.LightYellow;
 
@@ -2958,67 +2857,7 @@ namespace FinanceTool
             }
         }
 
-        // 최대 속도 최종 처리
-        private async Task MaxSpeedFinalizeAsync(ProcessProgressForm.UpdateProgressDelegate progress)
-        {
-            try
-            {
-                await progress(85, "클러스터링 데이터 검증...");
-
-                // 최대 병렬도로 검증 처리
-                int maxParallelism = Environment.ProcessorCount * 3;
-
-                var invalidRowsTasks = new List<Task<List<DataRow>>>();
-
-                // 데이터를 청크로 나누어 병렬 검증
-                var chunks = DataHandler.finalClusteringData.AsEnumerable()
-                    .Select((row, index) => new { row, index })
-                    .GroupBy(x => x.index / 10000)
-                    .Select(g => g.Select(x => x.row).ToList())
-                    .ToList();
-
-                foreach (var chunk in chunks)
-                {
-                    invalidRowsTasks.Add(Task.Run(() =>
-                    {
-                        return chunk.AsParallel()
-                            .WithDegreeOfParallelism(maxParallelism)
-                            .Where(row => row["ClusterID"] == DBNull.Value ||
-                                         string.IsNullOrEmpty(row["클러스터명"]?.ToString()))
-                            .ToList();
-                    }));
-                }
-
-                var allInvalidRows = (await Task.WhenAll(invalidRowsTasks)).SelectMany(x => x).ToList();
-
-                if (allInvalidRows.Count > 0)
-                {
-                    Debug.WriteLine($"극한 속도 수정: {allInvalidRows.Count}개 무효 데이터");
-
-                    // 병렬로 무효 데이터 수정
-                    Parallel.ForEach(allInvalidRows,
-                        new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
-                        row =>
-                        {
-                            if (row["ClusterID"] == DBNull.Value)
-                                row["ClusterID"] = -1;
-                            if (string.IsNullOrEmpty(row["클러스터명"]?.ToString()))
-                                row["클러스터명"] = "UltraSpeed_Fixed";
-                        }
-                    );
-                }
-
-                await progress(95, "변경사항 적용...");
-                DataHandler.finalClusteringData.AcceptChanges();
-
-                Debug.WriteLine("극한 속도 최종 처리 완료");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"최대 속도 최종 처리 오류: {ex.Message}");
-                throw;
-            }
-        }
+        
 
         public string FormatToKoreanUnit(decimal number)
         {
@@ -3495,7 +3334,7 @@ namespace FinanceTool
                 dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                 dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 dataGridView_modified.ReadOnly = true;
-                dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_modified.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                 // 정렬 이벤트 핸들러 설정
                 dataGridView_modified.SortCompare -= DataHandler.money_SortCompare;
@@ -3635,7 +3474,7 @@ namespace FinanceTool
                 dataGridView_supply_summary.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                 dataGridView_supply_summary.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 dataGridView_supply_summary.ReadOnly = true;
-                dataGridView_supply_summary.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_supply_summary.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                 // 정렬 이벤트 핸들러 설정
                 dataGridView_supply_summary.SortCompare -= DataHandler.money_SortCompare;

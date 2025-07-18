@@ -194,7 +194,7 @@
             button5.AutoSize = true;
             button5.BackColor = Color.LimeGreen;
             button5.FlatStyle = FlatStyle.Flat;
-            button5.Font = new Font("맑은 고딕", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            button5.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             button5.ForeColor = Color.White;
             button5.Location = new Point(1153, 12);
             button5.Name = "button5";
@@ -208,7 +208,7 @@
             // 
             btn_nextPage.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             btn_nextPage.AutoSize = true;
-            btn_nextPage.Font = new Font("맑은 고딕", 14.25F);
+            btn_nextPage.Font = new Font("Pretendard", 14.25F);
             btn_nextPage.Location = new Point(802, 13);
             btn_nextPage.Name = "btn_nextPage";
             btn_nextPage.Size = new Size(86, 35);
@@ -220,7 +220,7 @@
             // btn_prevPage
             // 
             btn_prevPage.AutoSize = true;
-            btn_prevPage.Font = new Font("맑은 고딕", 14.25F);
+            btn_prevPage.Font = new Font("Pretendard", 14.25F);
             btn_prevPage.Location = new Point(363, 12);
             btn_prevPage.Name = "btn_prevPage";
             btn_prevPage.Size = new Size(86, 35);
@@ -231,7 +231,7 @@
             // 
             // cmb_pageSize
             // 
-            cmb_pageSize.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            cmb_pageSize.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             cmb_pageSize.FormattingEnabled = true;
             cmb_pageSize.Location = new Point(130, 14);
             cmb_pageSize.Name = "cmb_pageSize";
@@ -241,7 +241,7 @@
             // lbl_pageSizeText
             // 
             lbl_pageSizeText.AutoSize = true;
-            lbl_pageSizeText.Font = new Font("맑은 고딕", 14F);
+            lbl_pageSizeText.Font = new Font("Pretendard", 14F);
             lbl_pageSizeText.Location = new Point(10, 17);
             lbl_pageSizeText.Name = "lbl_pageSizeText";
             lbl_pageSizeText.Size = new Size(125, 25);
@@ -251,7 +251,7 @@
             // lbl_pagination
             // 
             lbl_pagination.AutoSize = true;
-            lbl_pagination.Font = new Font("맑은 고딕", 14F);
+            lbl_pagination.Font = new Font("Pretendard", 14F);
             lbl_pagination.Location = new Point(455, 18);
             lbl_pagination.Name = "lbl_pagination";
             lbl_pagination.Size = new Size(80, 25);
@@ -260,7 +260,7 @@
             // 
             // num_pageNumber
             // 
-            num_pageNumber.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            num_pageNumber.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             num_pageNumber.Location = new Point(543, 16);
             num_pageNumber.Name = "num_pageNumber";
             num_pageNumber.Size = new Size(52, 33);
@@ -269,7 +269,7 @@
             // lbl_pagination2
             // 
             lbl_pagination2.AutoSize = true;
-            lbl_pagination2.Font = new Font("맑은 고딕", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            lbl_pagination2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             lbl_pagination2.Location = new Point(601, 19);
             lbl_pagination2.Name = "lbl_pagination2";
             lbl_pagination2.Size = new Size(118, 25);
@@ -307,7 +307,7 @@
             groupBox1.Controls.Add(label3);
             groupBox1.Controls.Add(dataGridView_classify);
             groupBox1.Dock = DockStyle.Fill;
-            groupBox1.Font = new Font("맑은 고딕", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            groupBox1.Font = new Font("Pretendard", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             groupBox1.Location = new Point(5, 5);
             groupBox1.Margin = new Padding(5);
             groupBox1.Name = "groupBox1";
@@ -319,7 +319,7 @@
             // label3
             // 
             label3.AutoSize = true;
-            label3.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label3.Font = new Font("Pretendard", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             label3.ForeColor = Color.IndianRed;
             label3.Location = new Point(10, 40);
             label3.Name = "label3";
@@ -352,7 +352,7 @@
             groupBox3.Controls.Add(dataGridView_delete_col2);
             groupBox3.Controls.Add(restore_col_btn);
             groupBox3.Dock = DockStyle.Fill;
-            groupBox3.Font = new Font("맑은 고딕", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            groupBox3.Font = new Font("Pretendard", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             groupBox3.Location = new Point(5, 645);
             groupBox3.Margin = new Padding(5);
             groupBox3.Name = "groupBox3";
@@ -364,7 +364,7 @@
             // label7
             // 
             label7.AutoSize = true;
-            label7.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label7.Font = new Font("Pretendard", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             label7.ForeColor = Color.IndianRed;
             label7.Location = new Point(10, 40);
             label7.Name = "label7";
@@ -376,7 +376,7 @@
             // 
             del_col_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_col_list_allcheck.AutoSize = true;
-            del_col_list_allcheck.Font = new Font("맑은 고딕", 14.25F);
+            del_col_list_allcheck.Font = new Font("Pretendard", 14.25F);
             del_col_list_allcheck.Location = new Point(350, 65);
             del_col_list_allcheck.Name = "del_col_list_allcheck";
             del_col_list_allcheck.Size = new Size(114, 29);
@@ -407,7 +407,7 @@
             restore_col_btn.AutoSize = true;
             restore_col_btn.BackColor = Color.Orange;
             restore_col_btn.FlatStyle = FlatStyle.Flat;
-            restore_col_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            restore_col_btn.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             restore_col_btn.ForeColor = Color.White;
             restore_col_btn.Location = new Point(330, 296);
             restore_col_btn.Name = "restore_col_btn";
@@ -421,7 +421,7 @@
             // 
             label10.Anchor = AnchorStyles.None;
             label10.BackColor = Color.SteelBlue;
-            label10.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label10.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label10.ForeColor = Color.White;
             label10.Location = new Point(432, 7);
             label10.Name = "label10";
@@ -434,7 +434,7 @@
             // 
             label4.Anchor = AnchorStyles.None;
             label4.BackColor = Color.SteelBlue;
-            label4.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label4.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label4.ForeColor = Color.White;
             label4.Location = new Point(432, 7);
             label4.Name = "label4";
@@ -446,7 +446,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Font = new Font("맑은 고딕", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label1.Font = new Font("Pretendard", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             label1.ForeColor = Color.IndianRed;
             label1.Location = new Point(10, 62);
             label1.Name = "label1";

@@ -76,7 +76,7 @@
             // 
             select_all_btn.BackColor = Color.DodgerBlue;
             select_all_btn.FlatStyle = FlatStyle.Flat;
-            select_all_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            select_all_btn.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             select_all_btn.ForeColor = Color.White;
             select_all_btn.Location = new Point(475, 16);
             select_all_btn.Name = "select_all_btn";
@@ -88,7 +88,7 @@
             // status_label
             // 
             status_label.AutoSize = true;
-            status_label.Font = new Font("맑은 고딕", 12F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            status_label.Font = new Font("Pretendard", 12F, FontStyle.Regular, GraphicsUnit.Point, 129);
             status_label.Location = new Point(309, 20);
             status_label.Name = "status_label";
             status_label.Size = new Size(57, 21);
@@ -100,7 +100,7 @@
             unmerge_selected_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             unmerge_selected_btn.BackColor = Color.Crimson;
             unmerge_selected_btn.FlatStyle = FlatStyle.Flat;
-            unmerge_selected_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            unmerge_selected_btn.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             unmerge_selected_btn.ForeColor = Color.White;
             unmerge_selected_btn.Location = new Point(894, 15);
             unmerge_selected_btn.Name = "unmerge_selected_btn";
@@ -115,7 +115,7 @@
             close_btn.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             close_btn.BackColor = Color.LimeGreen;
             close_btn.FlatStyle = FlatStyle.Flat;
-            close_btn.Font = new Font("맑은 고딕", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            close_btn.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             close_btn.ForeColor = Color.White;
             close_btn.Location = new Point(1094, 15);
             close_btn.Name = "close_btn";
@@ -127,7 +127,7 @@
             // detail_title_label
             // 
             detail_title_label.AutoSize = true;
-            detail_title_label.Font = new Font("맑은 고딕", 14F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            detail_title_label.Font = new Font("Pretendard", 14F, FontStyle.Bold, GraphicsUnit.Point, 129);
             detail_title_label.Location = new Point(15, 18);
             detail_title_label.Name = "detail_title_label";
             detail_title_label.Size = new Size(178, 25);
@@ -167,7 +167,7 @@
             BackColor = Color.White;
             ClientSize = new Size(1200, 800);
             Controls.Add(tableLayoutMain);
-            Font = new Font("맑은 고딕", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            Font = new Font("Pretendard", 9F, FontStyle.Regular, GraphicsUnit.Point, 129);
             MinimumSize = new Size(800, 600);
             Name = "ClusterDetailPopup";
             StartPosition = FormStartPosition.CenterParent;

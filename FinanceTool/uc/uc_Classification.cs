@@ -450,10 +450,10 @@ namespace FinanceTool
                 dgv.EnableHeadersVisualStyles = false;
                 dgv.ColumnHeadersDefaultCellStyle.BackColor = System.Drawing.Color.LightSteelBlue;
                 dgv.ColumnHeadersDefaultCellStyle.ForeColor = System.Drawing.Color.Black;
-                dgv.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("맑은 고딕", 9.0f, FontStyle.Bold);
+                dgv.ColumnHeadersDefaultCellStyle.Font = new System.Drawing.Font("Pretendard", 9.0f, FontStyle.Bold);
 
                 // 셀 폰트 설정
-                dgv.DefaultCellStyle.Font = new System.Drawing.Font("맑은 고딕", 9.0f);
+                dgv.DefaultCellStyle.Font = new System.Drawing.Font("Pretendard", 9.0f);
             }
         }
 
@@ -533,8 +533,8 @@ namespace FinanceTool
 
                 dgv.Columns["클러스터명"].ReadOnly = false;  // 클러스터명 편집 가능
                                                         //dgv.CellEndEdit += DataGridView_CellEndEdit;
-                                                        //dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
-                dgv.Font = new System.Drawing.Font("맑은 고딕", 9F);
+                                                        //dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
+                dgv.Font = new System.Drawing.Font("Pretendard", 9F);
                 // "클러스터명" 컬럼의 배경색을 연노란색으로 설정
                 dgv.Columns["클러스터명"].DefaultCellStyle.BackColor = System.Drawing.Color.LightYellow;
             }
@@ -1741,7 +1741,7 @@ namespace FinanceTool
 
                     // 클러스터명 컬럼 스타일 설정
                     clusterColumn.DefaultCellStyle.BackColor = System.Drawing.Color.LightBlue;
-                    clusterColumn.DefaultCellStyle.Font = new System.Drawing.Font("맑은 고딕", 9.0f, FontStyle.Bold);
+                    clusterColumn.DefaultCellStyle.Font = new System.Drawing.Font("Pretendard", 9.0f, FontStyle.Bold);
                     clusterColumn.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
                     // 컬럼 너비 조정
@@ -2102,7 +2102,7 @@ namespace FinanceTool
 
             targetDgv.Columns["Data"].ReadOnly = true;  // 데이터 컬럼은 읽기 전용
             targetDgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-            targetDgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            targetDgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
             // 필수 컬럼 목록 가져오기
             HashSet<string> essentialColumns = GetEssentialColumns();

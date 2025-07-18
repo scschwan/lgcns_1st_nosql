@@ -162,7 +162,7 @@ namespace FinanceTool
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.Columns["Data"].ReadOnly = true;  // 체크박스 컬럼만 편집 가능
             dgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-            dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
         }
 
 

@@ -1300,7 +1300,7 @@ namespace FinanceTool
                             sum_keyword_table.AllowUserToAddRows = false;
                             sum_keyword_table.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                             sum_keyword_table.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                            sum_keyword_table.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                            sum_keyword_table.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                             // Count 컬럼(1번 인덱스)에 천 단위 콤마 포맷팅 적용
                             if (sum_keyword_table.Columns.Count > 1)
@@ -1604,7 +1604,7 @@ namespace FinanceTool
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.ReadOnly = false;
             dgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-            dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
 
             //dgv.Columns[2].DefaultCellStyle.Format = "N0";
@@ -1896,7 +1896,7 @@ namespace FinanceTool
             Label loadingLabel = new Label
             {
                 Text = "데이터 렌더링 중...",
-                Font = new System.Drawing.Font("맑은 고딕", 14),
+                Font = new System.Drawing.Font("Pretendard", 14),
                 AutoSize = false,
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Fill
@@ -2181,7 +2181,8 @@ namespace FinanceTool
             {
                 target_keyword = search_keyword.Text.ToString();
             }
-            
+
+            Debug.WriteLine($"검색 키워드 target_keyword : {target_keyword}");
 
             //List<string> lowlevelList = DataHandler.GetColumnValuesAsList(DataHandler.lowLevelData, 0);
             List<string> valuelList = DataHandler.GetColumnValuesAsList(modifiedDataTable, 0);
@@ -2190,7 +2191,11 @@ namespace FinanceTool
 
             if (!"".Equals(target_keyword))
             {
-                MathcingPairs = DataHandler.FindMachKeyword(valuelList, target_keyword);
+                //MathcingPairs = DataHandler.FindMachKeyword(valuelList, target_keyword);
+
+                // 개선된 코드:
+                MathcingPairs = FindImprovedKeywordMatches(valuelList, target_keyword);
+
                 Debug.WriteLine($"MathcingPairs.Count : {MathcingPairs.Count}");
                 if (MathcingPairs.Count == 0)
                 {
@@ -2214,8 +2219,136 @@ namespace FinanceTool
 
             check_all_keyword_list.Checked = false;
 
-            modified_keyword.Text = target_keyword;
+            //modified_keyword.Text = target_keyword;
         }
+
+        /// <summary>
+        /// 개선된 키워드 검색 함수 (영어 대소문자 무시 + 2글자 기준 매칭)
+        /// </summary>
+        private List<string> FindImprovedKeywordMatches(List<string> keywordList, string searchKeyword)
+        {
+            if (string.IsNullOrEmpty(searchKeyword) || keywordList == null || keywordList.Count == 0)
+            {
+                return new List<string>();
+            }
+
+            var matchingKeywords = new List<string>();
+            bool isEnglishSearch = IsEnglishText(searchKeyword);
+
+            Debug.WriteLine($"검색어 '{searchKeyword}' - 영어 검색: {isEnglishSearch}");
+
+            foreach (string keyword in keywordList)
+            {
+                if (string.IsNullOrEmpty(keyword)) continue;
+
+                bool isMatch = false;
+
+                if (isEnglishSearch)
+                {
+                    // 영어인 경우: 대소문자 무시 + 2글자 기준 매칭
+                    if (searchKeyword.Length >= 2)
+                    {
+                        isMatch = CompareByTwoCharsIgnoreCase(searchKeyword, keyword) ||
+                                 keyword.ToUpper().Contains(searchKeyword.ToUpper());
+                    }
+                    else
+                    {
+                        // 1글자인 경우 대소문자 무시 Contains
+                        isMatch = keyword.ToUpper().Contains(searchKeyword.ToUpper());
+                    }
+                }
+                else
+                {
+                    // 한글인 경우: 기존 로직 + 2글자 기준 매칭
+                    if (searchKeyword.Length >= 2)
+                    {
+                        isMatch = CompareByTwoChars(searchKeyword, keyword) ||
+                                 keyword.Contains(searchKeyword);
+                    }
+                    else
+                    {
+                        // 1글자인 경우 기존 Contains
+                        isMatch = keyword.Contains(searchKeyword);
+                    }
+                }
+
+                if (isMatch)
+                {
+                    matchingKeywords.Add(keyword);
+                }
+            }
+
+            Debug.WriteLine($"매칭된 키워드 수: {matchingKeywords.Count}");
+            return matchingKeywords;
+        }
+
+        /// <summary>
+        /// 영어 텍스트인지 확인
+        /// </summary>
+        private bool IsEnglishText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+
+            // 영어 알파벳이 하나라도 있으면 영어로 판단
+            bool hasEnglish = text.Any(c => (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'));
+            return hasEnglish;
+        }
+
+        /// <summary>
+        /// 2글자 기준 비교 로직 (대소문자 무시)
+        /// </summary>
+        private bool CompareByTwoCharsIgnoreCase(string baseWord, string targetWord)
+        {
+            if (targetWord.Length < 2) return false;
+            if (baseWord.Length < 2) return targetWord.ToUpper().Contains(baseWord.ToUpper());
+
+            // 기준 단어를 2글자씩 자르기 (대문자 변환)
+            var baseParts = new List<string>();
+            string upperBaseWord = baseWord.ToUpper();
+            for (int i = 0; i < upperBaseWord.Length - 1; i++)
+            {
+                baseParts.Add(upperBaseWord.Substring(i, 2));
+            }
+
+            // 대상 단어를 2글자씩 자르기 (대문자 변환)
+            var targetParts = new List<string>();
+            string upperTargetWord = targetWord.ToUpper();
+            for (int i = 0; i < upperTargetWord.Length - 1; i++)
+            {
+                targetParts.Add(upperTargetWord.Substring(i, 2));
+            }
+
+            // 공통된 2글자 조합 확인
+            return baseParts.Any(b => targetParts.Contains(b));
+        }
+
+        /// <summary>
+        /// 2글자 기준 비교 로직 (한글용 - 기존 방식)
+        /// </summary>
+        private bool CompareByTwoChars(string baseWord, string targetWord)
+        {
+            if (targetWord.Length < 2) return false;
+            if (baseWord.Length < 2) return targetWord.Contains(baseWord);
+
+            // 기준 단어를 2글자씩 자르기
+            var baseParts = new List<string>();
+            for (int i = 0; i < baseWord.Length - 1; i++)
+            {
+                baseParts.Add(baseWord.Substring(i, 2));
+            }
+
+            // 대상 단어를 2글자씩 자르기
+            var targetParts = new List<string>();
+            for (int i = 0; i < targetWord.Length - 1; i++)
+            {
+                targetParts.Add(targetWord.Substring(i, 2));
+            }
+
+            // 공통된 2글자 조합 확인
+            return baseParts.Any(b => targetParts.Contains(b));
+        }
+
+
 
     }
 

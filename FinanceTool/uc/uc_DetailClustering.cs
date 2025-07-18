@@ -616,7 +616,7 @@ namespace FinanceTool
                         dataGridView_modified.AllowUserToAddRows = false;
                         dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                         dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                        dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                        dataGridView_modified.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                         // 나머지 컬럼들은 읽기 전용으로 설정
                         for (int i = 2; i < dataGridView_modified.Columns.Count; i++)
@@ -661,7 +661,7 @@ namespace FinanceTool
                 dataGridView_supply_summary.AllowUserToAddRows = false;
                 dataGridView_supply_summary.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                 dataGridView_supply_summary.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-                dataGridView_supply_summary.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_supply_summary.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                 // 나머지 컬럼들은 읽기 전용으로 설정
                 for (int i = 2; i < dataGridView_supply_summary.Columns.Count; i++)
@@ -862,7 +862,7 @@ namespace FinanceTool
             dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgv.Columns["Data"].ReadOnly = true;  // 체크박스 컬럼만 편집 가능
             dgv.Columns["CheckBox"].ReadOnly = false;  // 체크박스 컬럼만 편집 가능
-            dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
             Debug.WriteLine("lv1 table init complete");
 
@@ -1778,7 +1778,7 @@ namespace FinanceTool
             dgv.CellEndEdit += DataGridView_CellEndEdit;
             dgv.CellBeginEdit -= DataGridView_CellBeginEdit; // 중복 등록 방지
             dgv.CellBeginEdit += DataGridView_CellBeginEdit;
-            //dgv.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+            //dgv.Font = new System.Drawing.Font("Pretendard", 14.25F);
             // "클러스터명" 컬럼의 배경색을 연노란색으로 설정
             dgv.Columns["클러스터명"].DefaultCellStyle.BackColor = System.Drawing.Color.LightYellow;
 
@@ -3290,7 +3290,7 @@ namespace FinanceTool
                 dataGridView_modified.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                 dataGridView_modified.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 dataGridView_modified.ReadOnly = true;
-                dataGridView_modified.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_modified.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                 // 정렬 이벤트 핸들러 설정
                 dataGridView_modified.SortCompare -= DataHandler.money_SortCompare;
@@ -3431,7 +3431,7 @@ namespace FinanceTool
                 dataGridView_supply_summary.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
                 dataGridView_supply_summary.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
                 dataGridView_supply_summary.ReadOnly = true;
-                dataGridView_supply_summary.Font = new System.Drawing.Font("맑은 고딕", 14.25F);
+                dataGridView_supply_summary.Font = new System.Drawing.Font("Pretendard", 14.25F);
 
                 // 정렬 이벤트 핸들러 설정
                 dataGridView_supply_summary.SortCompare -= DataHandler.money_SortCompare;

@@ -113,7 +113,7 @@
             // 
             label9.Anchor = AnchorStyles.None;
             label9.BackColor = Color.SteelBlue;
-            label9.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label9.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label9.ForeColor = Color.White;
             label9.Location = new Point(860, 20);
             label9.Name = "label9";
@@ -126,7 +126,7 @@
             // 
             label10.Anchor = AnchorStyles.None;
             label10.BackColor = Color.SteelBlue;
-            label10.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label10.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label10.ForeColor = Color.White;
             label10.Location = new Point(117, 20);
             label10.Name = "label10";
@@ -230,7 +230,7 @@
             gb_separator.Controls.Add(seper_add_btn);
             gb_separator.Controls.Add(new_seper_word);
             gb_separator.Dock = DockStyle.Fill;
-            gb_separator.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
+            gb_separator.Font = new Font("Pretendard", 12F, FontStyle.Bold);
             gb_separator.Location = new Point(5, 5);
             gb_separator.Margin = new Padding(5);
             gb_separator.Name = "gb_separator";
@@ -246,7 +246,7 @@
             seper_apply_btn.AutoSize = true;
             seper_apply_btn.BackColor = Color.Orange;
             seper_apply_btn.FlatStyle = FlatStyle.Flat;
-            seper_apply_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            seper_apply_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             seper_apply_btn.ForeColor = Color.White;
             seper_apply_btn.Location = new Point(351, 155);
             seper_apply_btn.MinimumSize = new Size(100, 30);
@@ -262,7 +262,7 @@
             // 
             seper_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             seper_list_allcheck.AutoSize = true;
-            seper_list_allcheck.Font = new Font("맑은 고딕", 11F);
+            seper_list_allcheck.Font = new Font("Pretendard", 11F);
             seper_list_allcheck.Location = new Point(406, 65);
             seper_list_allcheck.Name = "seper_list_allcheck";
             seper_list_allcheck.Size = new Size(93, 24);
@@ -292,7 +292,7 @@
             seper_del_btn.AutoSize = true;
             seper_del_btn.BackColor = Color.Crimson;
             seper_del_btn.FlatStyle = FlatStyle.Flat;
-            seper_del_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            seper_del_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             seper_del_btn.ForeColor = Color.White;
             seper_del_btn.Location = new Point(351, 196);
             seper_del_btn.MinimumSize = new Size(100, 30);
@@ -309,7 +309,7 @@
             seper_add_btn.AutoSize = true;
             seper_add_btn.BackColor = Color.DodgerBlue;
             seper_add_btn.FlatStyle = FlatStyle.Flat;
-            seper_add_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            seper_add_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             seper_add_btn.ForeColor = Color.White;
             seper_add_btn.Location = new Point(351, 25);
             seper_add_btn.MinimumSize = new Size(100, 30);
@@ -323,7 +323,7 @@
             // new_seper_word
             // 
             new_seper_word.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            new_seper_word.Font = new Font("맑은 고딕", 11F);
+            new_seper_word.Font = new Font("Pretendard", 11F);
             new_seper_word.Location = new Point(8, 30);
             new_seper_word.Name = "new_seper_word";
             new_seper_word.PlaceholderText = "신규 변환 대상 입력";
@@ -340,7 +340,7 @@
             groupBox2.Controls.Add(remove_add_btn);
             groupBox2.Controls.Add(new_remove_word);
             groupBox2.Dock = DockStyle.Fill;
-            groupBox2.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
+            groupBox2.Font = new Font("Pretendard", 12F, FontStyle.Bold);
             groupBox2.Location = new Point(5, 262);
             groupBox2.Margin = new Padding(5);
             groupBox2.Name = "groupBox2";
@@ -356,7 +356,7 @@
             remove_apply_btn.AutoSize = true;
             remove_apply_btn.BackColor = Color.Orange;
             remove_apply_btn.FlatStyle = FlatStyle.Flat;
-            remove_apply_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            remove_apply_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             remove_apply_btn.ForeColor = Color.White;
             remove_apply_btn.Location = new Point(351, 155);
             remove_apply_btn.MinimumSize = new Size(100, 30);
@@ -372,7 +372,7 @@
             // 
             remove_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             remove_list_allcheck.AutoSize = true;
-            remove_list_allcheck.Font = new Font("맑은 고딕", 11F);
+            remove_list_allcheck.Font = new Font("Pretendard", 11F);
             remove_list_allcheck.Location = new Point(406, 65);
             remove_list_allcheck.Name = "remove_list_allcheck";
             remove_list_allcheck.Size = new Size(93, 24);
@@ -402,7 +402,7 @@
             remove_del_btn.AutoSize = true;
             remove_del_btn.BackColor = Color.Crimson;
             remove_del_btn.FlatStyle = FlatStyle.Flat;
-            remove_del_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            remove_del_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             remove_del_btn.ForeColor = Color.White;
             remove_del_btn.Location = new Point(351, 196);
             remove_del_btn.MinimumSize = new Size(100, 30);
@@ -419,7 +419,7 @@
             remove_add_btn.AutoSize = true;
             remove_add_btn.BackColor = Color.DodgerBlue;
             remove_add_btn.FlatStyle = FlatStyle.Flat;
-            remove_add_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            remove_add_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             remove_add_btn.ForeColor = Color.White;
             remove_add_btn.Location = new Point(351, 25);
             remove_add_btn.MinimumSize = new Size(100, 30);
@@ -433,7 +433,7 @@
             // new_remove_word
             // 
             new_remove_word.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            new_remove_word.Font = new Font("맑은 고딕", 11F);
+            new_remove_word.Font = new Font("Pretendard", 11F);
             new_remove_word.Location = new Point(8, 30);
             new_remove_word.Name = "new_remove_word";
             new_remove_word.PlaceholderText = "신규 불용어 대상 입력";
@@ -446,7 +446,7 @@
             groupBox1.Controls.Add(remove_1key);
             groupBox1.Controls.Add(keyword_seper_split);
             groupBox1.Dock = DockStyle.Fill;
-            groupBox1.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
+            groupBox1.Font = new Font("Pretendard", 12F, FontStyle.Bold);
             groupBox1.Location = new Point(5, 519);
             groupBox1.Margin = new Padding(5);
             groupBox1.Name = "groupBox1";
@@ -462,7 +462,7 @@
             remove_1key.AutoSize = true;
             remove_1key.BackColor = Color.Orange;
             remove_1key.FlatStyle = FlatStyle.Flat;
-            remove_1key.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            remove_1key.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             remove_1key.ForeColor = Color.White;
             remove_1key.Location = new Point(281, 40);
             remove_1key.MinimumSize = new Size(150, 35);
@@ -478,7 +478,7 @@
             keyword_seper_split.AutoSize = true;
             keyword_seper_split.BackColor = Color.LimeGreen;
             keyword_seper_split.FlatStyle = FlatStyle.Flat;
-            keyword_seper_split.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            keyword_seper_split.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             keyword_seper_split.ForeColor = Color.White;
             keyword_seper_split.Location = new Point(15, 40);
             keyword_seper_split.MinimumSize = new Size(150, 35);
@@ -497,7 +497,7 @@
             nlp_groupBox.Controls.Add(ai_limit_count);
             nlp_groupBox.Controls.Add(label6);
             nlp_groupBox.Dock = DockStyle.Fill;
-            nlp_groupBox.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
+            nlp_groupBox.Font = new Font("Pretendard", 12F, FontStyle.Bold);
             nlp_groupBox.Location = new Point(5, 647);
             nlp_groupBox.Margin = new Padding(5);
             nlp_groupBox.Name = "nlp_groupBox";
@@ -514,7 +514,7 @@
             keyword_model_split.AutoSize = true;
             keyword_model_split.BackColor = Color.MediumOrchid;
             keyword_model_split.FlatStyle = FlatStyle.Flat;
-            keyword_model_split.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
+            keyword_model_split.Font = new Font("Pretendard", 12F, FontStyle.Bold);
             keyword_model_split.ForeColor = Color.White;
             keyword_model_split.Location = new Point(180, 150);
             keyword_model_split.MinimumSize = new Size(120, 35);
@@ -528,7 +528,7 @@
             // label1
             // 
             label1.AutoSize = true;
-            label1.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            label1.Font = new Font("Pretendard", 10F, FontStyle.Bold);
             label1.ForeColor = Color.IndianRed;
             label1.Location = new Point(15, 70);
             label1.Name = "label1";
@@ -539,7 +539,7 @@
             // label8
             // 
             label8.AutoSize = true;
-            label8.Font = new Font("맑은 고딕", 11F);
+            label8.Font = new Font("Pretendard", 11F);
             label8.Location = new Point(130, 110);
             label8.Name = "label8";
             label8.Size = new Size(194, 20);
@@ -548,7 +548,7 @@
             // 
             // ai_limit_count
             // 
-            ai_limit_count.Font = new Font("맑은 고딕", 11F);
+            ai_limit_count.Font = new Font("Pretendard", 11F);
             ai_limit_count.Location = new Point(40, 108);
             ai_limit_count.Name = "ai_limit_count";
             ai_limit_count.Size = new Size(80, 27);
@@ -560,7 +560,7 @@
             // label6
             // 
             label6.AutoSize = true;
-            label6.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            label6.Font = new Font("Pretendard", 10F, FontStyle.Bold);
             label6.ForeColor = Color.IndianRed;
             label6.Location = new Point(15, 45);
             label6.Name = "label6";
@@ -585,7 +585,7 @@
             button5.AutoSize = true;
             button5.BackColor = Color.LimeGreen;
             button5.FlatStyle = FlatStyle.Flat;
-            button5.Font = new Font("맑은 고딕", 14F, FontStyle.Bold);
+            button5.Font = new Font("Pretendard", 14F, FontStyle.Bold);
             button5.ForeColor = Color.White;
             button5.Location = new Point(1750, 12);
             button5.MinimumSize = new Size(100, 35);

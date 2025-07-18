@@ -164,7 +164,7 @@
             // 
             this.label1.Anchor = ((AnchorStyles)((AnchorStyles.Left | AnchorStyles.Right)));
             this.label1.AutoSize = false;
-            this.label1.Font = new Font("맑은 고딕", 28F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            this.label1.Font = new Font("Pretendard", 28F, FontStyle.Bold, GraphicsUnit.Point, 129);
             this.label1.ForeColor = Color.White;
             this.label1.Location = new Point(0, 0);
             this.label1.Name = "label1";
@@ -178,7 +178,7 @@
             // 
             this.label2.Anchor = ((AnchorStyles)((AnchorStyles.Left | AnchorStyles.Right)));
             this.label2.AutoSize = false;
-            this.label2.Font = new Font("맑은 고딕", 28F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            this.label2.Font = new Font("Pretendard", 28F, FontStyle.Bold, GraphicsUnit.Point, 129);
             this.label2.ForeColor = Color.White;
             this.label2.Location = new Point(0, 0);
             this.label2.Name = "label2";

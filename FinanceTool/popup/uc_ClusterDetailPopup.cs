@@ -38,7 +38,7 @@ namespace FinanceTool
             // DataGridView 초기 설정
             detail_grid_view.AllowUserToAddRows = false;
             detail_grid_view.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            detail_grid_view.Font = new Font("맑은 고딕", 9F);
+            detail_grid_view.Font = new Font("Pretendard", 9F);
             detail_grid_view.RowHeadersVisible = false;
             detail_grid_view.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None;
             detail_grid_view.ScrollBars = ScrollBars.Both;

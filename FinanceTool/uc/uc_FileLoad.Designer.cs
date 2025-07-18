@@ -38,9 +38,6 @@
             label9 = new Label();
             label8 = new Label();
             pnl_data_grids = new Panel();
-            tabControl1 = new TabControl();
-            tabPage1 = new TabPage();
-            tabPage2 = new TabPage();
             dataGridView_process = new DataGridView();
             dataGridView_target = new DataGridView();
             pnl_pagination = new Panel();
@@ -52,19 +49,28 @@
             cmb_pageSize = new ComboBox();
             lbl_pageSizeText = new Label();
             tableLayoutRight = new TableLayoutPanel();
+            tabControl1 = new TabControl();
+            tabPage1 = new TabPage();
             restore_col_btn = new Button();
+            label7 = new Label();
             del_col_list_allcheck = new CheckBox();
             dataGridView_delete_col = new DataGridView();
-            label7 = new Label();
-            groupBox2 = new GroupBox();
+            tabPage2 = new TabPage();
             delete_data_btn = new Button();
-            restore_del_data_btn = new Button();
-            del_data_list_allcheck = new CheckBox();
             dataGridView_delete_data = new DataGridView();
-            delete_search_button = new Button();
-            delete_search_keyword = new TextBox();
-            stand_col_combo = new ComboBox();
+            restore_del_data_btn = new Button();
             label4 = new Label();
+            del_data_list_allcheck = new CheckBox();
+            stand_col_combo = new ComboBox();
+            delete_search_keyword = new TextBox();
+            delete_search_button = new Button();
+            groupBox2 = new GroupBox();
+            standard_btn = new Button();
+            label12 = new Label();
+            comboBox_standard_target = new ComboBox();
+            label11 = new Label();
+            comboBox_standard_key = new ComboBox();
+            dataGridView_standard = new DataGridView();
             groupBox1 = new GroupBox();
             btn_complete = new Button();
             prod_col_combo = new ComboBox();
@@ -79,32 +85,26 @@
             label5 = new Label();
             label2 = new Label();
             dataGridView2 = new DataGridView();
-            dataGridView_standard = new DataGridView();
-            label11 = new Label();
-            comboBox_standard_key = new ComboBox();
-            label12 = new Label();
-            comboBox_standard_target = new ComboBox();
-            standard_btn = new Button();
             tableLayoutMain.SuspendLayout();
             pnl_header.SuspendLayout();
             tableLayoutContent.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
             pnl_data_headers.SuspendLayout();
             pnl_data_grids.SuspendLayout();
-            tabControl1.SuspendLayout();
-            tabPage1.SuspendLayout();
-            tabPage2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_process).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dataGridView_target).BeginInit();
             pnl_pagination.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)num_pageNumber).BeginInit();
             tableLayoutRight.SuspendLayout();
+            tabControl1.SuspendLayout();
+            tabPage1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_delete_col).BeginInit();
-            groupBox2.SuspendLayout();
+            tabPage2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_delete_data).BeginInit();
+            groupBox2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_standard).BeginInit();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)dataGridView_standard).BeginInit();
             SuspendLayout();
             // 
             // tableLayoutMain
@@ -141,7 +141,7 @@
             btn_selectFile.AutoSize = true;
             btn_selectFile.BackColor = Color.DodgerBlue;
             btn_selectFile.FlatStyle = FlatStyle.Flat;
-            btn_selectFile.Font = new Font("맑은 고딕", 16F, FontStyle.Bold);
+            btn_selectFile.Font = new Font("Pretendard", 16F, FontStyle.Bold);
             btn_selectFile.ForeColor = Color.White;
             btn_selectFile.Location = new Point(15, 25);
             btn_selectFile.MinimumSize = new Size(120, 40);
@@ -156,7 +156,7 @@
             // lbl_filename
             // 
             lbl_filename.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            lbl_filename.Font = new Font("맑은 고딕", 16F);
+            lbl_filename.Font = new Font("Pretendard", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
             lbl_filename.ForeColor = Color.DarkSlateGray;
             lbl_filename.Location = new Point(180, 35);
             lbl_filename.Name = "lbl_filename";
@@ -215,7 +215,7 @@
             // 
             label9.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             label9.BackColor = Color.SteelBlue;
-            label9.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label9.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label9.ForeColor = Color.White;
             label9.Location = new Point(677, 10);
             label9.Name = "label9";
@@ -227,7 +227,7 @@
             // label8
             // 
             label8.BackColor = Color.SteelBlue;
-            label8.Font = new Font("맑은 고딕", 18F, FontStyle.Bold);
+            label8.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label8.ForeColor = Color.White;
             label8.Location = new Point(0, 10);
             label8.Name = "label8";
@@ -246,50 +246,6 @@
             pnl_data_grids.Name = "pnl_data_grids";
             pnl_data_grids.Size = new Size(1355, 777);
             pnl_data_grids.TabIndex = 1;
-            // 
-            // tabControl1
-            // 
-            tabControl1.Controls.Add(tabPage1);
-            tabControl1.Controls.Add(tabPage2);
-            tabControl1.Location = new Point(3, 3);
-            tabControl1.Name = "tabControl1";
-            tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(511, 259);
-            tabControl1.TabIndex = 2;
-            // 
-            // tabPage1
-            // 
-            tabPage1.Controls.Add(restore_col_btn);
-            tabPage1.Controls.Add(label7);
-            tabPage1.Controls.Add(del_col_list_allcheck);
-            tabPage1.Controls.Add(dataGridView_delete_col);
-            tabPage1.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            tabPage1.Location = new Point(4, 24);
-            tabPage1.Name = "tabPage1";
-            tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(503, 231);
-            tabPage1.TabIndex = 0;
-            tabPage1.Text = "제거 열 설정";
-            tabPage1.UseVisualStyleBackColor = true;
-            // 
-            // tabPage2
-            // 
-            tabPage2.Controls.Add(delete_data_btn);
-            tabPage2.Controls.Add(dataGridView_delete_data);
-            tabPage2.Controls.Add(restore_del_data_btn);
-            tabPage2.Controls.Add(label4);
-            tabPage2.Controls.Add(del_data_list_allcheck);
-            tabPage2.Controls.Add(stand_col_combo);
-            tabPage2.Controls.Add(delete_search_keyword);
-            tabPage2.Controls.Add(delete_search_button);
-            tabPage2.Font = new Font("맑은 고딕", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            tabPage2.Location = new Point(4, 24);
-            tabPage2.Name = "tabPage2";
-            tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(503, 231);
-            tabPage2.TabIndex = 1;
-            tabPage2.Text = "데이터 삭제";
-            tabPage2.UseVisualStyleBackColor = true;
             // 
             // dataGridView_process
             // 
@@ -347,7 +303,7 @@
             // 
             btn_nextPage.Anchor = AnchorStyles.None;
             btn_nextPage.AutoSize = true;
-            btn_nextPage.Font = new Font("맑은 고딕", 12F);
+            btn_nextPage.Font = new Font("Pretendard", 12F);
             btn_nextPage.Location = new Point(820, 12);
             btn_nextPage.Name = "btn_nextPage";
             btn_nextPage.Size = new Size(86, 35);
@@ -360,7 +316,7 @@
             // 
             lbl_pagination2.Anchor = AnchorStyles.None;
             lbl_pagination2.AutoSize = true;
-            lbl_pagination2.Font = new Font("맑은 고딕", 12F);
+            lbl_pagination2.Font = new Font("Pretendard", 12F);
             lbl_pagination2.Location = new Point(682, 19);
             lbl_pagination2.Name = "lbl_pagination2";
             lbl_pagination2.Size = new Size(100, 21);
@@ -370,7 +326,7 @@
             // num_pageNumber
             // 
             num_pageNumber.Anchor = AnchorStyles.None;
-            num_pageNumber.Font = new Font("맑은 고딕", 12F);
+            num_pageNumber.Font = new Font("Pretendard", 12F);
             num_pageNumber.Location = new Point(629, 16);
             num_pageNumber.Name = "num_pageNumber";
             num_pageNumber.Size = new Size(52, 29);
@@ -380,7 +336,7 @@
             // 
             lbl_pagination.Anchor = AnchorStyles.None;
             lbl_pagination.AutoSize = true;
-            lbl_pagination.Font = new Font("맑은 고딕", 12F);
+            lbl_pagination.Font = new Font("Pretendard", 12F);
             lbl_pagination.Location = new Point(552, 19);
             lbl_pagination.Name = "lbl_pagination";
             lbl_pagination.Size = new Size(68, 21);
@@ -391,7 +347,7 @@
             // 
             btn_prevPage.Anchor = AnchorStyles.None;
             btn_prevPage.AutoSize = true;
-            btn_prevPage.Font = new Font("맑은 고딕", 12F);
+            btn_prevPage.Font = new Font("Pretendard", 12F);
             btn_prevPage.Location = new Point(448, 12);
             btn_prevPage.Name = "btn_prevPage";
             btn_prevPage.Size = new Size(86, 35);
@@ -402,7 +358,7 @@
             // 
             // cmb_pageSize
             // 
-            cmb_pageSize.Font = new Font("맑은 고딕", 12F);
+            cmb_pageSize.Font = new Font("Pretendard", 12F);
             cmb_pageSize.FormattingEnabled = true;
             cmb_pageSize.Location = new Point(130, 16);
             cmb_pageSize.Name = "cmb_pageSize";
@@ -412,7 +368,7 @@
             // lbl_pageSizeText
             // 
             lbl_pageSizeText.AutoSize = true;
-            lbl_pageSizeText.Font = new Font("맑은 고딕", 12F);
+            lbl_pageSizeText.Font = new Font("Pretendard", 12F);
             lbl_pageSizeText.Location = new Point(15, 19);
             lbl_pageSizeText.Name = "lbl_pageSizeText";
             lbl_pageSizeText.Size = new Size(106, 21);
@@ -437,13 +393,38 @@
             tableLayoutRight.Size = new Size(519, 897);
             tableLayoutRight.TabIndex = 1;
             // 
+            // tabControl1
+            // 
+            tabControl1.Controls.Add(tabPage1);
+            tabControl1.Controls.Add(tabPage2);
+            tabControl1.Location = new Point(3, 3);
+            tabControl1.Name = "tabControl1";
+            tabControl1.SelectedIndex = 0;
+            tabControl1.Size = new Size(511, 259);
+            tabControl1.TabIndex = 2;
+            // 
+            // tabPage1
+            // 
+            tabPage1.Controls.Add(restore_col_btn);
+            tabPage1.Controls.Add(label7);
+            tabPage1.Controls.Add(del_col_list_allcheck);
+            tabPage1.Controls.Add(dataGridView_delete_col);
+            tabPage1.Font = new Font("Pretendard", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            tabPage1.Location = new Point(4, 24);
+            tabPage1.Name = "tabPage1";
+            tabPage1.Padding = new Padding(3);
+            tabPage1.Size = new Size(503, 231);
+            tabPage1.TabIndex = 0;
+            tabPage1.Text = "제거 열 설정";
+            tabPage1.UseVisualStyleBackColor = true;
+            // 
             // restore_col_btn
             // 
             restore_col_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
             restore_col_btn.AutoSize = true;
             restore_col_btn.BackColor = Color.Orange;
             restore_col_btn.FlatStyle = FlatStyle.Flat;
-            restore_col_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            restore_col_btn.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             restore_col_btn.ForeColor = Color.White;
             restore_col_btn.Location = new Point(357, 182);
             restore_col_btn.MinimumSize = new Size(100, 30);
@@ -454,11 +435,22 @@
             restore_col_btn.UseVisualStyleBackColor = false;
             restore_col_btn.Click += restore_col_btn_Click;
             // 
+            // label7
+            // 
+            label7.AutoSize = true;
+            label7.Font = new Font("Pretendard", 9F, FontStyle.Bold);
+            label7.ForeColor = Color.IndianRed;
+            label7.Location = new Point(6, 3);
+            label7.Name = "label7";
+            label7.Size = new Size(244, 15);
+            label7.TabIndex = 44;
+            label7.Text = "※ 선택한 열 정보만 출력하도록 지원합니다.";
+            // 
             // del_col_list_allcheck
             // 
             del_col_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_col_list_allcheck.AutoSize = true;
-            del_col_list_allcheck.Font = new Font("맑은 고딕", 11F);
+            del_col_list_allcheck.Font = new Font("Pretendard", 11F);
             del_col_list_allcheck.Location = new Point(404, 28);
             del_col_list_allcheck.Name = "del_col_list_allcheck";
             del_col_list_allcheck.Size = new Size(93, 24);
@@ -483,35 +475,24 @@
             dataGridView_delete_col.Size = new Size(348, 197);
             dataGridView_delete_col.TabIndex = 42;
             // 
-            // label7
+            // tabPage2
             // 
-            label7.AutoSize = true;
-            label7.Font = new Font("맑은 고딕", 9F, FontStyle.Bold);
-            label7.ForeColor = Color.IndianRed;
-            label7.Location = new Point(6, 3);
-            label7.Name = "label7";
-            label7.Size = new Size(244, 15);
-            label7.TabIndex = 44;
-            label7.Text = "※ 선택한 열 정보만 출력하도록 지원합니다.";
-            // 
-            // groupBox2
-            // 
-            groupBox2.Controls.Add(standard_btn);
-            groupBox2.Controls.Add(label12);
-            groupBox2.Controls.Add(comboBox_standard_target);
-            groupBox2.Controls.Add(label11);
-            groupBox2.Controls.Add(comboBox_standard_key);
-            groupBox2.Controls.Add(dataGridView_standard);
-            groupBox2.Dock = DockStyle.Fill;
-            groupBox2.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
-            groupBox2.Location = new Point(5, 274);
-            groupBox2.Margin = new Padding(5);
-            groupBox2.Name = "groupBox2";
-            groupBox2.Padding = new Padding(8);
-            groupBox2.Size = new Size(509, 259);
-            groupBox2.TabIndex = 16;
-            groupBox2.TabStop = false;
-            groupBox2.Text = "코스트센터/공급업체 명 표준화";
+            tabPage2.Controls.Add(delete_data_btn);
+            tabPage2.Controls.Add(dataGridView_delete_data);
+            tabPage2.Controls.Add(restore_del_data_btn);
+            tabPage2.Controls.Add(label4);
+            tabPage2.Controls.Add(del_data_list_allcheck);
+            tabPage2.Controls.Add(stand_col_combo);
+            tabPage2.Controls.Add(delete_search_keyword);
+            tabPage2.Controls.Add(delete_search_button);
+            tabPage2.Font = new Font("Pretendard", 9F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            tabPage2.Location = new Point(4, 24);
+            tabPage2.Name = "tabPage2";
+            tabPage2.Padding = new Padding(3);
+            tabPage2.Size = new Size(503, 231);
+            tabPage2.TabIndex = 1;
+            tabPage2.Text = "데이터 삭제";
+            tabPage2.UseVisualStyleBackColor = true;
             // 
             // delete_data_btn
             // 
@@ -519,7 +500,7 @@
             delete_data_btn.AutoSize = true;
             delete_data_btn.BackColor = Color.Crimson;
             delete_data_btn.FlatStyle = FlatStyle.Flat;
-            delete_data_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
+            delete_data_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
             delete_data_btn.ForeColor = Color.White;
             delete_data_btn.Location = new Point(357, 190);
             delete_data_btn.MinimumSize = new Size(100, 30);
@@ -529,36 +510,6 @@
             delete_data_btn.Text = "데이터 삭제";
             delete_data_btn.UseVisualStyleBackColor = false;
             delete_data_btn.Click += delete_data_btn_Click;
-            // 
-            // restore_del_data_btn
-            // 
-            restore_del_data_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            restore_del_data_btn.AutoSize = true;
-            restore_del_data_btn.BackColor = Color.LimeGreen;
-            restore_del_data_btn.FlatStyle = FlatStyle.Flat;
-            restore_del_data_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
-            restore_del_data_btn.ForeColor = Color.White;
-            restore_del_data_btn.Location = new Point(357, 149);
-            restore_del_data_btn.MinimumSize = new Size(100, 30);
-            restore_del_data_btn.Name = "restore_del_data_btn";
-            restore_del_data_btn.Size = new Size(140, 35);
-            restore_del_data_btn.TabIndex = 44;
-            restore_del_data_btn.Text = "데이터 원복";
-            restore_del_data_btn.UseVisualStyleBackColor = false;
-            restore_del_data_btn.Click += restore_del_data_btn_Click;
-            // 
-            // del_data_list_allcheck
-            // 
-            del_data_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            del_data_list_allcheck.AutoSize = true;
-            del_data_list_allcheck.Font = new Font("맑은 고딕", 11F);
-            del_data_list_allcheck.Location = new Point(358, 81);
-            del_data_list_allcheck.Name = "del_data_list_allcheck";
-            del_data_list_allcheck.Size = new Size(93, 24);
-            del_data_list_allcheck.TabIndex = 44;
-            del_data_list_allcheck.Text = "전체 선택";
-            del_data_list_allcheck.UseVisualStyleBackColor = true;
-            del_data_list_allcheck.CheckedChanged += del_data_list_allcheck_CheckedChanged;
             // 
             // dataGridView_delete_data
             // 
@@ -577,13 +528,75 @@
             dataGridView_delete_data.Size = new Size(346, 144);
             dataGridView_delete_data.TabIndex = 42;
             // 
+            // restore_del_data_btn
+            // 
+            restore_del_data_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            restore_del_data_btn.AutoSize = true;
+            restore_del_data_btn.BackColor = Color.LimeGreen;
+            restore_del_data_btn.FlatStyle = FlatStyle.Flat;
+            restore_del_data_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
+            restore_del_data_btn.ForeColor = Color.White;
+            restore_del_data_btn.Location = new Point(357, 149);
+            restore_del_data_btn.MinimumSize = new Size(100, 30);
+            restore_del_data_btn.Name = "restore_del_data_btn";
+            restore_del_data_btn.Size = new Size(140, 35);
+            restore_del_data_btn.TabIndex = 44;
+            restore_del_data_btn.Text = "데이터 원복";
+            restore_del_data_btn.UseVisualStyleBackColor = false;
+            restore_del_data_btn.Click += restore_del_data_btn_Click;
+            // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Font = new Font("Pretendard", 11F);
+            label4.Location = new Point(6, 8);
+            label4.Name = "label4";
+            label4.Size = new Size(102, 20);
+            label4.TabIndex = 3;
+            label4.Text = "기준 열 선택 :";
+            // 
+            // del_data_list_allcheck
+            // 
+            del_data_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            del_data_list_allcheck.AutoSize = true;
+            del_data_list_allcheck.Font = new Font("Pretendard", 11F);
+            del_data_list_allcheck.Location = new Point(358, 81);
+            del_data_list_allcheck.Name = "del_data_list_allcheck";
+            del_data_list_allcheck.Size = new Size(93, 24);
+            del_data_list_allcheck.TabIndex = 44;
+            del_data_list_allcheck.Text = "전체 선택";
+            del_data_list_allcheck.UseVisualStyleBackColor = true;
+            del_data_list_allcheck.CheckedChanged += del_data_list_allcheck_CheckedChanged;
+            // 
+            // stand_col_combo
+            // 
+            stand_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            stand_col_combo.Font = new Font("Pretendard", 11F);
+            stand_col_combo.FormattingEnabled = true;
+            stand_col_combo.Location = new Point(113, 5);
+            stand_col_combo.Name = "stand_col_combo";
+            stand_col_combo.Size = new Size(384, 28);
+            stand_col_combo.TabIndex = 2;
+            stand_col_combo.SelectedIndexChanged += stand_col_combo_SelectedIndexChanged;
+            // 
+            // delete_search_keyword
+            // 
+            delete_search_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            delete_search_keyword.Font = new Font("Pretendard", 10F);
+            delete_search_keyword.Location = new Point(245, 43);
+            delete_search_keyword.Name = "delete_search_keyword";
+            delete_search_keyword.PlaceholderText = "검색 키워드 입력";
+            delete_search_keyword.Size = new Size(176, 25);
+            delete_search_keyword.TabIndex = 46;
+            delete_search_keyword.KeyDown += delete_search_keyword_KeyDown;
+            // 
             // delete_search_button
             // 
             delete_search_button.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             delete_search_button.AutoSize = true;
             delete_search_button.BackColor = Color.DodgerBlue;
             delete_search_button.FlatStyle = FlatStyle.Flat;
-            delete_search_button.Font = new Font("맑은 고딕", 10F, FontStyle.Bold);
+            delete_search_button.Font = new Font("Pretendard", 10F, FontStyle.Bold);
             delete_search_button.ForeColor = Color.White;
             delete_search_button.Location = new Point(427, 39);
             delete_search_button.MinimumSize = new Size(60, 25);
@@ -594,198 +607,80 @@
             delete_search_button.UseVisualStyleBackColor = false;
             delete_search_button.Click += delete_search_button_Click;
             // 
-            // delete_search_keyword
+            // groupBox2
             // 
-            delete_search_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            delete_search_keyword.Font = new Font("맑은 고딕", 10F);
-            delete_search_keyword.Location = new Point(245, 43);
-            delete_search_keyword.Name = "delete_search_keyword";
-            delete_search_keyword.PlaceholderText = "검색 키워드 입력";
-            delete_search_keyword.Size = new Size(176, 25);
-            delete_search_keyword.TabIndex = 46;
-            delete_search_keyword.KeyDown += delete_search_keyword_KeyDown;
+            groupBox2.Controls.Add(standard_btn);
+            groupBox2.Controls.Add(label12);
+            groupBox2.Controls.Add(comboBox_standard_target);
+            groupBox2.Controls.Add(label11);
+            groupBox2.Controls.Add(comboBox_standard_key);
+            groupBox2.Controls.Add(dataGridView_standard);
+            groupBox2.Dock = DockStyle.Fill;
+            groupBox2.Font = new Font("Pretendard", 12F, FontStyle.Bold);
+            groupBox2.Location = new Point(5, 274);
+            groupBox2.Margin = new Padding(5);
+            groupBox2.Name = "groupBox2";
+            groupBox2.Padding = new Padding(8);
+            groupBox2.Size = new Size(509, 259);
+            groupBox2.TabIndex = 16;
+            groupBox2.TabStop = false;
+            groupBox2.Text = "코스트센터/공급업체 명 표준화";
             // 
-            // stand_col_combo
+            // standard_btn
             // 
-            stand_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            stand_col_combo.Font = new Font("맑은 고딕", 11F);
-            stand_col_combo.FormattingEnabled = true;
-            stand_col_combo.Location = new Point(113, 5);
-            stand_col_combo.Name = "stand_col_combo";
-            stand_col_combo.Size = new Size(384, 28);
-            stand_col_combo.TabIndex = 2;
-            stand_col_combo.SelectedIndexChanged += stand_col_combo_SelectedIndexChanged;
+            standard_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            standard_btn.AutoSize = true;
+            standard_btn.BackColor = Color.LimeGreen;
+            standard_btn.FlatStyle = FlatStyle.Flat;
+            standard_btn.Font = new Font("Pretendard", 11F, FontStyle.Bold);
+            standard_btn.ForeColor = Color.White;
+            standard_btn.Location = new Point(359, 213);
+            standard_btn.MinimumSize = new Size(100, 30);
+            standard_btn.Name = "standard_btn";
+            standard_btn.Size = new Size(140, 35);
+            standard_btn.TabIndex = 47;
+            standard_btn.Text = "표준화 수행";
+            standard_btn.UseVisualStyleBackColor = false;
             // 
-            // label4
+            // label12
             // 
-            label4.AutoSize = true;
-            label4.Font = new Font("맑은 고딕", 11F);
-            label4.Location = new Point(6, 8);
-            label4.Name = "label4";
-            label4.Size = new Size(102, 20);
-            label4.TabIndex = 3;
-            label4.Text = "기준 열 선택 :";
+            label12.AutoSize = true;
+            label12.Font = new Font("Pretendard", 11F);
+            label12.Location = new Point(11, 68);
+            label12.Name = "label12";
+            label12.Size = new Size(102, 20);
+            label12.TabIndex = 50;
+            label12.Text = "변경 열 선택 :";
             // 
-            // groupBox1
+            // comboBox_standard_target
             // 
-            groupBox1.Controls.Add(btn_complete);
-            groupBox1.Controls.Add(prod_col_combo);
-            groupBox1.Controls.Add(label10);
-            groupBox1.Controls.Add(cmb_target);
-            groupBox1.Controls.Add(label1);
-            groupBox1.Controls.Add(cmb_money);
-            groupBox1.Controls.Add(label3);
-            groupBox1.Controls.Add(dept_col_combo);
-            groupBox1.Controls.Add(label6);
-            groupBox1.Controls.Add(sub_acc_col_combo);
-            groupBox1.Controls.Add(label5);
-            groupBox1.Dock = DockStyle.Fill;
-            groupBox1.Font = new Font("맑은 고딕", 12F, FontStyle.Bold);
-            groupBox1.Location = new Point(5, 543);
-            groupBox1.Margin = new Padding(5);
-            groupBox1.Name = "groupBox1";
-            groupBox1.Padding = new Padding(8);
-            groupBox1.Size = new Size(509, 349);
-            groupBox1.TabIndex = 44;
-            groupBox1.TabStop = false;
-            groupBox1.Text = "필수 항목 설정";
+            comboBox_standard_target.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            comboBox_standard_target.Font = new Font("Pretendard", 11F);
+            comboBox_standard_target.FormattingEnabled = true;
+            comboBox_standard_target.Location = new Point(118, 65);
+            comboBox_standard_target.Name = "comboBox_standard_target";
+            comboBox_standard_target.Size = new Size(384, 28);
+            comboBox_standard_target.TabIndex = 49;
             // 
-            // btn_complete
+            // label11
             // 
-            btn_complete.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            btn_complete.AutoSize = true;
-            btn_complete.BackColor = Color.LimeGreen;
-            btn_complete.FlatStyle = FlatStyle.Flat;
-            btn_complete.Font = new Font("맑은 고딕", 14F, FontStyle.Bold);
-            btn_complete.ForeColor = Color.White;
-            btn_complete.Location = new Point(351, 300);
-            btn_complete.MinimumSize = new Size(100, 35);
-            btn_complete.Name = "btn_complete";
-            btn_complete.Size = new Size(150, 40);
-            btn_complete.TabIndex = 38;
-            btn_complete.Text = "완  료";
-            btn_complete.UseVisualStyleBackColor = false;
-            btn_complete.Click += btn_complete_Click;
+            label11.AutoSize = true;
+            label11.Font = new Font("Pretendard", 11F);
+            label11.Location = new Point(10, 30);
+            label11.Name = "label11";
+            label11.Size = new Size(95, 20);
+            label11.TabIndex = 48;
+            label11.Text = "key 열 선택 :";
             // 
-            // prod_col_combo
+            // comboBox_standard_key
             // 
-            prod_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            prod_col_combo.Font = new Font("맑은 고딕", 11F);
-            prod_col_combo.FormattingEnabled = true;
-            prod_col_combo.Location = new Point(140, 155);
-            prod_col_combo.Name = "prod_col_combo";
-            prod_col_combo.Size = new Size(361, 28);
-            prod_col_combo.TabIndex = 39;
-            // 
-            // label10
-            // 
-            label10.AutoSize = true;
-            label10.Font = new Font("맑은 고딕", 11F);
-            label10.Location = new Point(15, 158);
-            label10.Name = "label10";
-            label10.Size = new Size(97, 20);
-            label10.TabIndex = 40;
-            label10.Text = "공급업체 열 :";
-            // 
-            // cmb_target
-            // 
-            cmb_target.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            cmb_target.Font = new Font("맑은 고딕", 11F);
-            cmb_target.FormattingEnabled = true;
-            cmb_target.Location = new Point(140, 225);
-            cmb_target.Name = "cmb_target";
-            cmb_target.Size = new Size(361, 28);
-            cmb_target.TabIndex = 14;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Font = new Font("맑은 고딕", 11F);
-            label1.Location = new Point(15, 228);
-            label1.Name = "label1";
-            label1.Size = new Size(67, 20);
-            label1.TabIndex = 15;
-            label1.Text = "타겟 열 :";
-            // 
-            // cmb_money
-            // 
-            cmb_money.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            cmb_money.Font = new Font("맑은 고딕", 11F);
-            cmb_money.FormattingEnabled = true;
-            cmb_money.Location = new Point(140, 190);
-            cmb_money.Name = "cmb_money";
-            cmb_money.Size = new Size(361, 28);
-            cmb_money.TabIndex = 18;
-            // 
-            // label3
-            // 
-            label3.AutoSize = true;
-            label3.Font = new Font("맑은 고딕", 11F);
-            label3.Location = new Point(15, 193);
-            label3.Name = "label3";
-            label3.Size = new Size(67, 20);
-            label3.TabIndex = 19;
-            label3.Text = "금액 열 :";
-            // 
-            // dept_col_combo
-            // 
-            dept_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            dept_col_combo.Font = new Font("맑은 고딕", 11F);
-            dept_col_combo.FormattingEnabled = true;
-            dept_col_combo.Location = new Point(140, 120);
-            dept_col_combo.Name = "dept_col_combo";
-            dept_col_combo.Size = new Size(361, 28);
-            dept_col_combo.TabIndex = 21;
-            // 
-            // label6
-            // 
-            label6.AutoSize = true;
-            label6.Font = new Font("맑은 고딕", 11F);
-            label6.Location = new Point(15, 123);
-            label6.Name = "label6";
-            label6.Size = new Size(117, 20);
-            label6.TabIndex = 22;
-            label6.Text = "코스트센터 열  :";
-            // 
-            // sub_acc_col_combo
-            // 
-            sub_acc_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            sub_acc_col_combo.Font = new Font("맑은 고딕", 11F);
-            sub_acc_col_combo.FormattingEnabled = true;
-            sub_acc_col_combo.Location = new Point(140, 85);
-            sub_acc_col_combo.Name = "sub_acc_col_combo";
-            sub_acc_col_combo.Size = new Size(361, 28);
-            sub_acc_col_combo.TabIndex = 23;
-            // 
-            // label5
-            // 
-            label5.AutoSize = true;
-            label5.Font = new Font("맑은 고딕", 11F);
-            label5.Location = new Point(15, 88);
-            label5.Name = "label5";
-            label5.Size = new Size(67, 20);
-            label5.TabIndex = 24;
-            label5.Text = "세목 열 :";
-            // 
-            // label2
-            // 
-            label2.AutoSize = true;
-            label2.Font = new Font("맑은 고딕", 14F);
-            label2.Location = new Point(6, 41);
-            label2.Name = "label2";
-            label2.Size = new Size(132, 25);
-            label2.TabIndex = 3;
-            label2.Text = "제거 열 선택 :";
-            label2.Visible = false;
-            // 
-            // dataGridView2
-            // 
-            dataGridView2.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridView2.Location = new Point(6, 77);
-            dataGridView2.Name = "dataGridView2";
-            dataGridView2.Size = new Size(458, 180);
-            dataGridView2.TabIndex = 41;
-            dataGridView2.Visible = false;
+            comboBox_standard_key.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            comboBox_standard_key.Font = new Font("Pretendard", 11F);
+            comboBox_standard_key.FormattingEnabled = true;
+            comboBox_standard_key.Location = new Point(117, 27);
+            comboBox_standard_key.Name = "comboBox_standard_key";
+            comboBox_standard_key.Size = new Size(384, 28);
+            comboBox_standard_key.TabIndex = 47;
             // 
             // dataGridView_standard
             // 
@@ -804,61 +699,166 @@
             dataGridView_standard.Size = new Size(346, 144);
             dataGridView_standard.TabIndex = 47;
             // 
-            // label11
+            // groupBox1
             // 
-            label11.AutoSize = true;
-            label11.Font = new Font("맑은 고딕", 11F);
-            label11.Location = new Point(10, 30);
-            label11.Name = "label11";
-            label11.Size = new Size(95, 20);
-            label11.TabIndex = 48;
-            label11.Text = "key 열 선택 :";
+            groupBox1.Controls.Add(btn_complete);
+            groupBox1.Controls.Add(prod_col_combo);
+            groupBox1.Controls.Add(label10);
+            groupBox1.Controls.Add(cmb_target);
+            groupBox1.Controls.Add(label1);
+            groupBox1.Controls.Add(cmb_money);
+            groupBox1.Controls.Add(label3);
+            groupBox1.Controls.Add(dept_col_combo);
+            groupBox1.Controls.Add(label6);
+            groupBox1.Controls.Add(sub_acc_col_combo);
+            groupBox1.Controls.Add(label5);
+            groupBox1.Dock = DockStyle.Fill;
+            groupBox1.Font = new Font("Pretendard", 12F, FontStyle.Bold);
+            groupBox1.Location = new Point(5, 543);
+            groupBox1.Margin = new Padding(5);
+            groupBox1.Name = "groupBox1";
+            groupBox1.Padding = new Padding(8);
+            groupBox1.Size = new Size(509, 349);
+            groupBox1.TabIndex = 44;
+            groupBox1.TabStop = false;
+            groupBox1.Text = "필수 항목 설정";
             // 
-            // comboBox_standard_key
+            // btn_complete
             // 
-            comboBox_standard_key.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            comboBox_standard_key.Font = new Font("맑은 고딕", 11F);
-            comboBox_standard_key.FormattingEnabled = true;
-            comboBox_standard_key.Location = new Point(117, 27);
-            comboBox_standard_key.Name = "comboBox_standard_key";
-            comboBox_standard_key.Size = new Size(384, 28);
-            comboBox_standard_key.TabIndex = 47;
+            btn_complete.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btn_complete.AutoSize = true;
+            btn_complete.BackColor = Color.LimeGreen;
+            btn_complete.FlatStyle = FlatStyle.Flat;
+            btn_complete.Font = new Font("Pretendard", 14F, FontStyle.Bold);
+            btn_complete.ForeColor = Color.White;
+            btn_complete.Location = new Point(351, 300);
+            btn_complete.MinimumSize = new Size(100, 35);
+            btn_complete.Name = "btn_complete";
+            btn_complete.Size = new Size(150, 40);
+            btn_complete.TabIndex = 38;
+            btn_complete.Text = "완  료";
+            btn_complete.UseVisualStyleBackColor = false;
+            btn_complete.Click += btn_complete_Click;
             // 
-            // label12
+            // prod_col_combo
             // 
-            label12.AutoSize = true;
-            label12.Font = new Font("맑은 고딕", 11F);
-            label12.Location = new Point(11, 68);
-            label12.Name = "label12";
-            label12.Size = new Size(102, 20);
-            label12.TabIndex = 50;
-            label12.Text = "변경 열 선택 :";
+            prod_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            prod_col_combo.Font = new Font("Pretendard", 11F);
+            prod_col_combo.FormattingEnabled = true;
+            prod_col_combo.Location = new Point(140, 155);
+            prod_col_combo.Name = "prod_col_combo";
+            prod_col_combo.Size = new Size(361, 28);
+            prod_col_combo.TabIndex = 39;
             // 
-            // comboBox_standard_target
+            // label10
             // 
-            comboBox_standard_target.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            comboBox_standard_target.Font = new Font("맑은 고딕", 11F);
-            comboBox_standard_target.FormattingEnabled = true;
-            comboBox_standard_target.Location = new Point(118, 65);
-            comboBox_standard_target.Name = "comboBox_standard_target";
-            comboBox_standard_target.Size = new Size(384, 28);
-            comboBox_standard_target.TabIndex = 49;
+            label10.AutoSize = true;
+            label10.Font = new Font("Pretendard", 11F);
+            label10.Location = new Point(15, 158);
+            label10.Name = "label10";
+            label10.Size = new Size(97, 20);
+            label10.TabIndex = 40;
+            label10.Text = "공급업체 열 :";
             // 
-            // standard_btn
+            // cmb_target
             // 
-            standard_btn.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            standard_btn.AutoSize = true;
-            standard_btn.BackColor = Color.LimeGreen;
-            standard_btn.FlatStyle = FlatStyle.Flat;
-            standard_btn.Font = new Font("맑은 고딕", 11F, FontStyle.Bold);
-            standard_btn.ForeColor = Color.White;
-            standard_btn.Location = new Point(359, 213);
-            standard_btn.MinimumSize = new Size(100, 30);
-            standard_btn.Name = "standard_btn";
-            standard_btn.Size = new Size(140, 35);
-            standard_btn.TabIndex = 47;
-            standard_btn.Text = "표준화 수행";
-            standard_btn.UseVisualStyleBackColor = false;
+            cmb_target.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            cmb_target.Font = new Font("Pretendard", 11F);
+            cmb_target.FormattingEnabled = true;
+            cmb_target.Location = new Point(140, 225);
+            cmb_target.Name = "cmb_target";
+            cmb_target.Size = new Size(361, 28);
+            cmb_target.TabIndex = 14;
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Font = new Font("Pretendard", 11F);
+            label1.Location = new Point(15, 228);
+            label1.Name = "label1";
+            label1.Size = new Size(67, 20);
+            label1.TabIndex = 15;
+            label1.Text = "타겟 열 :";
+            // 
+            // cmb_money
+            // 
+            cmb_money.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            cmb_money.Font = new Font("Pretendard", 11F);
+            cmb_money.FormattingEnabled = true;
+            cmb_money.Location = new Point(140, 190);
+            cmb_money.Name = "cmb_money";
+            cmb_money.Size = new Size(361, 28);
+            cmb_money.TabIndex = 18;
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Font = new Font("Pretendard", 11F);
+            label3.Location = new Point(15, 193);
+            label3.Name = "label3";
+            label3.Size = new Size(67, 20);
+            label3.TabIndex = 19;
+            label3.Text = "금액 열 :";
+            // 
+            // dept_col_combo
+            // 
+            dept_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            dept_col_combo.Font = new Font("Pretendard", 11F);
+            dept_col_combo.FormattingEnabled = true;
+            dept_col_combo.Location = new Point(140, 120);
+            dept_col_combo.Name = "dept_col_combo";
+            dept_col_combo.Size = new Size(361, 28);
+            dept_col_combo.TabIndex = 21;
+            // 
+            // label6
+            // 
+            label6.AutoSize = true;
+            label6.Font = new Font("Pretendard", 11F);
+            label6.Location = new Point(15, 123);
+            label6.Name = "label6";
+            label6.Size = new Size(117, 20);
+            label6.TabIndex = 22;
+            label6.Text = "코스트센터 열  :";
+            // 
+            // sub_acc_col_combo
+            // 
+            sub_acc_col_combo.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            sub_acc_col_combo.Font = new Font("Pretendard", 11F);
+            sub_acc_col_combo.FormattingEnabled = true;
+            sub_acc_col_combo.Location = new Point(140, 85);
+            sub_acc_col_combo.Name = "sub_acc_col_combo";
+            sub_acc_col_combo.Size = new Size(361, 28);
+            sub_acc_col_combo.TabIndex = 23;
+            // 
+            // label5
+            // 
+            label5.AutoSize = true;
+            label5.Font = new Font("Pretendard", 11F);
+            label5.Location = new Point(15, 88);
+            label5.Name = "label5";
+            label5.Size = new Size(67, 20);
+            label5.TabIndex = 24;
+            label5.Text = "세목 열 :";
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Font = new Font("Pretendard", 14F);
+            label2.Location = new Point(6, 41);
+            label2.Name = "label2";
+            label2.Size = new Size(132, 25);
+            label2.TabIndex = 3;
+            label2.Text = "제거 열 선택 :";
+            label2.Visible = false;
+            // 
+            // dataGridView2
+            // 
+            dataGridView2.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dataGridView2.Location = new Point(6, 77);
+            dataGridView2.Name = "dataGridView2";
+            dataGridView2.Size = new Size(458, 180);
+            dataGridView2.TabIndex = 41;
+            dataGridView2.Visible = false;
             // 
             // uc_FileLoad
             // 
@@ -877,25 +877,25 @@
             tableLayoutLeft.ResumeLayout(false);
             pnl_data_headers.ResumeLayout(false);
             pnl_data_grids.ResumeLayout(false);
-            tabControl1.ResumeLayout(false);
-            tabPage1.ResumeLayout(false);
-            tabPage1.PerformLayout();
-            tabPage2.ResumeLayout(false);
-            tabPage2.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_process).EndInit();
             ((System.ComponentModel.ISupportInitialize)dataGridView_target).EndInit();
             pnl_pagination.ResumeLayout(false);
             pnl_pagination.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)num_pageNumber).EndInit();
             tableLayoutRight.ResumeLayout(false);
+            tabControl1.ResumeLayout(false);
+            tabPage1.ResumeLayout(false);
+            tabPage1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView_delete_col).EndInit();
+            tabPage2.ResumeLayout(false);
+            tabPage2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_delete_data).EndInit();
             groupBox2.ResumeLayout(false);
             groupBox2.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)dataGridView_delete_data).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dataGridView_standard).EndInit();
             groupBox1.ResumeLayout(false);
             groupBox1.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).EndInit();
-            ((System.ComponentModel.ISupportInitialize)dataGridView_standard).EndInit();
             ResumeLayout(false);
         }
 
