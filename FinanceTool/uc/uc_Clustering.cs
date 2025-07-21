@@ -419,6 +419,10 @@ namespace FinanceTool
 
                 // 6. 나머지 UI 초기화 작업들 (기존 코드 그대로 유지)
                 await InitializeRemainingUI();
+
+                //세부 목록 재조회
+                create_check_keyword_list();
+
             }
             catch (Exception ex)
             {
@@ -594,6 +598,17 @@ namespace FinanceTool
             try
             {
                 if (dataGridView_supply_summary == null) return;
+
+                //2025.07.21
+                //공급업체열이 필수가 아니면 로직 종료
+                if (!DataHandler.prod_col_yn)
+                {
+                    // DataGridView 초기화
+                    dataGridView_supply_summary.DataSource = null;
+                    dataGridView_supply_summary.Rows.Clear();
+                    dataGridView_supply_summary.Columns.Clear();
+                    return;
+                }
 
                 // DataGridView 초기화
                 dataGridView_supply_summary.DataSource = null;
@@ -1250,16 +1265,16 @@ namespace FinanceTool
                 // 클러스터 ID를 통해 키워드 목록 재구성 (기존 로직 호환을 위해)
                 //matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn);
                 // 클러스터 ID를 통해 원래 검색 키워드와 매칭되는 키워드만 재구성
-                matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn, parsedKeywords, equalsSearchYN);
+                //matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn, parsedKeywords, equalsSearchYN);
 
-                Debug.WriteLine($"복합 조건 검색 결과: {matchingKeywords.Count}개 키워드");
-                Debug.WriteLine($"매칭된 키워드 목록: [{string.Join(", ", matchingKeywords)}]");
+                //Debug.WriteLine($"복합 조건 검색 결과: {matchingKeywords.Count}개 키워드");
+                //Debug.WriteLine($"매칭된 키워드 목록: [{string.Join(", ", matchingKeywords)}]");
 
 
                 // 다중 컬럼 검색 조건 구성
                 var columnCriteria = new Dictionary<string, SearchColumnCriteria>();
 
-                if (matchingKeywords.Count > 0)
+                if (matchingClusterIds.Count > 0)
                 {
                     /*
                     columnCriteria[searchColumn] = new SearchColumnCriteria
@@ -1372,14 +1387,14 @@ namespace FinanceTool
                     // 클러스터 ID를 통해 키워드 목록 재구성 (기존 로직 호환을 위해)
                     //matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn);
                     // 클러스터 ID를 통해 원래 검색 키워드와 매칭되는 키워드만 재구성
-                    matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn, parsedKeywords, equalsSearchYN);
+                    //matchingKeywords = GetKeywordsByClusterIds(matchingClusterIds, searchColumn, parsedKeywords, equalsSearchYN);
 
-                    Debug.WriteLine($"복합 조건 검색 결과: {matchingKeywords.Count}개 키워드");
-                    Debug.WriteLine($"매칭된 키워드 목록: [{string.Join(", ", matchingKeywords)}]");
+                    //Debug.WriteLine($"복합 조건 검색 결과: {matchingKeywords.Count}개 키워드");
+                    //Debug.WriteLine($"매칭된 키워드 목록: [{string.Join(", ", matchingKeywords)}]");
                     // 다중 컬럼 검색 조건 구성
                     var columnCriteria = new Dictionary<string, SearchColumnCriteria>();
 
-                    if (matchingKeywords.Count > 0)
+                    if (matchingClusterIds.Count > 0)
                     {
                         /*
                         columnCriteria[searchColumn] = new SearchColumnCriteria
@@ -2492,12 +2507,6 @@ namespace FinanceTool
                     return;
                 }
 
-                if (selectedClusterIds.Count < 2)
-                {
-                    MessageBox.Show("병합하려면 최소 2개 이상의 클러스터를 선택해야 합니다.", "알림",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
 
                 DialogResult result = MessageBox.Show(
                     $"선택된 {selectedClusterIds.Count}개의 클러스터를 병합하시겠습니까?",
@@ -3515,6 +3524,18 @@ namespace FinanceTool
                 this.Invoke(new Action(() => UpdateSupplySummaryDataGridView()));
                 return;
             }
+
+            //2025.07.21
+            //공급업체열이 필수가 아니면 로직 종료
+            if (!DataHandler.prod_col_yn)
+            {
+                // DataGridView 초기화
+                dataGridView_supply_summary.DataSource = null;
+                dataGridView_supply_summary.Rows.Clear();
+                dataGridView_supply_summary.Columns.Clear();
+                return;
+            }
+
 
             // UI 업데이트 시작 전에 SuspendLayout 호출
             dataGridView_supply_summary.SuspendLayout();

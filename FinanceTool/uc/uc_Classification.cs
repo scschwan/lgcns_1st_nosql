@@ -213,12 +213,13 @@ namespace FinanceTool
                     // *** 컬럼 정보 전체 출력 ***
                     Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 행 수: {DataHandler.finalClusteringData.Rows.Count}");
                     Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 컬럼 수: {DataHandler.finalClusteringData.Columns.Count}");
+                    /*
                     for (int i = 0; i < DataHandler.finalClusteringData.Columns.Count; i++)
                     {
                         Debug.WriteLine($"  컬럼 {i}: Name='{DataHandler.finalClusteringData.Columns[i].ColumnName}'" +
                             $", DataType='{DataHandler.finalClusteringData.Columns[i].DataType}'");
                     }
-
+                    */
                     await progressForm.UpdateProgressHandler(100, "초기화 완료");
                     await Task.Delay(100);
                     progressForm.Close();
@@ -1814,12 +1815,7 @@ namespace FinanceTool
         "id", "import_date", "is_hidden"
     };
 
-            // 모든 컬럼 상태 로깅 (디버깅)
-            foreach (DataGridViewColumn column in dgv.Columns)
-            {
-                Debug.WriteLine($"컬럼 처리 전: {column.Name}, Visible: {column.Visible}");
-            }
-
+           
             // 각 컬럼에 대해 가시성 설정
             foreach (DataGridViewColumn column in dgv.Columns)
             {
@@ -1831,7 +1827,7 @@ namespace FinanceTool
                     if (systemColumns.Contains(columnName))
                     {
                         column.Visible = false;
-                        Debug.WriteLine($"시스템 컬럼 숨김: {columnName}");
+                        //Debug.WriteLine($"시스템 컬럼 숨김: {columnName}");
                         continue;
                     }
 
@@ -1839,14 +1835,14 @@ namespace FinanceTool
                     if (essentialColumns.Contains(columnName))
                     {
                         column.Visible = true;
-                        Debug.WriteLine($"필수 컬럼 표시: {columnName}");
+                        //Debug.WriteLine($"필수 컬럼 표시: {columnName}");
                         continue;
                     }
 
                     // 가시적 컬럼 목록에 있는 컬럼만 표시
                     bool isVisible = visibleColumnNames.Contains(columnName);
                     column.Visible = isVisible;
-                    Debug.WriteLine($"일반 컬럼 가시성 설정: {columnName}, Visible: {isVisible}");
+                    //Debug.WriteLine($"일반 컬럼 가시성 설정: {columnName}, Visible: {isVisible}");
                 }
                 catch (Exception ex)
                 {
@@ -1854,11 +1850,7 @@ namespace FinanceTool
                 }
             }
 
-            // 모든 컬럼 상태 로깅 (디버깅)
-            foreach (DataGridViewColumn column in dgv.Columns)
-            {
-                Debug.WriteLine($"컬럼 처리 후: {column.Name}, Visible: {column.Visible}");
-            }
+           
         }
 
         // 필수 컬럼 목록을 가져오는 헬퍼 함수 추가
@@ -2183,7 +2175,7 @@ namespace FinanceTool
                 targetDgv.Rows[rowIndex].Cells["CheckBox"].Value = column.Visible;
                 targetDgv.Rows[rowIndex].Cells["Data"].Value = column.Name;
 
-                Debug.WriteLine($"컬럼 추가: {column.Name}, Visible: {column.Visible}");
+                //Debug.WriteLine($"컬럼 추가: {column.Name}, Visible: {column.Visible}");
             }
 
             Debug.WriteLine($"AddSelectedColumnToGrid 완료: {targetDgv.Rows.Count}개 행 추가됨");

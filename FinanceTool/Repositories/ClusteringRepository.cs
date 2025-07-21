@@ -179,6 +179,27 @@ namespace FinanceTool.Repositories
         }
 
         /// <summary>
+        /// 세부 클러스터의 하위 클러스터들 조회 (새로 추가)
+        /// </summary>
+        public async Task<List<ClusteringResultDocument>> GetSubChildClustersAsync(int parentClusterSubId)
+        {
+            var filter = Builders<ClusteringResultDocument>.Filter.And(
+                Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterSubId, parentClusterSubId),
+                Builders<ClusteringResultDocument>.Filter.Ne(c => c.ClusterNumber, parentClusterSubId)
+            );
+            return await _collection.Find(filter).ToListAsync();
+        }
+
+        /// <summary>
+        /// 세부 클러스터 정보 조회 (새로 추가)
+        /// </summary>
+        public async Task<ClusteringResultDocument> GetByClusterSubNumberAsync(int clusterSubNumber)
+        {
+            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterSubNumber);
+            return await _collection.Find(filter).FirstOrDefaultAsync();
+        }
+
+        /// <summary>
         /// 클러스터 병합
         /// </summary>
         public async Task<int> MergeOrUpdateClusterAsync(

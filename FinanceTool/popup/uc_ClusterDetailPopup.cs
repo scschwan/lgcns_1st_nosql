@@ -20,6 +20,11 @@ namespace FinanceTool
         private decimal _decimalDivider = 1;
         private string _decimalDividerName = "원";
 
+        // 기존 생성자에 파라미터 추가
+        private bool _isSubClusterMode = false;
+        
+
+
         // 이벤트 정의 - 병합 해제가 완료되었을 때 발생
         public event EventHandler<ClusterUnmergeEventArgs> UnmergeCompleted;
 
@@ -31,9 +36,13 @@ namespace FinanceTool
             public bool RefreshRequired { get; set; } = true;
         }
 
-        public ClusterDetailPopup()
+
+        public ClusterDetailPopup(bool isSubClusterMode = false)
         {
             InitializeComponent();
+
+            _isSubClusterMode = isSubClusterMode;
+           
 
             // DataGridView 초기 설정
             detail_grid_view.AllowUserToAddRows = false;
@@ -64,6 +73,7 @@ namespace FinanceTool
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.ShowInTaskbar = false;
+            _isSubClusterMode = isSubClusterMode;
         }
 
         public async Task ShowClusterDetail(int clusterId)
@@ -78,7 +88,18 @@ namespace FinanceTool
             {
                 // 1. MongoDB에서 클러스터에 속한 하위 항목 조회
                 var clusteringRepo = new ClusteringRepository();
-                var childClusters = await clusteringRepo.GetChildClustersAsync(clusterId);
+                var childClusters = new List<ClusteringResultDocument>();
+                //세부 클러스터링 조회
+                if (_isSubClusterMode)
+                {
+                    childClusters = await clusteringRepo.GetSubChildClustersAsync(clusterId);
+                }
+                //일반 클러스터링 조회
+                else
+                {
+                    childClusters = await clusteringRepo.GetChildClustersAsync(clusterId);
+                }
+                
 
                 if (childClusters == null || childClusters.Count == 0)
                 {
@@ -116,6 +137,7 @@ namespace FinanceTool
             // UI 표시용 컬럼 추가 (기존 코드와 호환성 유지)
             detailDataTable.Columns.Add("ID", typeof(int));
             detailDataTable.Columns.Add("ClusterID", typeof(int));
+            detailDataTable.Columns.Add("ClusterSubID", typeof(int));
             detailDataTable.Columns.Add("클러스터명", typeof(string));
             detailDataTable.Columns.Add("키워드목록", typeof(string));
             detailDataTable.Columns.Add("Count", typeof(int));
@@ -132,6 +154,7 @@ namespace FinanceTool
                 row["_MongoId"] = cluster.Id;
                 row["ID"] = cluster.ClusterNumber;
                 row["ClusterID"] = cluster.ClusterId;
+                row["ClusterSubID"] = cluster.ClusterSubId;
                 row["클러스터명"] = cluster.ClusterName;
                 row["키워드목록"] = string.Join(",", cluster.Keywords);
                 row["Count"] = cluster.Count;
@@ -357,6 +380,10 @@ namespace FinanceTool
             if (detail_grid_view.Columns.Contains("ClusterID"))
                 detail_grid_view.Columns["ClusterID"].Visible = false;
 
+            // ClusterID 컬럼 숨기기
+            if (detail_grid_view.Columns.Contains("ClusterSubID"))
+                detail_grid_view.Columns["ClusterSubID"].Visible = false;
+
             // dataIndex 컬럼 숨기기
             if (detail_grid_view.Columns.Contains("dataIndex"))
                 detail_grid_view.Columns["dataIndex"].Visible = false;
@@ -458,6 +485,8 @@ namespace FinanceTool
         // ClusterDetailPopup.cs의 UnmergeSelectedItems_Click 함수 수정
         private async void UnmergeSelectedItems_Click(object sender, EventArgs e)
         {
+            string mapping_keyword = _isSubClusterMode ? "세부 병합" : "병합";
+            
             // 체크된 행에서 클러스터 ID 목록 가져오기
             List<int> selectedClusterIds = new List<int>();
 
@@ -475,15 +504,15 @@ namespace FinanceTool
 
             if (selectedClusterIds.Count == 0)
             {
-                MessageBox.Show("병합 해제할 항목을 선택해주세요.", "알림",
+                MessageBox.Show(mapping_keyword + " 해제할 항목을 선택해주세요.", "알림",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             // 확인 메시지
             DialogResult result = MessageBox.Show(
-                $"선택한 {selectedClusterIds.Count}개 항목을 병합에서 해제하시겠습니까?",
-                "병합 해제 확인",
+                $"선택한 {selectedClusterIds.Count}개 항목을 "+ mapping_keyword +"에서 해제하시겠습니까?",
+                mapping_keyword + " 해제 확인",
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 
@@ -497,7 +526,7 @@ namespace FinanceTool
                 using (var progressForm = new ProcessProgressForm())
                 {
                     progressForm.Show();
-                    await progressForm.UpdateProgressHandler(10, "병합 해제 작업 시작");
+                    await progressForm.UpdateProgressHandler(10, mapping_keyword + " 해제 작업 시작");
 
                     // *** 1단계: 부모 클러스터와 모든 하위 클러스터 정보 미리 수집 ***
                     await progressForm.UpdateProgressHandler(20, "클러스터 정보 수집 중");
@@ -509,9 +538,17 @@ namespace FinanceTool
                             MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
+                    var allChildClusters = new List<ClusteringResultDocument>();
 
-                    var allChildClusters = await clusteringRepo.GetChildClustersAsync(_currentClusterId);
-
+                    if (_isSubClusterMode)
+                    {
+                        allChildClusters = await clusteringRepo.GetSubChildClustersAsync(_currentClusterId);
+                    }
+                    else
+                    {
+                        allChildClusters = await clusteringRepo.GetChildClustersAsync(_currentClusterId);
+                    }
+                    
                     // 선택된 클러스터들의 상세 정보 수집
                     var selectedClusters = new List<ClusteringResultDocument>();
                     foreach (int clusterId in selectedClusterIds)
@@ -565,73 +602,150 @@ namespace FinanceTool
                     Debug.WriteLine($"DataIndices: {parentCluster.DataIndices?.Count ?? 0} -> {newDataIndices.Count}");
 
                     // *** 3단계: 선택된 클러스터들의 ClusterID를 -1로 업데이트 (병합 해제) ***
-                    await progressForm.UpdateProgressHandler(50, "선택된 클러스터 병합 해제 중");
-
+                    await progressForm.UpdateProgressHandler(50, "선택된 클러스터 "+ mapping_keyword + " 해제 중");
                     int processedCount = 0;
-                    foreach (int clusterId in selectedClusterIds)
+
+                    //세부 병합 클러스터
+                    if(_isSubClusterMode)
                     {
-                        await clusteringRepo.UpdateClusterIdAsync(clusterId, -1);
-
-                        // 메모리 상의 DataHandler.finalClusteringData도 즉시 업데이트
-                        var memoryRows = DataHandler.finalClusteringData.Select($"ID = {clusterId}");
-                        if (memoryRows.Length > 0)
                         {
-                            memoryRows[0]["ClusterID"] = -1;
-                        }
+                            foreach (int clusterId in selectedClusterIds)
+                            {
+                                await clusteringRepo.UpdateClusterSubIdAsync(clusterId, -1);
 
-                        processedCount++;
-                        int progress = 50 + (int)((double)processedCount / selectedClusterIds.Count * 20);
-                        await progressForm.UpdateProgressHandler(progress, $"병합 해제: {processedCount}/{selectedClusterIds.Count}");
+                                // 메모리 상의 DataHandler.subClusteringData 즉시 업데이트
+                                var memoryRows = DataHandler.subClusteringData.Select($"ID = {clusterId}");
+                                if (memoryRows.Length > 0)
+                                {
+                                    //memoryRows[0]["ClusterID"] = -1;
+                                    memoryRows[0]["ClusterSubID"] = -1;
+                                }
+
+                                processedCount++;
+                                int progress = 50 + (int)((double)processedCount / selectedClusterIds.Count * 20);
+                                await progressForm.UpdateProgressHandler(progress, mapping_keyword + $" 해제: {processedCount}/{selectedClusterIds.Count}");
+                            }
+
+                            // *** 4단계: 부모 클러스터 상태 결정 및 업데이트 ***
+                            await progressForm.UpdateProgressHandler(75, "부모 클러스터 상태 업데이트 중");
+
+                            if (remainingChildClusters.Count > 0)
+                            {
+                                // 남은 하위 클러스터가 있으면 부모 클러스터 업데이트
+                                Debug.WriteLine($"부모 클러스터 업데이트: 남은 하위 클러스터 {remainingChildClusters.Count}개");
+
+                                bool updateSuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
+                                    _currentClusterId,
+                                    parentCluster.ClusterName, // 클러스터명은 유지
+                                    newKeywords.ToList(),
+                                    newCount,
+                                    newTotalAmount,
+                                    newDataIndices.ToList()
+                                );
+
+                                if (!updateSuccess)
+                                {
+                                    throw new Exception($"부모 클러스터 {_currentClusterId} 업데이트 실패");
+                                }
+
+                                // 메모리 상의 부모 클러스터 데이터도 업데이트
+                                var parentMemoryRows = DataHandler.subClusteringData.Select($"ID = {_currentClusterId}");
+                                if (parentMemoryRows.Length > 0)
+                                {
+                                    parentMemoryRows[0]["Count"] = newCount;
+                                    parentMemoryRows[0]["합산금액"] = newTotalAmount;
+                                    parentMemoryRows[0]["dataIndex"] = string.Join(",", newDataIndices);
+                                    parentMemoryRows[0]["키워드목록"] = string.Join(",", newKeywords);
+                                }
+
+                                Debug.WriteLine("부모 클러스터 업데이트 완료");
+                            }
+                            else
+                            {
+                                // 남은 하위 클러스터가 없으면 부모 클러스터 삭제
+                                Debug.WriteLine("남은 하위 클러스터가 없어 부모 클러스터 삭제");
+
+                                await clusteringRepo.DeleteByClusterNumberAsync(_currentClusterId);
+
+                                // 메모리에서도 삭제
+                                var parentMemoryRows = DataHandler.subClusteringData.Select($"ID = {_currentClusterId}");
+                                if (parentMemoryRows.Length > 0)
+                                {
+                                    parentMemoryRows[0].Delete();
+                                }
+                            }
+                        }
                     }
-
-                    // *** 4단계: 부모 클러스터 상태 결정 및 업데이트 ***
-                    await progressForm.UpdateProgressHandler(75, "부모 클러스터 상태 업데이트 중");
-
-                    if (remainingChildClusters.Count > 0)
-                    {
-                        // 남은 하위 클러스터가 있으면 부모 클러스터 업데이트
-                        Debug.WriteLine($"부모 클러스터 업데이트: 남은 하위 클러스터 {remainingChildClusters.Count}개");
-
-                        bool updateSuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
-                            _currentClusterId,
-                            parentCluster.ClusterName, // 클러스터명은 유지
-                            newKeywords.ToList(),
-                            newCount,
-                            newTotalAmount,
-                            newDataIndices.ToList()
-                        );
-
-                        if (!updateSuccess)
-                        {
-                            throw new Exception($"부모 클러스터 {_currentClusterId} 업데이트 실패");
-                        }
-
-                        // 메모리 상의 부모 클러스터 데이터도 업데이트
-                        var parentMemoryRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
-                        if (parentMemoryRows.Length > 0)
-                        {
-                            parentMemoryRows[0]["Count"] = newCount;
-                            parentMemoryRows[0]["합산금액"] = newTotalAmount;
-                            parentMemoryRows[0]["dataIndex"] = string.Join(",", newDataIndices);
-                            parentMemoryRows[0]["키워드목록"] = string.Join(",", newKeywords);
-                        }
-
-                        Debug.WriteLine("부모 클러스터 업데이트 완료");
-                    }
+                    //병합 클러스터
                     else
                     {
-                        // 남은 하위 클러스터가 없으면 부모 클러스터 삭제
-                        Debug.WriteLine("남은 하위 클러스터가 없어 부모 클러스터 삭제");
-
-                        await clusteringRepo.DeleteByClusterNumberAsync(_currentClusterId);
-
-                        // 메모리에서도 삭제
-                        var parentMemoryRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
-                        if (parentMemoryRows.Length > 0)
+                        foreach (int clusterId in selectedClusterIds)
                         {
-                            parentMemoryRows[0].Delete();
+                            await clusteringRepo.UpdateClusterIdAsync(clusterId, -1);
+
+                            // 메모리 상의 DataHandler.finalClusteringData도 즉시 업데이트
+                            var memoryRows = DataHandler.finalClusteringData.Select($"ID = {clusterId}");
+                            if (memoryRows.Length > 0)
+                            {
+                                memoryRows[0]["ClusterID"] = -1;
+                            }
+
+                            processedCount++;
+                            int progress = 50 + (int)((double)processedCount / selectedClusterIds.Count * 20);
+                            await progressForm.UpdateProgressHandler(progress, mapping_keyword + $" 해제: {processedCount}/{selectedClusterIds.Count}");
+                        }
+
+                        // *** 4단계: 부모 클러스터 상태 결정 및 업데이트 ***
+                        await progressForm.UpdateProgressHandler(75, "부모 클러스터 상태 업데이트 중");
+
+                        if (remainingChildClusters.Count > 0)
+                        {
+                            // 남은 하위 클러스터가 있으면 부모 클러스터 업데이트
+                            Debug.WriteLine($"부모 클러스터 업데이트: 남은 하위 클러스터 {remainingChildClusters.Count}개");
+
+                            bool updateSuccess = await clusteringRepo.UpdateClusterFullInfoAsync(
+                                _currentClusterId,
+                                parentCluster.ClusterName, // 클러스터명은 유지
+                                newKeywords.ToList(),
+                                newCount,
+                                newTotalAmount,
+                                newDataIndices.ToList()
+                            );
+
+                            if (!updateSuccess)
+                            {
+                                throw new Exception($"부모 클러스터 {_currentClusterId} 업데이트 실패");
+                            }
+
+                            // 메모리 상의 부모 클러스터 데이터도 업데이트
+                            var parentMemoryRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
+                            if (parentMemoryRows.Length > 0)
+                            {
+                                parentMemoryRows[0]["Count"] = newCount;
+                                parentMemoryRows[0]["합산금액"] = newTotalAmount;
+                                parentMemoryRows[0]["dataIndex"] = string.Join(",", newDataIndices);
+                                parentMemoryRows[0]["키워드목록"] = string.Join(",", newKeywords);
+                            }
+
+                            Debug.WriteLine("부모 클러스터 업데이트 완료");
+                        }
+                        else
+                        {
+                            // 남은 하위 클러스터가 없으면 부모 클러스터 삭제
+                            Debug.WriteLine("남은 하위 클러스터가 없어 부모 클러스터 삭제");
+
+                            await clusteringRepo.DeleteByClusterNumberAsync(_currentClusterId);
+
+                            // 메모리에서도 삭제
+                            var parentMemoryRows = DataHandler.finalClusteringData.Select($"ID = {_currentClusterId}");
+                            if (parentMemoryRows.Length > 0)
+                            {
+                                parentMemoryRows[0].Delete();
+                            }
                         }
                     }
+                   
+                    
 
                     // *** 5단계: 메모리 변경사항 확정 ***
                     DataHandler.finalClusteringData.AcceptChanges();
@@ -654,7 +768,7 @@ namespace FinanceTool
                     // 결과 메시지 및 UI 처리
                     if (remainingChildClusters.Count > 0)
                     {
-                        MessageBox.Show($"선택한 {selectedClusterIds.Count}개 항목이 병합에서 해제되었습니다.", "완료",
+                        MessageBox.Show($"선택한 {selectedClusterIds.Count}개 항목이 "+ mapping_keyword + "에서 해제되었습니다.", "완료",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                         // 세부 정보 다시 표시
@@ -662,7 +776,7 @@ namespace FinanceTool
                     }
                     else
                     {
-                        MessageBox.Show($"선택한 {selectedClusterIds.Count}개 항목이 병합에서 해제되었습니다.\n부모 클러스터가 비어 있어 삭제되었습니다.", "완료",
+                        MessageBox.Show($"선택한 {selectedClusterIds.Count}개 항목이 "+ mapping_keyword + "에서 해제되었습니다.\n부모 클러스터가 비어 있어 삭제되었습니다.", "완료",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);
                         this.Close();  // 팝업 닫기
                     }
@@ -670,8 +784,8 @@ namespace FinanceTool
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"병합 해제 오류: {ex.Message}");
-                MessageBox.Show($"병합 해제 중 오류가 발생했습니다: {ex.Message}", "오류",
+                Debug.WriteLine(mapping_keyword + $" 해제 오류: {ex.Message}");
+                MessageBox.Show(mapping_keyword + $" 해제 중 오류가 발생했습니다: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

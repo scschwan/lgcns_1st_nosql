@@ -181,7 +181,7 @@
             tableLayoutLeft.Controls.Add(pnl_merge_pagination, 0, 6);
             tableLayoutLeft.Controls.Add(pnl_merge_controls, 0, 2);
             tableLayoutLeft.Dock = DockStyle.Fill;
-            tableLayoutLeft.Location = new Point(3, 31);
+            tableLayoutLeft.Location = new Point(3, 29);
             tableLayoutLeft.Name = "tableLayoutLeft";
             tableLayoutLeft.RowCount = 7;
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
@@ -191,7 +191,7 @@
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 53F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
-            tableLayoutLeft.Size = new Size(1211, 963);
+            tableLayoutLeft.Size = new Size(1211, 965);
             tableLayoutLeft.TabIndex = 0;
             // 
             // label1
@@ -239,7 +239,7 @@
             sub_search_info_label.AutoSize = true;
             sub_search_info_label.Location = new Point(586, 16);
             sub_search_info_label.Name = "sub_search_info_label";
-            sub_search_info_label.Size = new Size(0, 30);
+            sub_search_info_label.Size = new Size(0, 25);
             sub_search_info_label.TabIndex = 55;
             // 
             // groupBox6
@@ -260,7 +260,7 @@
             radioButton1.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             radioButton1.Location = new Point(6, 8);
             radioButton1.Name = "radioButton1";
-            radioButton1.Size = new Size(132, 29);
+            radioButton1.Size = new Size(113, 27);
             radioButton1.TabIndex = 52;
             radioButton1.TabStop = true;
             radioButton1.Text = "키워드 검색";
@@ -272,7 +272,7 @@
             radioButton2.Font = new Font("Pretendard", 14.25F);
             radioButton2.Location = new Point(144, 8);
             radioButton2.Name = "radioButton2";
-            radioButton2.Size = new Size(151, 29);
+            radioButton2.Size = new Size(129, 27);
             radioButton2.TabIndex = 53;
             radioButton2.Text = "공급업체 검색";
             radioButton2.UseVisualStyleBackColor = true;
@@ -283,7 +283,7 @@
             merge_all_check.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             merge_all_check.Location = new Point(10, 16);
             merge_all_check.Name = "merge_all_check";
-            merge_all_check.Size = new Size(114, 29);
+            merge_all_check.Size = new Size(98, 27);
             merge_all_check.TabIndex = 37;
             merge_all_check.Text = "전체 선택";
             merge_all_check.UseVisualStyleBackColor = true;
@@ -326,7 +326,7 @@
             decimal_combo.Items.AddRange(new object[] { "원", "천원", "백만원", "억원" });
             decimal_combo.Location = new Point(432, 13);
             decimal_combo.Name = "decimal_combo";
-            decimal_combo.Size = new Size(80, 33);
+            decimal_combo.Size = new Size(80, 31);
             decimal_combo.TabIndex = 24;
             decimal_combo.SelectedIndexChanged += decimal_combo_SelectedIndexChanged;
             // 
@@ -336,7 +336,7 @@
             label5.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             label5.Location = new Point(376, 16);
             label5.Name = "label5";
-            label5.Size = new Size(50, 25);
+            label5.Size = new Size(42, 23);
             label5.TabIndex = 35;
             label5.Text = "단위";
             // 
@@ -355,7 +355,7 @@
             uncluster_count_money.AutoSize = true;
             uncluster_count_money.Location = new Point(743, 6);
             uncluster_count_money.Name = "uncluster_count_money";
-            uncluster_count_money.Size = new Size(179, 30);
+            uncluster_count_money.Size = new Size(153, 25);
             uncluster_count_money.TabIndex = 51;
             uncluster_count_money.Text = "미병합 합산금액 :";
             // 
@@ -364,7 +364,7 @@
             uncluster_count.AutoSize = true;
             uncluster_count.Location = new Point(304, 6);
             uncluster_count.Name = "uncluster_count";
-            uncluster_count.Size = new Size(208, 30);
+            uncluster_count.Size = new Size(190, 25);
             uncluster_count.TabIndex = 46;
             uncluster_count.Text = "미병합 세부 Cluster :";
             // 
@@ -373,7 +373,7 @@
             cluster_count.AutoSize = true;
             cluster_count.Location = new Point(10, 5);
             cluster_count.Name = "cluster_count";
-            cluster_count.Size = new Size(74, 30);
+            cluster_count.Size = new Size(63, 25);
             cluster_count.TabIndex = 43;
             cluster_count.Text = "행 수 :";
             // 
@@ -384,7 +384,7 @@
             pnl_merge_data.Location = new Point(5, 384);
             pnl_merge_data.Margin = new Padding(5);
             pnl_merge_data.Name = "pnl_merge_data";
-            pnl_merge_data.Size = new Size(1201, 524);
+            pnl_merge_data.Size = new Size(1201, 526);
             pnl_merge_data.TabIndex = 2;
             // 
             // merge_cluster_table
@@ -401,7 +401,7 @@
             merge_cluster_table.MinimumSize = new Size(500, 300);
             merge_cluster_table.Name = "merge_cluster_table";
             merge_cluster_table.ReadOnly = true;
-            merge_cluster_table.Size = new Size(1191, 518);
+            merge_cluster_table.Size = new Size(1191, 520);
             merge_cluster_table.TabIndex = 34;
             merge_cluster_table.CellContentClick += merge_cluster_table_CellContentClick;
             // 
@@ -415,7 +415,7 @@
             pnl_merge_pagination.Controls.Add(num_pageNumber);
             pnl_merge_pagination.Controls.Add(lbl_pagination2);
             pnl_merge_pagination.Dock = DockStyle.Fill;
-            pnl_merge_pagination.Location = new Point(3, 916);
+            pnl_merge_pagination.Location = new Point(3, 918);
             pnl_merge_pagination.Name = "pnl_merge_pagination";
             pnl_merge_pagination.Size = new Size(1205, 44);
             pnl_merge_pagination.TabIndex = 3;
@@ -449,7 +449,7 @@
             cmb_pageSize.FormattingEnabled = true;
             cmb_pageSize.Location = new Point(140, 10);
             cmb_pageSize.Name = "cmb_pageSize";
-            cmb_pageSize.Size = new Size(121, 33);
+            cmb_pageSize.Size = new Size(121, 31);
             cmb_pageSize.TabIndex = 65;
             // 
             // lbl_pageSizeText
@@ -458,7 +458,7 @@
             lbl_pageSizeText.Font = new Font("Pretendard", 14F);
             lbl_pageSizeText.Location = new Point(10, 13);
             lbl_pageSizeText.Name = "lbl_pageSizeText";
-            lbl_pageSizeText.Size = new Size(125, 25);
+            lbl_pageSizeText.Size = new Size(105, 23);
             lbl_pageSizeText.TabIndex = 64;
             lbl_pageSizeText.Text = "페이지 크기 :";
             // 
@@ -468,7 +468,7 @@
             lbl_pagination.Font = new Font("Pretendard", 14F);
             lbl_pagination.Location = new Point(592, 12);
             lbl_pagination.Name = "lbl_pagination";
-            lbl_pagination.Size = new Size(80, 25);
+            lbl_pagination.Size = new Size(68, 23);
             lbl_pagination.TabIndex = 61;
             lbl_pagination.Text = "페이지 :";
             // 
@@ -477,7 +477,7 @@
             num_pageNumber.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             num_pageNumber.Location = new Point(685, 10);
             num_pageNumber.Name = "num_pageNumber";
-            num_pageNumber.Size = new Size(52, 33);
+            num_pageNumber.Size = new Size(52, 30);
             num_pageNumber.TabIndex = 63;
             // 
             // lbl_pagination2
@@ -486,7 +486,7 @@
             lbl_pagination2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             lbl_pagination2.Location = new Point(743, 13);
             lbl_pagination2.Name = "lbl_pagination2";
-            lbl_pagination2.Size = new Size(118, 25);
+            lbl_pagination2.Size = new Size(102, 23);
             lbl_pagination2.TabIndex = 62;
             lbl_pagination2.Text = "/ 0 (총 0 행)";
             // 
@@ -521,7 +521,7 @@
             merge_search_keyword.Location = new Point(32, 40);
             merge_search_keyword.Name = "merge_search_keyword";
             merge_search_keyword.PlaceholderText = "검색 키워드 입력";
-            merge_search_keyword.Size = new Size(300, 33);
+            merge_search_keyword.Size = new Size(300, 30);
             merge_search_keyword.TabIndex = 38;
             merge_search_keyword.KeyDown += merge_search_keyword_KeyDown;
             // 
@@ -533,7 +533,7 @@
             except_keyword.Location = new Point(32, 92);
             except_keyword.Name = "except_keyword";
             except_keyword.PlaceholderText = "제외 항목 입력";
-            except_keyword.Size = new Size(300, 33);
+            except_keyword.Size = new Size(300, 30);
             except_keyword.TabIndex = 45;
             except_keyword.KeyDown += except_keyword_KeyDown;
             // 
@@ -542,9 +542,9 @@
             sub_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             sub_search_checkbox.AutoSize = true;
             sub_search_checkbox.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            sub_search_checkbox.Location = new Point(902, 99);
+            sub_search_checkbox.Location = new Point(925, 99);
             sub_search_checkbox.Name = "sub_search_checkbox";
-            sub_search_checkbox.Size = new Size(147, 29);
+            sub_search_checkbox.Size = new Size(124, 27);
             sub_search_checkbox.TabIndex = 54;
             sub_search_checkbox.Text = "결과 내 검색 ";
             sub_search_checkbox.UseVisualStyleBackColor = true;
@@ -570,7 +570,7 @@
             column_search_combo.FormattingEnabled = true;
             column_search_combo.Location = new Point(25, 40);
             column_search_combo.Name = "column_search_combo";
-            column_search_combo.Size = new Size(284, 33);
+            column_search_combo.Size = new Size(284, 31);
             column_search_combo.TabIndex = 47;
             column_search_combo.Text = "검색 컬럼 선택";
             column_search_combo.SelectedIndexChanged += column_search_combo_SelectedIndexChanged;
@@ -580,9 +580,9 @@
             excep_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             excep_search_checkbox.AutoSize = true;
             excep_search_checkbox.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            excep_search_checkbox.Location = new Point(25, 108);
+            excep_search_checkbox.Location = new Point(57, 108);
             excep_search_checkbox.Name = "excep_search_checkbox";
-            excep_search_checkbox.Size = new Size(204, 29);
+            excep_search_checkbox.Size = new Size(172, 27);
             excep_search_checkbox.TabIndex = 48;
             excep_search_checkbox.Text = "검색 제외 항목 적용";
             excep_search_checkbox.UseVisualStyleBackColor = true;
@@ -593,9 +593,9 @@
             equal_search_checkbox.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             equal_search_checkbox.AutoSize = true;
             equal_search_checkbox.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            equal_search_checkbox.Location = new Point(25, 79);
+            equal_search_checkbox.Location = new Point(57, 79);
             equal_search_checkbox.Name = "equal_search_checkbox";
-            equal_search_checkbox.Size = new Size(204, 29);
+            equal_search_checkbox.Size = new Size(172, 27);
             equal_search_checkbox.TabIndex = 47;
             equal_search_checkbox.Text = "검색 조건 완전 일치";
             equal_search_checkbox.UseVisualStyleBackColor = true;
@@ -608,7 +608,7 @@
             label2.ForeColor = Color.IndianRed;
             label2.Location = new Point(879, 53);
             label2.Name = "label2";
-            label2.Size = new Size(306, 17);
+            label2.Size = new Size(253, 16);
             label2.TabIndex = 48;
             label2.Text = "※ OR 조건 검색 : 검색어 마다 | 구분 후 추가 입력";
             // 
@@ -635,7 +635,7 @@
             label3.ForeColor = Color.IndianRed;
             label3.Location = new Point(879, 25);
             label3.Name = "label3";
-            label3.Size = new Size(316, 17);
+            label3.Size = new Size(261, 16);
             label3.TabIndex = 49;
             label3.Text = "※ AND 조건 검색 : 키워드 마다 , 구분 후 추가 입력";
             // 
@@ -710,10 +710,10 @@
             // 
             tabPage1.Controls.Add(dataGridView_modified);
             tabPage1.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            tabPage1.Location = new Point(4, 29);
+            tabPage1.Location = new Point(4, 27);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(609, 235);
+            tabPage1.Size = new Size(609, 237);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "키워드별";
             tabPage1.UseVisualStyleBackColor = true;
@@ -739,10 +739,10 @@
             // 
             tabPage2.Controls.Add(dataGridView_supply_summary);
             tabPage2.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            tabPage2.Location = new Point(4, 29);
+            tabPage2.Location = new Point(4, 27);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(609, 235);
+            tabPage2.Size = new Size(609, 237);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "공급업체별";
             tabPage2.UseVisualStyleBackColor = true;
@@ -801,7 +801,7 @@
             new_reco_word.Location = new Point(10, 35);
             new_reco_word.Name = "new_reco_word";
             new_reco_word.PlaceholderText = "신규 항목 입력";
-            new_reco_word.Size = new Size(145, 33);
+            new_reco_word.Size = new Size(145, 30);
             new_reco_word.TabIndex = 27;
             new_reco_word.KeyDown += new_reco_word_KeyDown;
             // 
@@ -872,7 +872,7 @@
             new_lv1_word.Location = new Point(10, 35);
             new_lv1_word.Name = "new_lv1_word";
             new_lv1_word.PlaceholderText = "신규 항목 입력";
-            new_lv1_word.Size = new Size(149, 33);
+            new_lv1_word.Size = new Size(149, 30);
             new_lv1_word.TabIndex = 27;
             new_lv1_word.KeyDown += new_lv1_word_KeyDown;
             // 
@@ -965,7 +965,7 @@
             label7.ForeColor = Color.IndianRed;
             label7.Location = new Point(20, 401);
             label7.Name = "label7";
-            label7.Size = new Size(280, 17);
+            label7.Size = new Size(234, 16);
             label7.TabIndex = 47;
             label7.Text = "※ 세부 클러스터명은 직접 수정이 가능합니다.";
             // 
@@ -987,14 +987,12 @@
             // 
             // check_search_keyword
             // 
-            check_search_keyword.Enabled = false;
             check_search_keyword.Font = new Font("Pretendard", 14.25F);
             check_search_keyword.Location = new Point(323, 101);
             check_search_keyword.Name = "check_search_keyword";
             check_search_keyword.PlaceholderText = "키워드 입력";
-            check_search_keyword.Size = new Size(209, 33);
+            check_search_keyword.Size = new Size(209, 30);
             check_search_keyword.TabIndex = 30;
-            check_search_keyword.Visible = false;
             check_search_keyword.KeyDown += check_search_keyword_KeyDown;
             // 
             // merge_cancel_button

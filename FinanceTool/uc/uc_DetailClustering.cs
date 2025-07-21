@@ -398,6 +398,13 @@ namespace FinanceTool
                 // 4. 세부 정보 표시
                 ShowMergeClusterDetail();
 
+                //세부 목록 재조회
+                create_check_keyword_list();
+
+                // 병합 작업 후 UI 업데이트
+                UpdateModifiedDataGridView();
+                UpdateSupplySummaryDataGridView();
+
                 Debug.WriteLine($"컨텍스트 메뉴: 행 {rightClickedRow.Index}를 선택하고 세부정보 표시");
             };
 
@@ -646,6 +653,17 @@ namespace FinanceTool
             try
             {
                 if (dataGridView_supply_summary == null) return;
+
+                //2025.07.21
+                //공급업체열이 필수가 아니면 로직 종료
+                if (!DataHandler.prod_col_yn)
+                {
+                    // DataGridView 초기화
+                    dataGridView_supply_summary.DataSource = null;
+                    dataGridView_supply_summary.Rows.Clear();
+                    dataGridView_supply_summary.Columns.Clear();
+                    return;
+                }
 
                 // DataGridView 초기화
                 dataGridView_supply_summary.DataSource = null;
@@ -1178,10 +1196,36 @@ namespace FinanceTool
                 }
 
 
+
+                // 키워드 파싱
+                var parsedKeywords = ParseComplexKeywords(target_keyword);
+                Debug.WriteLine($"파싱 결과 - AND: [{string.Join(", ", parsedKeywords.AndKeywords)}], OR: [{string.Join(", ", parsedKeywords.OrKeywords)}]");
+
                 // *** 핵심 변경: 기존 DataHandler 함수 대신 ClusteringManager 사용 ***
                 string searchColumn = GetSelectedSearchColumn();
-                List<string> matchingKeywords;
+                var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
 
+                
+
+                if (matchingClusterIds.Count > 0)
+                {
+                    // PerformSearchWithCriteria 우회하고 직접 결과 표시
+                    await _clusteringManager.DisplaySpecificClustersAsync(matchingClusterIds);
+
+                    // 선택 상태 초기화
+                    merge_all_check.Checked = false;
+                    change_row_count();
+                    Debug.WriteLine($"복합 조건 검색 완료: {matchingClusterIds.Count}개 클러스터 표시");
+                }
+                else
+                {
+                    await ShowEmptySearchResult();
+                    Debug.WriteLine("검색 결과 없음 - 빈 테이블 표시");
+                }
+
+                /*
+                 * 
+                List<string> matchingKeywords;
                 if (equalsSearchYN)
                 {
                     // 완전일치 검색 - ClusteringManager 사용
@@ -1202,7 +1246,7 @@ namespace FinanceTool
 
                 // 다중 컬럼 검색 조건 구성
                 var columnCriteria = new Dictionary<string, SearchColumnCriteria>();
-
+               
                 if (matchingKeywords.Count > 0)
                 {
                     columnCriteria[searchColumn] = new SearchColumnCriteria
@@ -1220,6 +1264,7 @@ namespace FinanceTool
                     await ShowEmptySearchResult();
                     Debug.WriteLine("검색 결과 없음 - 빈 테이블 표시");
                 }
+                 */
 
             }
             else
@@ -1253,6 +1298,39 @@ namespace FinanceTool
                     }
 
                     // *** 핵심 변경: 기존 DataHandler 함수 대신 ClusteringManager 사용 ***
+
+                    // 키워드 파싱
+                    var parsedKeywords = ParseComplexKeywords(target_keyword);
+                    Debug.WriteLine($"파싱 결과 - AND: [{string.Join(", ", parsedKeywords.AndKeywords)}], OR: [{string.Join(", ", parsedKeywords.OrKeywords)}]");
+
+
+                    // *** 핵심 변경: 기존 DataHandler 함수 대신 ClusteringManager 사용 ***
+                    string searchColumn = GetSelectedSearchColumn();
+
+                    await progressForm.UpdateProgressHandler(20, $"'{searchColumn}' 컬럼에서 검색 중...");
+                    await Task.Delay(10);
+
+                    var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+
+                    await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
+                    await Task.Delay(10);
+
+                    if (matchingClusterIds.Count > 0)
+                    {
+                        // PerformSearchWithCriteria 우회하고 직접 결과 표시
+                        await _clusteringManager.DisplaySpecificClustersAsync(matchingClusterIds);
+
+                        // 선택 상태 초기화
+                        merge_all_check.Checked = false;
+                        change_row_count();
+                        Debug.WriteLine($"복합 조건 검색 완료: {matchingClusterIds.Count}개 클러스터 표시");
+                    }
+                    else
+                    {
+                        await ShowEmptySearchResult();
+                        Debug.WriteLine("검색 결과 없음 - 빈 테이블 표시");
+                    }
+                    /*
                     string searchColumn = GetSelectedSearchColumn();
                     List<string> matchingKeywords;
 
@@ -1302,7 +1380,7 @@ namespace FinanceTool
                     }
 
                    
-
+                    */
                     await progressForm.UpdateProgressHandler(90, "데이터 검색 완료");
                     await Task.Delay(10);
 
@@ -1994,7 +2072,13 @@ namespace FinanceTool
                 // *** 6단계: DataTable 업데이트 (기존 행 업데이트 + 병합된 클러스터들의 ClusterID 변경) ***
                 await UpdateDataTableAfterMerge(dataTable, targetIds, newClusterNumber, isNewCluster);
 
+
                 // *** 7단계: 데이터 보강 (동기적 처리로 일관성 보장) ***
+                //_detailClusteringData = dataTable;
+                //_detailClusteringData.AcceptChanges();
+                //mergeClusterDataTable = await EnrichWithRawTableDataAsync(_detailClusteringData);
+
+                dataTable.AcceptChanges();
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(dataTable);
 
                 // *** 8단계: ClusteringManager 데이터 새로고침 ***
@@ -2201,6 +2285,10 @@ namespace FinanceTool
                 var searchCriteria = CreateSearchCriteriaFromCurrentUI();
                 await _clusteringManager.SearchAsync(searchCriteria , true);
 
+                // 병합 작업 후 UI 업데이트
+                UpdateModifiedDataGridView();
+                UpdateSupplySummaryDataGridView();
+
                 Debug.WriteLine("병합 해제 완료");
             }
             catch (Exception ex)
@@ -2273,7 +2361,7 @@ namespace FinanceTool
                     int clusterNumber = Convert.ToInt32(localRow["ID"]);
                     int clusterSubId = Convert.ToInt32(localRow["ClusterSubID"]);
 
-                    Debug.WriteLine($"clusterNumber : {clusterNumber} clusterSubId: {clusterSubId}");
+                    //Debug.WriteLine($"clusterNumber : {clusterNumber} clusterSubId: {clusterSubId}");
 
                     // 전역 데이터에서 동일한 cluster_number 찾기
                     var globalRow = DataHandler.finalClusteringData.AsEnumerable()
@@ -2290,7 +2378,7 @@ namespace FinanceTool
                         globalRow["합산금액"] = localRow["합산금액"];
                         globalRow["dataIndex"] = localRow["dataIndex"];
 
-                        Debug.WriteLine($"기존 클러스터 {clusterNumber} 업데이트 - ClusterSubID: {clusterSubId}");
+                        //Debug.WriteLine($"기존 클러스터 {clusterNumber} 업데이트 - ClusterSubID: {clusterSubId}");
                     }
                     else if (clusterSubId == clusterNumber)
                     {
@@ -2307,7 +2395,7 @@ namespace FinanceTool
                         //newGlobalRow["_id"] = localRow["_id"];
 
                         DataHandler.finalClusteringData.Rows.Add(newGlobalRow);
-                        Debug.WriteLine($"새로운 세부 클러스터 {clusterNumber} 전역 데이터에 추가");
+                        //Debug.WriteLine($"새로운 세부 클러스터 {clusterNumber} 전역 데이터에 추가");
                     }
                 }
 
@@ -2351,33 +2439,7 @@ namespace FinanceTool
 
             try
             {
-                string searchKeyword = merge_search_keyword.Text?.Trim() ?? "";
-
-                // 검색어가 없을 때 사용자에게 확인
-                /*
-                if (string.IsNullOrEmpty(searchKeyword))
-                {
-                    if (_isSubSearchMode && _baseSearchResults.Count > 0)
-                    {
-                        Debug.WriteLine("결과 내 재검색: 이전 검색 결과 표시");
-                    }
-                    else
-                    {
-                        var result = MessageBox.Show(
-                            "검색어가 입력되지 않았습니다. 전체 데이터를 표시하시겠습니까?",
-                            "전체 데이터 검색",
-                            MessageBoxButtons.YesNo,
-                            MessageBoxIcon.Question
-                        );
-
-                        if (result == DialogResult.No)
-                        {
-                            return;
-                        }
-                        Debug.WriteLine("전체 데이터 검색 실행");
-                    }
-                }
-                */
+                
                 await create_merge_keyword_list();
             }
             catch (Exception ex)
@@ -2444,21 +2506,15 @@ namespace FinanceTool
 
                 if (selectedClusterIds.Count == 0)
                 {
-                    MessageBox.Show("병합할 클러스터를 선택해주세요.", "알림",
+                    MessageBox.Show("세부 병합할 클러스터를 선택해주세요.", "알림",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                if (selectedClusterIds.Count < 2)
-                {
-                    MessageBox.Show("병합하려면 최소 2개 이상의 클러스터를 선택해야 합니다.", "알림",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
 
                 DialogResult result = MessageBox.Show(
-                    $"선택된 {selectedClusterIds.Count}개의 클러스터를 병합하시겠습니까?",
-                    "클러스터 병합 확인",
+                    $"선택된 {selectedClusterIds.Count}개의 클러스터를 세부 병합하시겠습니까?",
+                    "클러스터 세부 병합 확인",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question
                 );
@@ -2468,7 +2524,7 @@ namespace FinanceTool
                     using (var progressForm = new ProcessProgressForm())
                     {
                         progressForm.Show();
-                        await progressForm.UpdateProgressHandler(10, "클러스터 병합 시작");
+                        await progressForm.UpdateProgressHandler(10, "클러스터 세부 병합 시작");
                         await Task.Delay(10);
 
 
@@ -2478,7 +2534,7 @@ namespace FinanceTool
                         //await MergeAndCreateNewCluster(DataHandler.finalClusteringData, clusterNumbersToMerge);
                         await MergeAndCreateNewCluster(_detailClusteringData, clusterNumbersToMerge);
 
-                        await progressForm.UpdateProgressHandler(50, "클러스터 병합 중...");
+                        await progressForm.UpdateProgressHandler(50, "클러스터 세부 병합 중...");
                         await Task.Delay(10);
 
                         // 병합 후 선택 상태 초기화
@@ -2488,7 +2544,7 @@ namespace FinanceTool
                         // 데이터 다시 로드
                         await create_merge_keyword_list(true);
 
-                        await progressForm.UpdateProgressHandler(100, "클러스터 병합 완료");
+                        await progressForm.UpdateProgressHandler(100, "클러스터 세부 병합 완료");
                         await Task.Delay(10);
 
                     }
@@ -2502,14 +2558,14 @@ namespace FinanceTool
                             $", DataType='{DataHandler.finalClusteringData.Columns[i].DataType}'");
                     }
 
-                    MessageBox.Show("클러스터 병합이 완료되었습니다.", "완료",
+                    MessageBox.Show("클러스터 세부 병합이 완료되었습니다.", "완료",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"클러스터 병합 중 오류: {ex.Message}");
-                MessageBox.Show($"클러스터 병합 중 오류가 발생했습니다: {ex.Message}", "오류",
+                Debug.WriteLine($"클러스터 세부 병합 중 오류: {ex.Message}");
+                MessageBox.Show($"클러스터 세부 병합 중 오류가 발생했습니다: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -2520,7 +2576,7 @@ namespace FinanceTool
 
             if (mergeIDlList.Count == 0)
             {
-                MessageBox.Show("병합 해제 대상을 선택하셔야 합니다.", "알림",
+                MessageBox.Show("세부 병합 해제 대상을 선택하셔야 합니다.", "알림",
                                    MessageBoxButtons.OK,
                                    MessageBoxIcon.Warning);
 
@@ -2530,14 +2586,14 @@ namespace FinanceTool
             using (var progressForm = new ProcessProgressForm())
             {
                 progressForm.Show();
-                await progressForm.UpdateProgressHandler(10, "클러스터 병합 해제 시작");
+                await progressForm.UpdateProgressHandler(10, "클러스터 세부 병합 해제 시작");
                 await Task.Delay(10);
 
                
 
                 await deleteClusterId(_detailClusteringData, mergeIDlList);
 
-                await progressForm.UpdateProgressHandler(50, "클러스터 병합 해제 중...");
+                await progressForm.UpdateProgressHandler(50, "클러스터 세부 병합 해제 중...");
                 await Task.Delay(10);
 
                 //검색조건 초기화
@@ -2554,7 +2610,7 @@ namespace FinanceTool
                 UpdateModifiedDataGridView();
                 UpdateSupplySummaryDataGridView();
 
-                MessageBox.Show(this, "클러스터 병합 해제가 완료되었습니다.", "Info",
+                MessageBox.Show(this, "클러스터 세부 병합 해제가 완료되었습니다.", "Info",
                                        MessageBoxButtons.OK,
                                        MessageBoxIcon.Information);
 
@@ -2654,6 +2710,7 @@ namespace FinanceTool
                 // 변경 사항 저장
                 //DataHandler.finalClusteringData.AcceptChanges();
                 //mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
+                _detailClusteringData.AcceptChanges();
                 mergeClusterDataTable = await EnrichWithRawTableDataAsync(_detailClusteringData);
 
                 await progressForm.UpdateProgressHandler(70, "클러스터명 변경 결과 출력 중...");
@@ -2666,6 +2723,10 @@ namespace FinanceTool
                 }
 
                 create_check_keyword_list();
+
+                // 병합 작업 후 UI 업데이트
+                UpdateModifiedDataGridView();
+                UpdateSupplySummaryDataGridView();
 
                 await progressForm.UpdateProgressHandler(100);
                 await Task.Delay(10);
@@ -3322,6 +3383,18 @@ namespace FinanceTool
                 return;
             }
 
+            //2025.07.21
+            //공급업체열이 필수가 아니면 로직 종료
+            if (!DataHandler.prod_col_yn)
+            {
+                // DataGridView 초기화
+                dataGridView_supply_summary.DataSource = null;
+                dataGridView_supply_summary.Rows.Clear();
+                dataGridView_supply_summary.Columns.Clear();
+                return;
+            }
+
+
             // UI 업데이트 시작 전에 SuspendLayout 호출
             dataGridView_supply_summary.SuspendLayout();
 
@@ -3513,7 +3586,8 @@ namespace FinanceTool
                     await progressForm.UpdateProgressHandler(30, "병합 대상 확인 중");
 
                     // 병합 대상 클러스터들이 모두 상위 클러스터인지 확인 (cluster_number = cluster_id)
-                    bool allParentClusters = clustersToMerge.All(c => c.ClusterId == c.ClusterNumber);
+                    //bool allParentClusters = clustersToMerge.All(c => c.ClusterId == c.ClusterNumber);
+                    bool allParentClusters = clustersToMerge.All(c => c.ClusterSubId == c.ClusterNumber);
                     if (!allParentClusters)
                     {
                         progressForm.Close();
@@ -3574,7 +3648,9 @@ namespace FinanceTool
                     var newCluster = new ClusteringResultDocument
                     {
                         ClusterNumber = newClusterNumber,
-                        ClusterId = newClusterNumber, // 병합된 클러스터는 자신의 번호가 ClusterId
+                        //ClusterId = newClusterNumber, // 병합된 클러스터는 자신의 번호가 ClusterId
+                        ClusterId = _parentClusterId, // 병합된 클러스터는 자신의 번호가 ClusterId
+                        ClusterSubId = newClusterNumber, // 병합된 클러스터는 자신의 번호가 ClusterId
                         ClusterName = combinedClusterName,
                         Keywords = keywordSet.ToList(),
                         Count = totalCount,
@@ -3695,7 +3771,7 @@ namespace FinanceTool
                         // 클러스터 ID가 자신과 동일한지 확인 (병합된 클러스터인 경우)
                         if (row.Cells["ClusterSubID"] != null && row.Cells["ClusterSubID"].Value != null)
                         {
-                            int clusterSubID = Convert.ToInt32(row.Cells[" "].Value);
+                            int clusterSubID = Convert.ToInt32(row.Cells["ClusterSubID"].Value);
                             if (clusterId == clusterSubID)
                             {
                                 checkedClusterIds.Add(clusterId);
@@ -3724,9 +3800,14 @@ namespace FinanceTool
 
             try
             {
+                //세부클러스터링용 데이터 복사
+                DataHandler.subClusteringData = null;
+                DataHandler.subClusteringData = _detailClusteringData.Copy();
                 // 새 팝업 창 생성
-                using (ClusterDetailPopup popup = new ClusterDetailPopup())
+                using (ClusterDetailPopup popup = new ClusterDetailPopup(true))
                 {
+                    
+                    
                     // 통화 단위 설정
                     double divider = Math.Pow(1000, decimal_combo.SelectedIndex);
                     if (decimal_combo.SelectedIndex == 3)
@@ -3742,6 +3823,10 @@ namespace FinanceTool
                         {
                             // 메모리 데이터는 이미 업데이트되었으므로 UI만 갱신
                             Debug.WriteLine("popup.UnmergeCompleted start");
+
+                            //데이터 갱신
+                            _detailClusteringData = DataHandler.subClusteringData.Copy();
+                            _detailClusteringData.AcceptChanges();
 
                             // 이 부분이 중요합니다!
                             mergeClusterDataTable = await EnrichWithRawTableDataAsync(_detailClusteringData);
@@ -4048,11 +4133,36 @@ namespace FinanceTool
         }
 
         /////////////////////////////검색 헬퍼 메서드///////////////////////////////////
-       
 
-       
+        private ParsedKeywords ParseComplexKeywords(string searchText)
+        {
+            // uc_Clustering과 동일한 로직
+            var result = new ParsedKeywords();
 
-       
+            if (string.IsNullOrEmpty(searchText))
+                return result;
+
+            if (searchText.Contains("|"))
+            {
+                result.OrKeywords = searchText.Split('|')
+                    .SelectMany(group => group.Split(','))
+                    .Select(k => k.Trim())
+                    .Where(k => !string.IsNullOrEmpty(k))
+                    .ToList();
+            }
+            else
+            {
+                result.AndKeywords = searchText.Split(',')
+                    .Select(k => k.Trim())
+                    .Where(k => !string.IsNullOrEmpty(k))
+                    .ToList();
+            }
+
+            return result;
+        }
+
+
+
 
     }
 }

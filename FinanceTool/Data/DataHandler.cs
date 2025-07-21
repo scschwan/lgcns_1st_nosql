@@ -43,6 +43,10 @@ namespace FinanceTool
         public static DataTable secondClusteringData = new DataTable();
         public static DataTable finalClusteringData = new DataTable();
 
+
+        //subClustering 전용 저장 테이블
+        public static DataTable subClusteringData = new DataTable();
+
         private static ObjectId _currentSessionId = ObjectId.Empty;
         private const string EXCEL_COMPLETED_FOLDER = @"C:\Dmillions\excel_completed";
 
