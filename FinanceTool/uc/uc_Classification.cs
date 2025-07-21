@@ -180,6 +180,8 @@ namespace FinanceTool
                     await progressForm.UpdateProgressHandler(10, "초기화 준비 중...");
                     await Task.Delay(10);
 
+                    DataHandler.finalClusteringData.AcceptChanges();
+
                     // *** 페이징 초기화 추가 ***
                     InitializePagination();
 

@@ -467,6 +467,14 @@ namespace FinanceTool
                 // *** 6. 나머지 UI 초기화 ***
                 await InitializeRemainingUI();
 
+
+                // 병합 클러스터 리스트 생성
+                create_check_keyword_list();
+
+                // 병합 작업 후 UI 업데이트
+                UpdateModifiedDataGridView();
+                UpdateSupplySummaryDataGridView();
+
                 Debug.WriteLine("세부 클러스터링 초기화 완료");
 
 
@@ -2313,37 +2321,19 @@ namespace FinanceTool
                     return;
                 }
 
-                // *** 1. 전역 데이터에서 해당 부모 클러스터 관련 데이터 찾기 ***
+                // *** 1. 전역 데이터에서 해당 부모 클러스터 관련 데이터만 추출 ***
                 var globalParentRows = DataHandler.finalClusteringData.AsEnumerable()
                     .Where(row => Convert.ToInt32(row["ClusterID"]) == _parentClusterId)
                     .ToList();
 
                 Debug.WriteLine($"전역 데이터에서 부모 클러스터 {_parentClusterId} 관련 행: {globalParentRows.Count}개");
 
-                // *** 컬럼 정보 전체 출력 ***
-                Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 행 수: {DataHandler.finalClusteringData.Rows.Count}");
-                Debug.WriteLine($"[CreateCheckDataGridView] DataHandler.finalClusteringData 총 컬럼 수: {DataHandler.finalClusteringData.Columns.Count}");
-                for (int i = 0; i < DataHandler.finalClusteringData.Columns.Count; i++)
-                {
-                    Debug.WriteLine($"  컬럼 {i}: Name='{DataHandler.finalClusteringData.Columns[i].ColumnName}'" +
-                        $", DataType='{DataHandler.finalClusteringData.Columns[i].DataType}'");
-                }
-
-                // *** 컬럼 정보 전체 출력 ***
-                Debug.WriteLine($"[CreateCheckDataGridView] _detailClusteringData 총 행 수: {_detailClusteringData.Rows.Count}");
-                Debug.WriteLine($"[CreateCheckDataGridView] _detailClusteringData 총 컬럼 수: {_detailClusteringData.Columns.Count}");
-                for (int i = 0; i < _detailClusteringData.Columns.Count; i++)
-                {
-                    Debug.WriteLine($"  컬럼 {i}: Name='{_detailClusteringData.Columns[i].ColumnName}'" +
-                        $", DataType='{_detailClusteringData.Columns[i].DataType}'");
-                }
-
                 // *** 전역 데이터에 ClusterSubID 컬럼이 없으면 추가 ***
                 if (!DataHandler.finalClusteringData.Columns.Contains("ClusterSubID"))
                 {
                     DataHandler.finalClusteringData.Columns.Add("ClusterSubID", typeof(int));
 
-                    // 기존 모든 행에 기본값 -1 설정
+                    // 기존 모든 행에 기본값 -1 설정 (한 번만 실행)
                     foreach (DataRow existingRow in DataHandler.finalClusteringData.Rows)
                     {
                         existingRow["ClusterSubID"] = -1;
@@ -2353,24 +2343,28 @@ namespace FinanceTool
                     Debug.WriteLine("전역 데이터에 ClusterSubID 컬럼 추가 및 기본값 설정 완료");
                 }
 
-                // *** 2. 로컬 데이터와 비교하여 변경사항 적용 ***
-                foreach (var localRow in _detailClusteringData.AsEnumerable())
+                // *** 2. 로컬 데이터의 클러스터 번호 목록 추출 (효율성을 위해 미리 수집) ***
+                var localClusterNumbers = new HashSet<int>(
+                    _detailClusteringData.AsEnumerable()
+                        .Select(row => Convert.ToInt32(row["ID"]))
+                );
+
+                Debug.WriteLine($"로컬 데이터 클러스터 번호: {localClusterNumbers.Count}개");
+
+                // *** 3. 부모 클러스터 관련 행만을 대상으로 수정 작업 수행 ***
+                foreach (var globalRow in globalParentRows)
                 {
-                    
+                    int globalClusterNumber = Convert.ToInt32(globalRow["ID"]);
 
-                    int clusterNumber = Convert.ToInt32(localRow["ID"]);
-                    int clusterSubId = Convert.ToInt32(localRow["ClusterSubID"]);
+                    // 로컬 데이터에서 해당 클러스터 찾기
+                    var localRow = _detailClusteringData.AsEnumerable()
+                        .FirstOrDefault(row => Convert.ToInt32(row["ID"]) == globalClusterNumber);
 
-                    //Debug.WriteLine($"clusterNumber : {clusterNumber} clusterSubId: {clusterSubId}");
-
-                    // 전역 데이터에서 동일한 cluster_number 찾기
-                    var globalRow = DataHandler.finalClusteringData.AsEnumerable()
-                        .FirstOrDefault(row => Convert.ToInt32(row["ID"]) == clusterNumber);
-                   
-
-                    if (globalRow != null)
+                    if (localRow != null)
                     {
                         // *** 기존 데이터 업데이트 (ClusterSubID 동기화) ***
+                        int clusterSubId = Convert.ToInt32(localRow["ClusterSubID"]);
+
                         globalRow["ClusterSubID"] = clusterSubId;
                         globalRow["클러스터명"] = localRow["클러스터명"];
                         globalRow["키워드목록"] = localRow["키워드목록"];
@@ -2378,39 +2372,56 @@ namespace FinanceTool
                         globalRow["합산금액"] = localRow["합산금액"];
                         globalRow["dataIndex"] = localRow["dataIndex"];
 
-                        //Debug.WriteLine($"기존 클러스터 {clusterNumber} 업데이트 - ClusterSubID: {clusterSubId}");
-                    }
-                    else if (clusterSubId == clusterNumber)
-                    {
-                        // *** 새로 생성된 세부 상위 클러스터 추가 ***
-                        DataRow newGlobalRow = DataHandler.finalClusteringData.NewRow();
-                        newGlobalRow["ID"] = localRow["ID"];
-                        newGlobalRow["ClusterID"] = localRow["ClusterID"];
-                        newGlobalRow["ClusterSubID"] = localRow["ClusterSubID"];
-                        newGlobalRow["클러스터명"] = localRow["클러스터명"];
-                        newGlobalRow["키워드목록"] = localRow["키워드목록"];
-                        newGlobalRow["Count"] = localRow["Count"];
-                        newGlobalRow["합산금액"] = localRow["합산금액"];
-                        newGlobalRow["dataIndex"] = localRow["dataIndex"];
-                        //newGlobalRow["_id"] = localRow["_id"];
-
-                        DataHandler.finalClusteringData.Rows.Add(newGlobalRow);
-                        //Debug.WriteLine($"새로운 세부 클러스터 {clusterNumber} 전역 데이터에 추가");
+                        Debug.WriteLine($"기존 클러스터 {globalClusterNumber} 업데이트 - ClusterSubID: {clusterSubId}");
                     }
                 }
 
-                // *** 3. 로컬에서 삭제된 세부 클러스터 전역에서도 제거 ***
-                var globalRowsToDelete = DataHandler.finalClusteringData.AsEnumerable()
+                // *** 4. 새로 생성된 세부 상위 클러스터 추가 ***
+                // (ClusterSubID == ClusterNumber이면서 전역 데이터에 없는 클러스터)
+                var newDetailClusters = _detailClusteringData.AsEnumerable()
+                    .Where(localRow =>
+                    {
+                        int clusterId = Convert.ToInt32(localRow["ID"]);
+                        int clusterSubId = Convert.ToInt32(localRow["ClusterSubID"]);
+
+                        // 세부 상위 클러스터이면서 전역 데이터에 없는 경우
+                        return clusterSubId == clusterId &&
+                               clusterSubId > 0 &&
+                               !globalParentRows.Any(globalRow => Convert.ToInt32(globalRow["ID"]) == clusterId);
+                    })
+                    .ToList();
+
+                foreach (var newLocalRow in newDetailClusters)
+                {
+                    DataRow newGlobalRow = DataHandler.finalClusteringData.NewRow();
+                    newGlobalRow["ID"] = newLocalRow["ID"];
+                    newGlobalRow["ClusterID"] = newLocalRow["ClusterID"];
+                    newGlobalRow["ClusterSubID"] = newLocalRow["ClusterSubID"];
+                    newGlobalRow["클러스터명"] = newLocalRow["클러스터명"];
+                    newGlobalRow["키워드목록"] = newLocalRow["키워드목록"];
+                    newGlobalRow["Count"] = newLocalRow["Count"];
+                    newGlobalRow["합산금액"] = newLocalRow["합산금액"];
+                    newGlobalRow["dataIndex"] = newLocalRow["dataIndex"];
+
+                    DataHandler.finalClusteringData.Rows.Add(newGlobalRow);
+
+                    int newClusterNumber = Convert.ToInt32(newLocalRow["ID"]);
+                    Debug.WriteLine($"새로운 세부 클러스터 {newClusterNumber} 전역 데이터에 추가");
+                }
+
+                // *** 5. 삭제된 세부 클러스터 전역에서도 제거 ***
+                // (전역에는 있지만 로컬에는 없는 세부 상위 클러스터)
+                var globalRowsToDelete = globalParentRows
                     .Where(globalRow =>
                     {
                         int globalClusterNumber = Convert.ToInt32(globalRow["ID"]);
-                        int globalClusterSubId = Convert.ToInt32(globalRow["ClusterSubID"]);
+                        int globalClusterSubId = globalRow["ClusterSubID"] != DBNull.Value ?
+                                                Convert.ToInt32(globalRow["ClusterSubID"]) : -1;
 
                         // 세부 상위 클러스터이면서 로컬 데이터에 없는 경우
                         return globalClusterSubId == globalClusterNumber &&
                                globalClusterSubId > 0 &&
-                               !_detailClusteringData.AsEnumerable().Any(localRow =>
-                                   Convert.ToInt32(localRow["ID"]) == globalClusterNumber);
+                               !localClusterNumbers.Contains(globalClusterNumber);
                     })
                     .ToList();
 
@@ -2421,14 +2432,14 @@ namespace FinanceTool
                     Debug.WriteLine($"삭제된 세부 클러스터 {deletedClusterNumber} 전역 데이터에서 제거");
                 }
 
+                // *** 6. 변경사항 저장 ***
                 DataHandler.finalClusteringData.AcceptChanges();
-                Debug.WriteLine("세부 클러스터링 데이터 동기화 완료");
+
+                Debug.WriteLine($"세부 클러스터링 데이터 동기화 완료 - 처리된 부모 클러스터 관련 행: {globalParentRows.Count}개");
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"데이터 동기화 오류: {ex.Message}");
-
-               
                 throw;
             }
         }
@@ -2773,82 +2784,12 @@ namespace FinanceTool
             {
                 using (var progressForm = new ProcessProgressForm())
                 {
-                    /*
-                    int clusterCount = GetCountOfNegativeOneClusterIDs(DataHandler.finalClusteringData);
-
-                    if (clusterCount > 0)
-                    {
-                        //await progressForm.UpdateProgressHandler(20, "병합 클러스터링 통합 시작...");
-
-                        // 최대 속도 처리를 위한 극한 병렬 클러스터 통합
-                        //await ProcessMaxSpeedClusterMergeAsync(clusterCount, progressForm.UpdateProgressHandler);
-
-                        DialogResult result = MessageBox.Show(
-                                   $"{clusterCount}개의 클러스터가 남아있습니다.\n 자동으로 병합하시겠습니까?",
-                                   "클러스터 병합 확인",
-                                   MessageBoxButtons.YesNo,
-                                   MessageBoxIcon.Question
-                               );
-
-                        if (result == DialogResult.No)
-                        {
-                            return;
-                        }
-
-                    }
                     
                     progressForm.Show();
                     await progressForm.UpdateProgressHandler(10, "세부 병합 클러스터링 완료 처리 시작...");
 
-                    if (clusterCount > 0)
-                    {
-                        await progressForm.UpdateProgressHandler(20, "세부 병합 클러스터링 통합 시작...");
-
-                        // 최대 속도 처리를 위한 극한 병렬 클러스터 통합
-                        await ProcessMaxSpeedClusterMergeAsync(clusterCount, progressForm.UpdateProgressHandler);
-                    }
-
-
-                    await progressForm.UpdateProgressHandler(60, "최종 데이터 검증...");
-
-                    // 최대 속도 최종 처리
-                    //await MaxSpeedFinalizeAsync(progressForm.UpdateProgressHandler);
-
-
-                    // *** 6단계: DataTable 업데이트 (기존 행 업데이트 + 병합된 클러스터들의 ClusterID 변경) ***
-                    //await UpdateDataTableAfterMerge(DataHandler.finalClusteringData, targetIds, newClusterNumber, isNewCluster);
-
-                    // *** 7단계: 데이터 보강 (동기적 처리로 일관성 보장) ***
-                    //mergeClusterDataTable = await EnrichWithRawTableDataAsync(DataHandler.finalClusteringData);
-
-                    // *** 8단계: ClusteringManager 데이터 새로고침 ***
-                    if (_clusteringManager != null)
-                    {
-                        await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
-                    }
-
-                    //Debug.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] 병합 완료: {newClusterNumber}");
-
-                    await progressForm.UpdateProgressHandler(80, "데이터 정렬 중...");
-
-                    // 병합 클러스터 리스트 생성
-                    create_check_keyword_list();
-
-                    // 병합 작업 후 업데이트
-                    UpdateModifiedDataGridView();
-                    UpdateSupplySummaryDataGridView();
-
-                    //merge_cluster_table.Rows.Clear();
-
-                    //dataGridView_modified.Rows.Clear();
-                   
-
-                    await progressForm.UpdateProgressHandler(100, "클러스터링 완료");
-                     */
-                    progressForm.Show();
-                    await progressForm.UpdateProgressHandler(10, "세부 병합 클러스터링 완료 처리 시작...");
-
                     await SyncDetailClusteringToGlobalData();
+                    await Task.Delay(10);
 
                     await progressForm.UpdateProgressHandler(70, "Export 페이지 이동 중...");
                     // 다음 페이지로 이동
