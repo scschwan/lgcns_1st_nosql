@@ -1148,9 +1148,10 @@ namespace FinanceTool
 
                 // *** 핵심 변경: 기존 DataHandler 함수 대신 ClusteringManager 사용 ***
                 string searchColumn = GetSelectedSearchColumn();
-                var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN ,true );
+                //var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN ,true );
+                var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN,_baseSearchResults,_isSubSearchMode, true);
 
-                
+
 
                 if (matchingClusterIds.Count > 0)
                 {
@@ -1255,7 +1256,8 @@ namespace FinanceTool
                     await progressForm.UpdateProgressHandler(20, $"'{searchColumn}' 컬럼에서 검색 중...");
                     await Task.Delay(10);
 
-                    var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN ,true);
+                    //var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN ,true);
+                    var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN, _baseSearchResults, _isSubSearchMode, true);
 
                     await progressForm.UpdateProgressHandler(40, "데이터 검색 중...");
                     await Task.Delay(10);

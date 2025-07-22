@@ -1236,7 +1236,7 @@ namespace FinanceTool
                 // 복합 조건 검색 수행
                 //matchingKeywords = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
                 // 복합 조건 검색 수행
-                var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+                var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN ,_baseSearchResults ,_isSubSearchMode );
 
                 Debug.WriteLine($"복합 조건 검색 결과: {matchingClusterIds.Count}개 클러스터");
 
@@ -1358,7 +1358,8 @@ namespace FinanceTool
                     // 복합 조건 검색 수행
                     //matchingKeywords = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
                     // 복합 조건 검색 수행
-                    var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+                    //var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN);
+                    var matchingClusterIds = _clusteringManager.SearchWithComplexConditions(searchColumn, parsedKeywords, equalsSearchYN, _baseSearchResults, _isSubSearchMode);
 
                     Debug.WriteLine($"복합 조건 검색 결과: {matchingClusterIds.Count}개 클러스터");
 

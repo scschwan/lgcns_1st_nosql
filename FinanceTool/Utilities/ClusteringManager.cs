@@ -1478,7 +1478,8 @@ public class ClusteringManager
 
 
     // ClusteringManager 클래스에 추가할 메서드
-    public List<int> SearchWithComplexConditions(string columnName, ParsedKeywords parsedKeywords, bool exactMatch , bool subClusteringYN = false)
+    public List<int> SearchWithComplexConditions(string columnName, ParsedKeywords parsedKeywords, bool exactMatch
+        , List<int> baseSearchResults ,  bool isSubSearchMode  , bool subClusteringYN = false)
     {
         List<int> results = new List<int>();
 
@@ -1507,7 +1508,7 @@ public class ClusteringManager
         if (results.Count > 0)
         {
             // 자기 자신 제외 로직 추가
-            results = FilterOutSelfReferences(results , subClusteringYN);
+            results = FilterOutSelfReferences(results , subClusteringYN , baseSearchResults , isSubSearchMode);
         }
         
 
@@ -1520,7 +1521,7 @@ public class ClusteringManager
     /// </summary>
     /// <param name="clusterIds">검색된 클러스터 ID 목록</param>
     /// <returns>필터링된 클러스터 ID 목록</returns>
-    private List<int> FilterOutSelfReferences(List<int> clusterIds , bool subClusteringYN)
+    private List<int> FilterOutSelfReferences(List<int> clusterIds , bool subClusteringYN , List<int> baseSearchResults, bool isSubSearchMode)
     {
         if (clusterIds == null || clusterIds.Count == 0)
             return new List<int>();
@@ -1550,6 +1551,11 @@ public class ClusteringManager
             }
             //클러스터링 검색 조회 대상이 아닐 경우
             else if (!subClusteringYN && clusterID > 0 )
+            {
+                continue;
+            }
+            //결과내 검색 필터링 기능 추가
+            else if (isSubSearchMode && !baseSearchResults.Contains(id))
             {
                 continue;
             }
