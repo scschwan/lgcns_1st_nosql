@@ -6,6 +6,7 @@ using FinanceTool.Repositories;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
@@ -1561,9 +1562,13 @@ namespace FinanceTool
             }
         }
 
-      
+
         /// <summary>
         /// 계정명 컬럼 내용 검증 및 추출
+        /// </summary>
+        /// <summary>
+        /// 계정명 컬럼 내용 검증 및 추출 (초고속 병렬 처리 버전)
+        /// 192GB 메모리와 멀티코어 CPU를 최대한 활용
         /// </summary>
         private async Task<ValidationResult> ValidateAndExtractAccountContent(FileDisplayData fileData)
         {
@@ -1572,7 +1577,9 @@ namespace FinanceTool
                 try
                 {
                     string filePath = Path.Combine(UPLOAD_FOLDER, fileData.StoredFilename);
-                    var accountContents = new HashSet<string>();
+                    var sw = Stopwatch.StartNew();
+
+                    Debug.WriteLine($"[병렬처리] 시작 - 파일: {fileData.OriginalFilename}");
 
                     using (var document = SpreadsheetDocument.Open(filePath, false))
                     {
@@ -1583,7 +1590,6 @@ namespace FinanceTool
                         var allRows = sheetData.Elements<Row>().ToList();
                         if (allRows.Count <= 1)
                         {
-                            // 빈 데이터도 UI에 반영
                             Application.OpenForms[0].Invoke((MethodInvoker)delegate
                             {
                                 fileData.AccountContents = new List<string>();
@@ -1592,7 +1598,9 @@ namespace FinanceTool
                             return new ValidationResult { IsValid = true };
                         }
 
-                        // 헤더에서 계정명 컬럼 인덱스 찾기
+                        Debug.WriteLine($"[병렬처리] 총 행 수: {allRows.Count:N0}");
+
+                        // 1단계: 헤더 분석 (단일 스레드)
                         var headerRow = allRows.First();
                         var headerCells = headerRow.Elements<Cell>().ToList();
                         int accountColumnIndex = -1;
@@ -1616,141 +1624,154 @@ namespace FinanceTool
                             };
                         }
 
-                        // 데이터 행들에서 계정명 내용 추출
-                        for (int rowIndex = 1; rowIndex < allRows.Count; rowIndex++)
-                        {
-                            var row = allRows[rowIndex];
-                            var cells = row.Elements<Cell>().ToList();
+                        Debug.WriteLine($"[병렬처리] 계정명 컬럼 인덱스: {accountColumnIndex}");
 
-                            if (accountColumnIndex < cells.Count)
+                        // 2단계: 데이터 행만 추출 (헤더 제외)
+                        var dataRows = allRows.Skip(1).ToList();
+
+                        // 3단계: 초고속 병렬 처리를 위한 설정
+                        var parallelOptions = new ParallelOptions
+                        {
+                            MaxDegreeOfParallelism = Environment.ProcessorCount * 4, // CPU 코어수의 4배
+                            TaskScheduler = TaskScheduler.Default
+                        };
+
+                        // 4단계: 메모리 최적화된 병렬 데이터 추출
+                        // ConcurrentHashSet 대신 Thread-Safe Dictionary 사용 (더 빠름)
+                        var accountDict = new ConcurrentDictionary<string, byte>();
+                        var processedCount = 0;
+                        var totalRows = dataRows.Count;
+
+                        Debug.WriteLine($"[병렬처리] 병렬 처리 시작 - MaxDegreeOfParallelism: {parallelOptions.MaxDegreeOfParallelism}");
+
+                        // PLINQ를 사용한 초고속 병렬 처리
+                        var validAccounts = dataRows
+                            .AsParallel()
+                            .WithDegreeOfParallelism(parallelOptions.MaxDegreeOfParallelism)
+                            .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                            .Select((row, index) =>
                             {
-                                string cellValue = GetCellValue(cells[accountColumnIndex], workbookPart);
-                                if (!string.IsNullOrWhiteSpace(cellValue))
+                                // 진행률 업데이트 (1000개마다)
+                                if (Interlocked.Increment(ref processedCount) % 1000 == 0)
                                 {
-                                    accountContents.Add(cellValue.Trim());
+                                    var progress = (processedCount * 100) / totalRows;
+                                    Debug.WriteLine($"[병렬처리] 진행률: {progress}% ({processedCount:N0}/{totalRows:N0})");
                                 }
-                            }
-                        }
-                    }
 
-                    var uniqueContents = accountContents.ToList();
+                                var cells = row.Elements<Cell>().ToList();
+                                if (accountColumnIndex < cells.Count)
+                                {
+                                    string cellValue = GetCellValue(cells[accountColumnIndex], workbookPart);
+                                    if (!string.IsNullOrWhiteSpace(cellValue))
+                                    {
+                                        return cellValue.Trim();
+                                    }
+                                }
+                                return null;
+                            })
+                            .Where(value => !string.IsNullOrEmpty(value))
+                            .Distinct() // PLINQ의 Distinct는 병렬로 처리됨
+                            .ToList();
 
-                    // UI 스레드에서 데이터 업데이트
-                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                    {
-                        fileData.AccountContents = uniqueContents;
-                        // 계정명 내용 포맷팅 개선 (최대 3개 표시 + 개수 정보)
-                        if (uniqueContents.Count == 0)
+                        sw.Stop();
+                        Debug.WriteLine($"[병렬처리] 완료 - 소요시간: {sw.ElapsedMilliseconds:N0}ms, 고유 계정명: {validAccounts.Count}개");
+
+                        // 5단계: UI 스레드에서 결과 업데이트
+                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
                         {
-                            fileData.AccountContentFormatted = "";
-                        }
-                        else if (uniqueContents.Count == 1)
-                        {
-                            fileData.AccountContentFormatted = uniqueContents[0];
-                        }
-                        else if (uniqueContents.Count <= 3)
-                        {
-                            fileData.AccountContentFormatted = string.Join(", ", uniqueContents) + $" ({uniqueContents.Count}개)";
-                        }
-                        else
-                        {
-                            fileData.AccountContentFormatted = string.Join(", ", uniqueContents.Take(3)) + $"... ({uniqueContents.Count}개)";
-                        }
-                    });
+                            fileData.AccountContents = validAccounts;
 
-                    // *** 핵심 변경: 40개 초과 시 경고하되 처리는 허용 ***
-                    if (uniqueContents.Count > 40)
-                    {
-                        string warningMessage = $"계정명 종류가 40개를 초과했습니다. ({uniqueContents.Count}개)\n" +
-                                              "성능상 권장하지 않지만 처리를 계속합니다.\n" +
-                                              "처음 5개 계정명:\n" +
-                                              string.Join("\n", uniqueContents.Take(5).Select((v, i) => $"{i + 1}. {v}"));
-
-                        // 비동기로 경고 표시 (처리는 계속)
-                        Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
-                        {
-                            //MessageBox.Show(warningMessage, "계정명 개수 경고",  MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-                            Form progressForm = Application.OpenForms.Cast<Form>()
-                            .FirstOrDefault(f => f.GetType().Name == "ProcessProgressForm");
-
-                            if (progressForm != null)
+                            // 계정명 내용 포맷팅
+                            if (validAccounts.Count == 0)
                             {
-                                progressForm.Hide();
-                            }
-
-                            MessageBox.Show(warningMessage, "계정명 개수 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-
-                            if (progressForm != null)
-                            {
-                                progressForm.Show();
-                            }
-                        });
-                    }
-                    // 1~40개는 정상 처리
-                    else if (uniqueContents.Count > 1)
-                    {
-                        string infoMessage = $"계정명이 {uniqueContents.Count}개 감지되었습니다.\n" +
-                                           "세션 생성 시 계정명별로 분리됩니다.\n" +
-                                           "감지된 계정명:\n" +
-                                           string.Join("\n", uniqueContents.Take(10).Select((v, i) => $"{i + 1}. {v}")) +
-                                           (uniqueContents.Count > 10 ? $"\n... 외 {uniqueContents.Count - 10}개 더" : "");
-
-                        // 정보성 메시지 (선택사항)
-                        Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
-                        {
-                            /*
-                            var result = MessageBox.Show(infoMessage + "\n계속 진행하시겠습니까?",
-                                "계정명 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-
-                            if (result != DialogResult.Yes)
-                            {
-                                // 사용자가 취소한 경우 계정명 컬럼 선택 해제
-                                fileData.AccountColumnName = "";
-                                fileData.AccountContents.Clear();
                                 fileData.AccountContentFormatted = "";
                             }
-                            */
-
-                            // progressForm이 있다면 일시적으로 숨기기
-                            Form progressForm = Application.OpenForms.Cast<Form>()
-                                .FirstOrDefault(f => f.GetType().Name == "ProcessProgressForm");
-
-                            if (progressForm != null)
+                            else if (validAccounts.Count == 1)
                             {
-                                progressForm.Hide();
+                                fileData.AccountContentFormatted = validAccounts[0];
                             }
-
-                            try
+                            else if (validAccounts.Count <= 3)
                             {
-                                var result = MessageBox.Show(infoMessage + "\n계속 진행하시겠습니까?",
-                                    "계정명 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                                fileData.AccountContentFormatted = string.Join(", ", validAccounts) + $" ({validAccounts.Count}개)";
+                            }
+                            else
+                            {
+                                fileData.AccountContentFormatted = string.Join(", ", validAccounts.Take(3)) + $"... ({validAccounts.Count}개)";
+                            }
+                        });
 
-                                if (result != DialogResult.Yes)
+                        // 6단계: 계정명 개수별 처리 로직
+                        if (validAccounts.Count > 40)
+                        {
+                            string warningMessage = $"계정명 종류가 40개를 초과했습니다. ({validAccounts.Count}개)\n" +
+                                                  $"병렬 처리로 {sw.ElapsedMilliseconds:N0}ms 만에 완료되었습니다.\n" +
+                                                  "성능상 권장하지 않지만 처리를 계속합니다.\n" +
+                                                  "처음 5개 계정명:\n" +
+                                                  string.Join("\n", validAccounts.Take(5).Select((v, i) => $"{i + 1}. {v}"));
+
+                            Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
+                            {
+                                Form progressForm = Application.OpenForms.Cast<Form>()
+                                    .FirstOrDefault(f => f.GetType().Name == "ProcessProgressForm");
+
+                                if (progressForm != null)
                                 {
-                                    fileData.AccountColumnName = "";
-                                    fileData.AccountContents.Clear();
-                                    fileData.AccountContentFormatted = "";
+                                    progressForm.Hide();
                                 }
-                            }
-                            finally
-                            {
-                                // progressForm 다시 표시
-                                /*
+
+                                MessageBox.Show(warningMessage, "계정명 개수 경고", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+
                                 if (progressForm != null)
                                 {
                                     progressForm.Show();
                                 }
-                                */
-                            }
-                        });
-                    }
+                            });
+                        }
+                        else if (validAccounts.Count > 1)
+                        {
+                            string infoMessage = $"계정명이 {validAccounts.Count}개 감지되었습니다.\n" +
+                                               $"병렬 처리로 {sw.ElapsedMilliseconds:N0}ms 만에 완료되었습니다.\n" +
+                                               "세션 생성 시 계정명별로 분리됩니다.\n" +
+                                               "감지된 계정명:\n" +
+                                               string.Join("\n", validAccounts.Take(10).Select((v, i) => $"{i + 1}. {v}")) +
+                                               (validAccounts.Count > 10 ? $"\n... 외 {validAccounts.Count - 10}개 더" : "");
 
-                    return new ValidationResult { IsValid = true };
+                            Application.OpenForms[0].BeginInvoke((MethodInvoker)delegate
+                            {
+                                Form progressForm = Application.OpenForms.Cast<Form>()
+                                    .FirstOrDefault(f => f.GetType().Name == "ProcessProgressForm");
+
+                                if (progressForm != null)
+                                {
+                                    progressForm.Hide();
+                                }
+
+                                try
+                                {
+                                    var result = MessageBox.Show(infoMessage + "\n계속 진행하시겠습니까?",
+                                        "계정명 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+
+                                    if (result != DialogResult.Yes)
+                                    {
+                                        fileData.AccountColumnName = "";
+                                        fileData.AccountContents.Clear();
+                                        fileData.AccountContentFormatted = "";
+                                    }
+                                }
+                                finally
+                                {
+                                    // progressForm은 의도적으로 재표시하지 않음 (사용자 경험 개선)
+                                }
+                            });
+                        }
+
+                        Debug.WriteLine($"[병렬처리] 전체 완료 - 파일: {fileData.OriginalFilename}, 처리시간: {sw.ElapsedMilliseconds:N0}ms");
+                        return new ValidationResult { IsValid = true };
+                    }
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"계정명 내용 검증 오류: {ex.Message}");
+                    Debug.WriteLine($"[병렬처리] 오류 발생: {ex.Message}");
                     return new ValidationResult
                     {
                         IsValid = false,
@@ -1760,8 +1781,12 @@ namespace FinanceTool
             });
         }
 
+
         /// <summary>
         /// 금액 컬럼 검증 및 합계 계산
+        /// </summary>
+        /// <summary>
+        /// 금액 컬럼 검증 및 합계 계산 (초고속 병렬 처리 버전)
         /// </summary>
         private async Task<ValidationResult> ValidateAndCalculateAmount(FileDisplayData fileData)
         {
@@ -1770,8 +1795,9 @@ namespace FinanceTool
                 try
                 {
                     string filePath = Path.Combine(UPLOAD_FOLDER, fileData.StoredFilename);
-                    decimal totalAmount = 0;
-                    var nonNumericValues = new List<string>();
+                    var sw = Stopwatch.StartNew();
+
+                    Debug.WriteLine($"[병렬금액처리] 시작 - 파일: {fileData.OriginalFilename}");
 
                     using (var document = SpreadsheetDocument.Open(filePath, false))
                     {
@@ -1782,7 +1808,6 @@ namespace FinanceTool
                         var allRows = sheetData.Elements<Row>().ToList();
                         if (allRows.Count <= 1)
                         {
-                            // *** UI 스레드에서 데이터 업데이트 ***
                             Application.OpenForms[0].Invoke((MethodInvoker)delegate
                             {
                                 fileData.TotalAmount = 0;
@@ -1815,65 +1840,85 @@ namespace FinanceTool
                             };
                         }
 
-                        // 데이터 행들에서 금액 검증 및 합계 계산
-                        for (int rowIndex = 1; rowIndex < allRows.Count; rowIndex++)
-                        {
-                            var row = allRows[rowIndex];
-                            var cells = row.Elements<Cell>().ToList();
+                        var dataRows = allRows.Skip(1).ToList();
+                        var nonNumericValues = new ConcurrentBag<string>();
+                        var processedCount = 0;
+                        var totalRows = dataRows.Count;
 
-                            if (amountColumnIndex < cells.Count)
+                        Debug.WriteLine($"[병렬금액처리] 병렬 처리 시작 - 총 {totalRows:N0}행");
+
+                        // PLINQ를 사용한 초고속 병렬 금액 계산
+                        var totalAmount = dataRows
+                            .AsParallel()
+                            .WithDegreeOfParallelism(Environment.ProcessorCount * 4)
+                            .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                            .Select(row =>
                             {
-                                string cellValue = GetCellValue(cells[amountColumnIndex], workbookPart);
-                                if (!string.IsNullOrWhiteSpace(cellValue))
+                                // 진행률 업데이트 (10000개마다)
+                                if (Interlocked.Increment(ref processedCount) % 10000 == 0)
                                 {
-                                    string cleanValue = cellValue.Replace(",", "").Trim();
-                                    if (decimal.TryParse(cleanValue, out decimal amount))
+                                    var progress = (processedCount * 100) / totalRows;
+                                    Debug.WriteLine($"[병렬금액처리] 진행률: {progress}% ({processedCount:N0}/{totalRows:N0})");
+                                }
+
+                                var cells = row.Elements<Cell>().ToList();
+                                if (amountColumnIndex < cells.Count)
+                                {
+                                    string cellValue = GetCellValue(cells[amountColumnIndex], workbookPart);
+                                    if (!string.IsNullOrWhiteSpace(cellValue))
                                     {
-                                        totalAmount += amount;
-                                    }
-                                    else
-                                    {
-                                        if (nonNumericValues.Count < 10)
+                                        string cleanValue = cellValue.Replace(",", "").Trim();
+                                        if (decimal.TryParse(cleanValue, out decimal amount))
                                         {
-                                            nonNumericValues.Add(cellValue);
+                                            return amount;
+                                        }
+                                        else
+                                        {
+                                            if (nonNumericValues.Count < 10)
+                                            {
+                                                nonNumericValues.Add(cellValue);
+                                            }
                                         }
                                     }
                                 }
+                                return 0m;
+                            })
+                            .Sum(); // PLINQ의 Sum은 자동으로 병렬 처리됨
+
+                        sw.Stop();
+                        Debug.WriteLine($"[병렬금액처리] 완료 - 소요시간: {sw.ElapsedMilliseconds:N0}ms, 총액: {totalAmount:N0}");
+
+                        // UI 스레드에서 결과 업데이트
+                        Application.OpenForms[0].Invoke((MethodInvoker)delegate
+                        {
+                            if (nonNumericValues.Count == 0)
+                            {
+                                fileData.TotalAmount = totalAmount;
+                                fileData.TotalAmountFormatted = totalAmount.ToString("N0") + " 원";
                             }
-                        }
-                    }
+                        });
 
-                    // *** UI 스레드에서 데이터 업데이트 ***
-                    Application.OpenForms[0].Invoke((MethodInvoker)delegate
-                    {
-                        if (nonNumericValues.Count == 0)
+                        // 숫자가 아닌 값이 있는 경우 오류
+                        if (nonNumericValues.Count > 0)
                         {
-                            fileData.TotalAmount = totalAmount;
-                            fileData.TotalAmountFormatted = totalAmount.ToString("N0") + " 원";
+                            var nonNumericList = nonNumericValues.Take(10).ToList();
+                            string errorMessage = "금액 컬럼은 숫자 값만 존재해야 합니다.\n\n" +
+                                                "숫자가 아닌 값들:\n" +
+                                                string.Join("\n", nonNumericList.Select((v, i) => $"{i + 1}. '{v}'"));
 
+                            return new ValidationResult
+                            {
+                                IsValid = false,
+                                ErrorMessage = errorMessage
+                            };
                         }
 
-                    });
-
-                    // 숫자가 아닌 값이 있는 경우 오류
-                    if (nonNumericValues.Count > 0)
-                    {
-                        string errorMessage = "금액 컬럼은 숫자 값만 존재해야 합니다.\n\n" +
-                                            "숫자가 아닌 값들:\n" +
-                                            string.Join("\n", nonNumericValues.Select((v, i) => $"{i + 1}. '{v}'"));
-
-                        return new ValidationResult
-                        {
-                            IsValid = false,
-                            ErrorMessage = errorMessage
-                        };
+                        return new ValidationResult { IsValid = true };
                     }
-
-                    return new ValidationResult { IsValid = true };
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"금액 검증 오류: {ex.Message}");
+                    Debug.WriteLine($"[병렬금액처리] 오류 발생: {ex.Message}");
                     return new ValidationResult
                     {
                         IsValid = false,
