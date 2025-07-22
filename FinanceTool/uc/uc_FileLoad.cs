@@ -751,11 +751,6 @@ namespace FinanceTool
 
        
 
-       
-     
-
-        
-
         //체크 항목 데이터 수집
         public List<string> GetCheckedRowsData(DataGridView dgv)
         {
@@ -980,7 +975,6 @@ namespace FinanceTool
                 throw new Exception($"컬럼 검사 중 오류 발생: {ex.Message}");
             }
         }
-
 
 
         private void del_col_list_allcheck_CheckedChanged(object sender, EventArgs e)
@@ -1691,8 +1685,6 @@ namespace FinanceTool
             }
         }
 
-
-
         // 이벤트 핸들러
 
         /// <summary>
@@ -1774,8 +1766,6 @@ namespace FinanceTool
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
-      
 
         // 핵심 분석 및 처리 함수
 

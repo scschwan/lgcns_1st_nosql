@@ -419,9 +419,6 @@ namespace FinanceTool
             return sortedTable;
         }
 
-
-
-
         private void UpdatePaginationInfo()
         {
             // NumericUpDown 범위 설정
@@ -460,10 +457,6 @@ namespace FinanceTool
             }
         }
 
-       
-
-        
-       
        
         public void CreateCheckDataGridView(DataGridView dgv, DataTable dt)
         {
@@ -547,8 +540,6 @@ namespace FinanceTool
             }
             
         }
-
-
 
         public DataTable ConvertDataGridViewToCustomDataTable(DataGridView dgv)
         {
@@ -1130,16 +1121,6 @@ namespace FinanceTool
             }
         }
 
-
-        /// <summary>
-        /// 현재 세션 ID 가져오기 (구현 필요)
-        /// </summary>
-        private ObjectId GetCurrentSessionId()
-        {
-            return DataHandler.GetCurrentSessionId();
-        }
-
-
         // MongoDB에서 visible 컬럼 목록 가져오기
         private async Task GetColumnListAsync()
         {
@@ -1167,8 +1148,6 @@ namespace FinanceTool
             }
         }
 
-
-
         public List<string> GetCheckedRowsData(DataGridView dgv)
         {
             List<string> checkedData = new List<string>();
@@ -1189,8 +1168,6 @@ namespace FinanceTool
 
             return checkedData;
         }
-
-
 
         private async void dataGridView_classify_CellValueChanged(object sender, DataGridViewCellEventArgs e)
         {
@@ -1262,7 +1239,6 @@ namespace FinanceTool
             }
 
         }
-
 
         private async void restore_col_btn_Click(object sender, EventArgs e)
         {
@@ -1436,14 +1412,7 @@ namespace FinanceTool
             //btn_nextPage.Click += btn_nextPage_Click;
         }
 
-        // 페이징 컨트롤 활성화/비활성화 메서드
-        private void EnablePagingControls(bool enabled)
-        {
-            btn_prevPage.Enabled = enabled;
-            btn_nextPage.Enabled = enabled;
-            num_pageNumber.Enabled = enabled;
-            cmb_pageSize.Enabled = enabled;
-        }
+      
 
         // NumericUpDown 값 변경 이벤트 핸들러
         private async void num_pageNumber_ValueChanged(object sender, EventArgs e)
@@ -2182,8 +2151,6 @@ namespace FinanceTool
 
             Debug.WriteLine($"AddSelectedColumnToGrid 완료: {targetDgv.Rows.Count}개 행 추가됨");
         }
-
-
 
         //2025.04.28
         //상세 항목을 불러오는게 어려운 상황이라 우선 구현 skip

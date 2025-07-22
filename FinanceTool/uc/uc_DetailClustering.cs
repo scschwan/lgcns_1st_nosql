@@ -265,71 +265,10 @@ namespace FinanceTool
                 }
             }
 
-            /// <summary>
-            /// 현재 시스템 성능 상태 출력
-            /// </summary>
-            public static void LogSystemStatus()
-            {
-                try
-                {
-                    Debug.WriteLine("=== 시스템 성능 상태 ===");
-                    Debug.WriteLine($"프로세서 코어 수: {Environment.ProcessorCount}");
-                    Debug.WriteLine($"사용 가능한 메모리: {GC.GetTotalMemory(false) / 1024 / 1024}MB");
-                    Debug.WriteLine($"Server GC 모드: {GCSettings.IsServerGC}");
-                    Debug.WriteLine($"GC 지연 모드: {GCSettings.LatencyMode}");
-
-                    ThreadPool.GetMinThreads(out int minWorker, out int minIO);
-                    ThreadPool.GetMaxThreads(out int maxWorker, out int maxIO);
-                    Debug.WriteLine($"스레드 풀 - Worker: {minWorker}-{maxWorker}, IOCP: {minIO}-{maxIO}");
-                    Debug.WriteLine("========================");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"시스템 상태 로깅 오류: {ex.Message}");
-                }
-            }
+           
         }
 
-        /// <summary>
-        /// 고성능 객체 풀 구현 (메모리 재사용)
-        /// </summary>
-        public class HighPerformanceObjectPool<T> where T : class, new()
-        {
-            private readonly ConcurrentQueue<T> _objects = new ConcurrentQueue<T>();
-            private readonly Func<T> _objectGenerator;
-            private readonly Action<T> _resetAction;
-            private int _currentCount = 0;
-            private readonly int _maxObjects;
-
-            public HighPerformanceObjectPool(int maxObjects = 1000, Func<T> objectGenerator = null, Action<T> resetAction = null)
-            {
-                _maxObjects = maxObjects;
-                _objectGenerator = objectGenerator ?? (() => new T());
-                _resetAction = resetAction;
-            }
-
-            public T Get()
-            {
-                if (_objects.TryDequeue(out T item))
-                {
-                    Interlocked.Decrement(ref _currentCount);
-                    return item;
-                }
-                return _objectGenerator();
-            }
-
-            public void Return(T item)
-            {
-                if (_currentCount < _maxObjects)
-                {
-                    _resetAction?.Invoke(item);
-                    _objects.Enqueue(item);
-                    Interlocked.Increment(ref _currentCount);
-                }
-            }
-        }
-
-
+       
 
         public uc_DetailClustering()
         {
@@ -818,8 +757,6 @@ namespace FinanceTool
     Debug.WriteLine($"제외 키워드 {excludeKeywords.Count}개: {string.Join(", ", excludeKeywords)}");
     return excludeKeywords;
         }
-
-        
 
         private void LoadSeparatorsAndRemovers()
         {
@@ -1431,27 +1368,7 @@ namespace FinanceTool
 
         }
 
-        /// <summary>
-        /// 검색 키워드 파싱 (AND/OR 지원)
-        /// </summary>
-        private List<string> ParseSearchKeywords(string searchText)
-        {
-            var keywords = new List<string>();
-
-            if (searchText.Contains("|"))
-            {
-                // OR 조건 처리 (현재는 단순화)
-                keywords.AddRange(searchText.Split('|').SelectMany(part =>
-                    part.Split(',').Select(k => k.Trim())).Where(k => !string.IsNullOrEmpty(k)));
-            }
-            else
-            {
-                // AND 조건 또는 단일 키워드
-                keywords.AddRange(searchText.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)));
-            }
-
-            return keywords;
-        }
+      
 
         /// <summary>
         /// 검색 조건으로 실제 검색 수행
@@ -1653,70 +1570,6 @@ namespace FinanceTool
 
         }
 
-        //checkFlag = 0 : merge table combo box
-        //checkFlag = 1 : check table combo box
-        public List<string> ExtractUniqueKeywords(DataTable dataTable, int checkFlag)
-        {
-            HashSet<string> uniqueKeywords = new HashSet<string>();
-
-            foreach (DataRow row in dataTable.Rows)
-            {
-                if (!row.IsNull("ClusterSubID") && !row.IsNull("ID"))
-                {
-                    int clusterSubID = Convert.ToInt32(row["ClusterSubID"]);
-                    int id = Convert.ToInt32(row["ID"]);
-
-                    //*** 핵심 수정: checkFlag = 0일 때 병합되지 않은 클러스터만 포함 ***
-                    if (checkFlag == 0)
-                    {
-                        // 병합되지 않은 클러스터만 포함: ClusterID <= 0 또는 ClusterID == ID
-                        if (clusterSubID > 0 && clusterSubID != id)
-                        {
-                            // 이미 다른 클러스터에 병합된 하위 클러스터는 제외
-                            continue;
-                        }
-                    }
-                    else if (checkFlag == 1)
-                    {
-                        // 병합된 클러스터만 포함: ClusterID > 0 && ClusterID == ID
-                        if (clusterSubID <= 0 || clusterSubID != id)
-                        {
-                            continue;
-                        }
-                    }
-                }
-                else
-                {
-                    // ClusterID나 ID가 없는 데이터 처리
-                    if (checkFlag == 1)
-                    {
-                        // check table에서는 클러스터 정보가 없는 데이터는 skip
-                        continue;
-                    }
-                }
-
-                // 키워드목록 컬럼의 데이터 가져오기 (null 체크 포함)
-                string keywordList = row["키워드목록"]?.ToString();
-
-                if (!string.IsNullOrEmpty(keywordList))
-                {
-                    // 쉼표로 구분된 키워드를 분리하고 각각 HashSet에 추가
-                    string[] keywords = keywordList.Split(',');
-                    foreach (string keyword in keywords)
-                    {
-                        // 앞뒤 공백 제거 후 추가
-                        string trimmedKeyword = keyword.Trim();
-                        if (!string.IsNullOrEmpty(trimmedKeyword))
-                        {
-                            uniqueKeywords.Add(trimmedKeyword);
-                        }
-                    }
-                }
-            }
-
-            // HashSet을 List로 변환하여 반환 (정렬된 상태로)
-            return uniqueKeywords.OrderBy(k => k).ToList();
-        }
 
       
         public void CreateCheckDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords)
@@ -2777,8 +2630,6 @@ namespace FinanceTool
             }
         }
 
-
-
         private async void complete_btn_Click(object sender, EventArgs e)
         {
             try
@@ -3001,8 +2852,6 @@ namespace FinanceTool
 
 
         }
-
-
 
         private void lv1_add_btn_Click(object sender, EventArgs e)
         {

@@ -260,29 +260,7 @@ namespace FinanceTool
                 }
             }
 
-            /// <summary>
-            /// 현재 시스템 성능 상태 출력
-            /// </summary>
-            public static void LogSystemStatus()
-            {
-                try
-                {
-                    Debug.WriteLine("=== 시스템 성능 상태 ===");
-                    Debug.WriteLine($"프로세서 코어 수: {Environment.ProcessorCount}");
-                    Debug.WriteLine($"사용 가능한 메모리: {GC.GetTotalMemory(false) / 1024 / 1024}MB");
-                    Debug.WriteLine($"Server GC 모드: {GCSettings.IsServerGC}");
-                    Debug.WriteLine($"GC 지연 모드: {GCSettings.LatencyMode}");
-
-                    ThreadPool.GetMinThreads(out int minWorker, out int minIO);
-                    ThreadPool.GetMaxThreads(out int maxWorker, out int maxIO);
-                    Debug.WriteLine($"스레드 풀 - Worker: {minWorker}-{maxWorker}, IOCP: {minIO}-{maxIO}");
-                    Debug.WriteLine("========================");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"시스템 상태 로깅 오류: {ex.Message}");
-                }
-            }
+         
         }
 
        
@@ -1441,72 +1419,6 @@ namespace FinanceTool
 
 
         /// <summary>
-        /// 클러스터 ID들로부터 원래 검색 키워드와 매칭되는 키워드만 추출
-        /// </summary>
-        private List<string> GetKeywordsByClusterIds(List<int> clusterIds, string columnName, ParsedKeywords originalKeywords, bool exactMatch)
-        {
-            var keywords = new HashSet<string>();
-
-            // 원래 검색한 모든 키워드 목록
-            var originalSearchKeywords = new HashSet<string>();
-            originalSearchKeywords.UnionWith(originalKeywords.AndKeywords);
-            originalSearchKeywords.UnionWith(originalKeywords.OrKeywords);
-
-            foreach (int clusterId in clusterIds)
-            {
-                var row = _clusteringManager.GetClusterRow(clusterId);
-                if (row != null && row.Table.Columns.Contains(columnName))
-                {
-                    string columnValue = row[columnName]?.ToString();
-                    if (!string.IsNullOrEmpty(columnValue))
-                    {
-                        // 컬럼 값을 분리하여 처리
-                        IEnumerable<string> values;
-                        if (columnName == "키워드목록" || columnName == DataHandler.prod_col_name)
-                        {
-                            values = columnValue.Split(',').Select(v => v.Trim()).Where(v => !string.IsNullOrEmpty(v));
-                        }
-                        else
-                        {
-                            values = new[] { columnValue.Trim() };
-                        }
-
-                        // 원래 검색 키워드와 매칭되는 것만 추가
-                        foreach (string value in values)
-                        {
-                            foreach (string originalKeyword in originalSearchKeywords)
-                            {
-                                bool isMatch = false;
-
-                                if (exactMatch)
-                                {
-                                    // 완전 일치 검색
-                                    isMatch = string.Equals(value, originalKeyword, StringComparison.OrdinalIgnoreCase);
-                                }
-                                else
-                                {
-                                    // 부분 포함 검색
-                                    isMatch = value.Contains(originalKeyword, StringComparison.OrdinalIgnoreCase);
-                                }
-
-                                if (isMatch)
-                                {
-                                    keywords.Add(value);
-                                    break; // 하나라도 매칭되면 추가하고 다음 value로
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Debug.WriteLine($"클러스터 ID {clusterIds.Count}개 → 매칭 키워드 {keywords.Count}개 추출");
-            Debug.WriteLine($"추출된 키워드: [{string.Join(", ", keywords.Take(10))}]");
-
-            return keywords.ToList();
-        }
-
-        /// <summary>
         /// 현재 선택된 검색 컬럼 반환 (keyword_radio 대체)
         /// </summary>
         private string GetSelectedSearchColumn()
@@ -1537,27 +1449,7 @@ namespace FinanceTool
 
         }
 
-        /// <summary>
-        /// 검색 키워드 파싱 (AND/OR 지원)
-        /// </summary>
-        private List<string> ParseSearchKeywords(string searchText)
-        {
-            var keywords = new List<string>();
-
-            if (searchText.Contains("|"))
-            {
-                // OR 조건 처리 (현재는 단순화)
-                keywords.AddRange(searchText.Split('|').SelectMany(part =>
-                    part.Split(',').Select(k => k.Trim())).Where(k => !string.IsNullOrEmpty(k)));
-            }
-            else
-            {
-                // AND 조건 또는 단일 키워드
-                keywords.AddRange(searchText.Split(',').Select(k => k.Trim()).Where(k => !string.IsNullOrEmpty(k)));
-            }
-
-            return keywords;
-        }
+      
 
         /// <summary>
         /// 검색 조건으로 실제 검색 수행
@@ -2744,7 +2636,6 @@ namespace FinanceTool
                 e.SuppressKeyPress = true;  // 비프음 방지
             }
         }
-
 
 
         private async void complete_btn_Click(object sender, EventArgs e)
