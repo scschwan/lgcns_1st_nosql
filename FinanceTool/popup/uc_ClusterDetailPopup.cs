@@ -395,6 +395,17 @@ namespace FinanceTool
             if (detail_grid_view.Columns.Contains("cluster_number"))
                 detail_grid_view.Columns["cluster_number"].Visible = false;
 
+            // dataIndex 컬럼 숨기기
+            if (detail_grid_view.Columns.Contains("_id"))
+                detail_grid_view.Columns["_id"].Visible = false;
+
+            // MongoDB 관련 필드 숨기기
+            if (detail_grid_view.Columns.Contains("import_date"))
+                detail_grid_view.Columns["import_date"].Visible = false;
+
+            if (detail_grid_view.Columns.Contains("is_hidden"))
+                detail_grid_view.Columns["is_hidden"].Visible = false;
+
             // Count 컬럼 형식 설정
             if (detail_grid_view.Columns.Contains("Count"))
             {

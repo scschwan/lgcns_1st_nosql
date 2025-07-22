@@ -2728,11 +2728,12 @@ namespace FinanceTool
                 await Task.Delay(10);
 
                 // 4. ClusteringManager 데이터 새로고침
+                /*
                 if (_clusteringManager != null)
                 {
                     await _clusteringManager.RefreshDataAsync(mergeClusterDataTable);
                 }
-
+                */
                 create_check_keyword_list();
 
                 // 병합 작업 후 UI 업데이트
@@ -3579,8 +3580,9 @@ namespace FinanceTool
                     List<int> allChildClusterNumbers = new List<int>();
                     foreach (var cluster in clustersToMerge)
                     {
-                        var childClusters = await clusteringRepo.GetChildClustersAsync(cluster.ClusterNumber);
-                        allChildClusterNumbers.AddRange(childClusters.Select(c => c.ClusterNumber));
+                        //var childClusters = await clusteringRepo.GetChildClustersAsync(cluster.ClusterNumber);
+                        var subchildClusters = await clusteringRepo.GetSubChildClustersAsync(cluster.ClusterNumber);
+                        allChildClusterNumbers.AddRange(subchildClusters.Select(c => c.ClusterNumber));
                     }
 
                     // 7. MongoDB에 새 병합 클러스터 생성
@@ -3608,7 +3610,7 @@ namespace FinanceTool
                     // 8. 모든 하위 클러스터의 ClusterId를 새 클러스터 번호로 변경
                     foreach (int childNumber in allChildClusterNumbers)
                     {
-                        await clusteringRepo.UpdateClusterIdAsync(childNumber, newClusterNumber);
+                        await clusteringRepo.UpdateClusterSubIdAsync(childNumber, newClusterNumber);
                     }
 
                     await progressForm.UpdateProgressHandler(80, "기존 클러스터 삭제 중");

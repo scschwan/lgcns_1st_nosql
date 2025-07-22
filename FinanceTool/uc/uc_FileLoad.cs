@@ -844,6 +844,29 @@ namespace FinanceTool
                 return;
             }
 
+            // 선택된 컬럼 목록 생성
+            List<string> selectedColumns = new List<string>();
+            selectedColumns.Add(sub_acc_col_combo.SelectedItem.ToString());
+            selectedColumns.Add(dept_col_combo.SelectedItem.ToString());
+            selectedColumns.Add(prod_col_combo.SelectedItem.ToString());
+            selectedColumns.Add(cmb_money.SelectedItem.ToString());
+            selectedColumns.Add(cmb_target.SelectedItem.ToString());
+
+            // 중복 검사
+            var duplicates = selectedColumns.GroupBy(x => x)
+                                          .Where(g => g.Count() > 1)
+                                          .Select(g => g.Key)
+                                          .ToList();
+
+            if (duplicates.Count > 0)
+            {
+                string duplicateColumns = string.Join(", ", duplicates);
+                MessageBox.Show($"동일한 컬럼을 중복 선택할 수 없습니다.\n중복된 컬럼: {duplicateColumns}",
+                               "중복 선택 오류",
+                               MessageBoxButtons.OK,
+                               MessageBoxIcon.Warning);
+                return;
+            }
             try
             {
                 using (var progressForm = new ProcessProgressForm())
@@ -851,13 +874,7 @@ namespace FinanceTool
                     progressForm.Show();
                     progressForm.UpdateProgressHandler(10);
 
-                    // 선택된 컬럼 목록 생성
-                    List<string> selectedColumns = new List<string>();
-                    selectedColumns.Add(sub_acc_col_combo.SelectedItem.ToString());
-                    selectedColumns.Add(dept_col_combo.SelectedItem.ToString());
-                    selectedColumns.Add(prod_col_combo.SelectedItem.ToString());
-                    selectedColumns.Add(cmb_money.SelectedItem.ToString());
-                    selectedColumns.Add(cmb_target.SelectedItem.ToString());
+                   
 
                     // 필요한 전역 변수 설정
                     DataHandler.sub_acc_col_name = sub_acc_col_combo.SelectedItem.ToString();
