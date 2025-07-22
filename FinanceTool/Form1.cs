@@ -1,4 +1,4 @@
-using DocumentFormat.OpenXml.Wordprocessing;
+ï»¿using DocumentFormat.OpenXml.Wordprocessing;
 using FinanceTool.Utilities;
 using System.Data;
 
@@ -18,14 +18,14 @@ namespace FinanceTool
 
 
         /// <summary>
-        /// ÄÁÆ®·Ñ Å©±â ¹× À§Ä¡¸¦ ÀçÁ¶Á¤ÇÏ´Â ¸Ş¼Òµå
+        /// Ã„ÃÃ†Â®Â·Ã‘ Ã…Â©Â±Ã¢ Â¹Ã— Ã€Â§Ã„Â¡Â¸Â¦ Ã€Ã§ÃÂ¶ÃÂ¤Ã‡ÃÂ´Ã‚ Â¸ÃÂ¼Ã’ÂµÃ¥
         /// </summary>
         private void ResizeControls()
         {
-            // ÄÁÆ®·Ñ Å©±â ¹× À§Ä¡ ÀçÁ¶Á¤ ·ÎÁ÷ ±¸Çö
-            // °¢ UserControl¿¡ ´ëÇÑ ·¹ÀÌ¾Æ¿ô ¾÷µ¥ÀÌÆ®°¡ ÇÊ¿äÇÑ °æ¿ì Ã³¸®
+            // Ã„ÃÃ†Â®Â·Ã‘ Ã…Â©Â±Ã¢ Â¹Ã— Ã€Â§Ã„Â¡ Ã€Ã§ÃÂ¶ÃÂ¤ Â·ÃÃÃ· Â±Â¸Ã‡Ã¶
+            // Â°Â¢ UserControlÂ¿Â¡ Â´Ã«Ã‡Ã‘ Â·Â¹Ã€ÃŒÂ¾Ã†Â¿Ã´ Â¾Ã·ÂµÂ¥Ã€ÃŒÃ†Â®Â°Â¡ Ã‡ÃŠÂ¿Ã¤Ã‡Ã‘ Â°Ã¦Â¿Ã¬ ÃƒÂ³Â¸Â®
 
-            // ÇöÀç mainPanel¿¡ Ãß°¡µÈ ÄÁÆ®·ÑµéÀÇ ·¹ÀÌ¾Æ¿ôÀ» ¾÷µ¥ÀÌÆ®
+            // Ã‡Ã¶Ã€Ã§ mainPanelÂ¿Â¡ ÃƒÃŸÂ°Â¡ÂµÃˆ Ã„ÃÃ†Â®Â·Ã‘ÂµÃ©Ã€Ã‡ Â·Â¹Ã€ÃŒÂ¾Ã†Â¿Ã´Ã€Â» Â¾Ã·ÂµÂ¥Ã€ÃŒÃ†Â®
             foreach (System.Windows.Forms.Control control in mainPanel.Controls)
             {
                 if (control is UserControl)
@@ -38,71 +38,76 @@ namespace FinanceTool
         private async void Form1_Load(object sender, EventArgs e)
         {
 
-            // ¸ŞÀÎ È­¸é ÃÊ±âÈ­ ÀÛ¾÷
+            // Â¸ÃÃ€Ã ÃˆÂ­Â¸Ã© ÃƒÃŠÂ±Ã¢ÃˆÂ­ Ã€Ã›Â¾Ã·
             //mainPanel.Controls.Add(userControlHandler.uc_fileLoad);
             mainPanel.Controls.Add(userControlHandler.uc_multiFileUpload);
 
-            // ÆûÀ» ÀÏ½ÃÀûÀ¸·Î ºñÈ°¼ºÈ­ (ProcessProgressFormÀº º°µµ ÆûÀÌ¹Ç·Î ¿µÇâ ¾øÀ½)
+            // Ã†Ã»Ã€Â» Ã€ÃÂ½ÃƒÃ€Ã»Ã€Â¸Â·Ã ÂºÃ±ÃˆÂ°Â¼ÂºÃˆÂ­ (ProcessProgressFormÃ€Âº ÂºÂ°ÂµÂµ Ã†Ã»Ã€ÃŒÂ¹Ã‡Â·Ã Â¿ÂµÃ‡Ã¢ Â¾Ã¸Ã€Â½)
             this.Enabled = false;
 
             try
             {
+                //í”„ë¡œê·¸ë¨ ê¶Œí•œ ê²€ì¦
+                TrialManager trialManager = new TrialManager();
+
+                //2025.07.22 mac address ê²€ì¦ ë¡œì§ ì¶”ê°€
+                await trialManager.checkMacaddress();
+
                 if (trialYN)
                 {
                     using (var progress = new ProcessProgressForm())
                     {
-                        // ¸ğ´Ş¸®½º Ã¢À¸·Î Ç¥½Ã
+                        // Â¸Ã°Â´ÃÂ¸Â®Â½Âº ÃƒÂ¢Ã€Â¸Â·Ã Ã‡Â¥Â½Ãƒ
                         progress.Show(this);
 
-                        // ÁøÇà »óÅÂ ¾÷µ¥ÀÌÆ®
-                        await progress.UpdateProgressHandler(30, "ÇÁ·Î±×·¥ ÃÊ±âÈ­...");
+                        // ÃÃ¸Ã‡Ã  Â»Ã³Ã…Ã‚ Â¾Ã·ÂµÂ¥Ã€ÃŒÃ†Â®
+                        await progress.UpdateProgressHandler(30, "Ã‡ÃÂ·ÃÂ±Ã—Â·Â¥ ÃƒÃŠÂ±Ã¢ÃˆÂ­...");
                         await Task.Delay(10);
 
-                        // Æò°¡ÆÇ ÀÏÁ¤È®ÀÎ
-                        TrialManager trialManager = new TrialManager();
+                    
                         await trialManager.CheckTrial();
 
-                        // ÁøÇà ¿Ï·á ¹× Æû ´İ±â
+                        // ÃÃ¸Ã‡Ã  Â¿ÃÂ·Ã¡ Â¹Ã— Ã†Ã» Â´ÃÂ±Ã¢
                         await progress.UpdateProgressHandler(100);
                         await Task.Delay(10);
                         progress.Close();
                     }
                 }
 
-                // Æû ´Ù½Ã È°¼ºÈ­
+                // Ã†Ã» Â´Ã™Â½Ãƒ ÃˆÂ°Â¼ÂºÃˆÂ­
                 this.Enabled = true;
             }
             catch (Exception ex)
             {
-                // ¿À·ù ¹ß»ı ½Ã Ã³¸®
-                MessageBox.Show($"ÃÊ±âÈ­ Áß ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù: {ex.Message}", "¿À·ù",
+                // Â¿Ã€Â·Ã¹ Â¹ÃŸÂ»Ã½ Â½Ãƒ ÃƒÂ³Â¸Â®
+                MessageBox.Show($"ÃƒÃŠÂ±Ã¢ÃˆÂ­ ÃÃŸ Â¿Ã€Â·Ã¹Â°Â¡ Â¹ÃŸÂ»Ã½Ã‡ÃŸÂ½Ã€Â´ÃÂ´Ã™: {ex.Message}", "Â¿Ã€Â·Ã¹",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
             {
 
 
-                // ·¹ÀÌ¾Æ¿ô ÃÖÁ¾ Á¶Á¤
+                // Â·Â¹Ã€ÃŒÂ¾Ã†Â¿Ã´ ÃƒÃ–ÃÂ¾ ÃÂ¶ÃÂ¤
                 ResizeControls();
             }
 
 
         }
 
-        // ¸ğµç ÄÁÆ®·ÑÀÇ Enabled ¼Ó¼ºÀ» ¼³Á¤ÇÏ´Â Àç±Í ¸Ş¼Òµå
+        // Â¸Ã°ÂµÃ§ Ã„ÃÃ†Â®Â·Ã‘Ã€Ã‡ Enabled Â¼Ã“Â¼ÂºÃ€Â» Â¼Â³ÃÂ¤Ã‡ÃÂ´Ã‚ Ã€Ã§Â±Ã Â¸ÃÂ¼Ã’ÂµÃ¥
 
 
         public void LoadUserControl(UserControl control)
         {
-            // ±âÁ¸ ÄÁÆ®·Ñ Á¦°Å
+            // Â±Ã¢ÃÂ¸ Ã„ÃÃ†Â®Â·Ã‘ ÃÂ¦Â°Ã…
             mainPanel.Controls.Clear();
 
-            // »õ ÄÁÆ®·Ñ Ãß°¡ ¹× ·¹ÀÌ¾Æ¿ô ¼³Á¤
+            // Â»Ãµ Ã„ÃÃ†Â®Â·Ã‘ ÃƒÃŸÂ°Â¡ Â¹Ã— Â·Â¹Ã€ÃŒÂ¾Ã†Â¿Ã´ Â¼Â³ÃÂ¤
             control.Dock = DockStyle.Fill;
             //control.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             mainPanel.Controls.Add(control);
 
-            // ·¹ÀÌ¾Æ¿ô ¾÷µ¥ÀÌÆ®
+            // Â·Â¹Ã€ÃŒÂ¾Ã†Â¿Ã´ Â¾Ã·ÂµÂ¥Ã€ÃŒÃ†Â®
             control.Invalidate();
             mainPanel.Invalidate();
         }

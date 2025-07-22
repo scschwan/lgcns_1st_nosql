@@ -1561,35 +1561,7 @@ namespace FinanceTool
             }
         }
 
-        /// <summary>
-        /// 특정 파일의 그리드 행만 새로고침
-        /// </summary>
-        private void RefreshFileGridRow(FileDisplayData fileData)
-        {
-            try
-            {
-                var fileList = dgv_files.DataSource as List<FileDisplayData>;
-                if (fileList != null)
-                {
-                    var index = fileList.FindIndex(f => f.Id == fileData.Id);
-                    if (index >= 0)
-                    {
-                        // 특정 행만 무효화해서 다시 그리기
-                        dgv_files.InvalidateRow(index);
-
-                        // 콤보박스 아이템도 다시 설정
-                        UpdateComboBoxItems();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"그리드 행 새로고침 오류: {ex.Message}");
-                // 전체 그리드 새로고침으로 폴백
-                dgv_files.Invalidate();
-            }
-        }
-
+      
         /// <summary>
         /// 계정명 컬럼 내용 검증 및 추출
         /// </summary>
@@ -1907,70 +1879,6 @@ namespace FinanceTool
                         IsValid = false,
                         ErrorMessage = $"금액 컬럼 검증 중 오류가 발생했습니다: {ex.Message}"
                     };
-                }
-            });
-        }
-
-
-
-        /// <summary>
-        /// 엑셀 파일에서 지정된 컬럼의 합계 계산
-        /// </summary>
-        private async Task<decimal> CalculateTotalAmountFromExcel(string storedFilename, string amountColumnName)
-        {
-            return await Task.Run(() =>
-            {
-                try
-                {
-                    string filePath = Path.Combine(UPLOAD_FOLDER, storedFilename);
-                    decimal total = 0;
-
-                    using (var document = SpreadsheetDocument.Open(filePath, false))
-                    {
-                        var workbookPart = document.WorkbookPart;
-                        var worksheet = workbookPart.WorksheetParts.First().Worksheet;
-                        var sheetData = worksheet.GetFirstChild<SheetData>();
-
-                        // 첫 번째 행에서 컬럼 인덱스 찾기
-                        var headerRow = sheetData.Elements<Row>().FirstOrDefault();
-                        if (headerRow == null) return 0;
-
-                        int amountColumnIndex = -1;
-                        var headerCells = headerRow.Elements<Cell>().ToList();
-
-                        for (int i = 0; i < headerCells.Count; i++)
-                        {
-                            string cellValue = GetCellValue(headerCells[i], workbookPart);
-                            if (cellValue.Trim().Equals(amountColumnName.Trim(), StringComparison.OrdinalIgnoreCase))
-                            {
-                                amountColumnIndex = i;
-                                break;
-                            }
-                        }
-
-                        if (amountColumnIndex == -1) return 0;
-
-                        // 데이터 행들에서 금액 합계 계산
-                        foreach (var row in sheetData.Elements<Row>().Skip(1)) // 헤더 제외
-                        {
-                            var cells = row.Elements<Cell>().ToList();
-                            if (amountColumnIndex < cells.Count)
-                            {
-                                string cellValue = GetCellValue(cells[amountColumnIndex], workbookPart);
-                                if (decimal.TryParse(cellValue.Replace(",", ""), out decimal amount))
-                                {
-                                    total += amount;
-                                }
-                            }
-                        }
-                    }
-
-                    return total;
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"엑셀 금액 합계 계산 오류: {ex.Message}");
-                    return 0;
                 }
             });
         }
@@ -2752,10 +2660,6 @@ namespace FinanceTool
             }
         }
 
-
-        /// <summary>
-        /// 세션 삭제 처리
-        /// </summary>
         /// <summary>
         /// 세션 삭제 처리
         /// </summary>
@@ -3230,196 +3134,6 @@ namespace FinanceTool
         }
 
         /// <summary>
-        /// 다중 파일 선택 시 추가 검증
-        /// </summary>
-        /// <summary>
-        /// 다중 파일 선택 시 추가 검증 (계정명 내용 검증 완화)
-        /// </summary>
-        private ValidationResult ValidateMultipleFiles(List<FileDisplayData> selectedFiles)
-        {
-            if (selectedFiles.Count < 2)
-                return new ValidationResult { IsValid = true };
-
-            // 첫 번째 파일을 기준으로 설정
-            var referenceFile = selectedFiles[0];
-            string refAccountColumn = referenceFile.AccountColumnName.Trim().ToUpper();
-            string refAmountColumn = referenceFile.AmountColumnName.Trim().ToUpper();
-            var refColumns = referenceFile.DetectedColumns.Select(c => c.Trim().ToUpper()).OrderBy(c => c).ToList();
-
-            // 나머지 파일들과 비교
-            for (int i = 1; i < selectedFiles.Count; i++)
-            {
-                var currentFile = selectedFiles[i];
-                string currAccountColumn = currentFile.AccountColumnName.Trim().ToUpper();
-                string currAmountColumn = currentFile.AmountColumnName.Trim().ToUpper();
-
-                // 계정명 컬럼 일치 확인
-                if (refAccountColumn != currAccountColumn)
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = $"계정명 컬럼이 일치하지 않습니다.\\n\\n" +
-                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AccountColumnName}'\\n" +
-                                     $"• {currentFile.OriginalFilename}: '{currentFile.AccountColumnName}'"
-                    };
-                }
-
-                // 금액 컬럼 일치 확인
-                if (refAmountColumn != currAmountColumn)
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = $"금액 컬럼이 일치하지 않습니다.\\n\\n" +
-                                     $"• {referenceFile.OriginalFilename}: '{referenceFile.AmountColumnName}'\\n" +
-                                     $"• {currentFile.OriginalFilename}: '{currentFile.AmountColumnName}'"
-                    };
-                }
-
-                // *** 변경: 계정명 내용 일치 확인 제거 (다중 계정명 허용) ***
-                // 기존 계정명 내용 일치 검증 로직 주석 처리
-                /*
-                if (refAccountContent != currAccountContent)
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = $"계정명 내용이 일치하지 않습니다..."
-                    };
-                }
-                */
-
-                // 전체 컬럼 구조 일치 확인 (헤더 구조 검증 강화)
-                var currColumns = currentFile.DetectedColumns.Select(c => c.Trim().ToUpper()).OrderBy(c => c).ToList();
-
-                if (refColumns.Count != currColumns.Count || !refColumns.SequenceEqual(currColumns))
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = $"컬럼 구조가 일치하지 않습니다.\\n\\n" +
-                                     $"• {referenceFile.OriginalFilename}: {refColumns.Count}개 컬럼\\n" +
-                                     $"• {currentFile.OriginalFilename}: {currColumns.Count}개 컬럼\\n\\n" +
-                                     "파일들의 헤더 구조가 정확히 일치해야 합니다."
-                    };
-                }
-            }
-
-            // *** 새로 추가: 다중 계정명 확인 메시지 ***
-            var allAccountContents = selectedFiles.SelectMany(f => f.AccountContents ?? new List<string>()).Distinct().ToList();
-            if (allAccountContents.Count > 1)
-            {
-                string message = $"선택된 파일들에서 {allAccountContents.Count}개의 서로 다른 계정명이 발견되었습니다.\\n\\n" +
-                                "발견된 계정명:\\n" +
-                                string.Join("\\n", allAccountContents.Take(10).Select((v, i) => $"{i + 1}. {v}")) +
-                                (allAccountContents.Count > 10 ? $"\\n... 외 {allAccountContents.Count - 10}개 더" : "") +
-                                "\\n\\n세션 생성 시 계정명별로 자동 분리됩니다.\\n계속 진행하시겠습니까?";
-
-                var result = MessageBox.Show(message, "다중 계정명 확인",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                if (result != DialogResult.Yes)
-                {
-                    return new ValidationResult
-                    {
-                        IsValid = false,
-                        ErrorMessage = "사용자가 다중 계정명 처리를 취소했습니다."
-                    };
-                }
-            }
-
-            return new ValidationResult { IsValid = true };
-        }
-
-        /// <summary>
-        /// 세션 데이터 생성
-        /// </summary>
-        private async Task<SessionDisplayData> CreateSessionData(List<FileDisplayData> selectedFiles,
-            ProcessProgressForm.UpdateProgressDelegate progressCallback)
-        {
-            try
-            {
-                await progressCallback(20, "세션 정보 계산 중...");
-
-                // 세션 기본 정보 설정
-                var firstFile = selectedFiles[0];
-                string sessionName = GenerateSessionName(selectedFiles);
-
-                // 합계 계산
-                int totalRows = 0;
-                decimal totalAmount = 0;
-
-                await progressCallback(40, "파일별 데이터 합산 중...");
-
-                // 각 파일의 실제 데이터를 읽어서 합산
-                for (int i = 0; i < selectedFiles.Count; i++)
-                {
-                    var file = selectedFiles[i];
-                    var fileData = await ProcessFileForSession(file);
-
-                    totalRows += fileData.RowCount;
-                    totalAmount += fileData.TotalAmount;
-
-                    // 진행률 업데이트
-                    int progress = 40 + ((i + 1) * 30 / selectedFiles.Count);
-                    await progressCallback(progress, $"파일 처리 중... ({i + 1}/{selectedFiles.Count})");
-                }
-
-                await progressCallback(75, "MongoDB에 세션 저장 중...");
-
-                // MongoDB에 세션 저장
-                var fileIds = selectedFiles.Select(f => f.Id).ToList();
-                var sessionDocument = new FileSessionDocument
-                {
-                    SessionName = sessionName,
-                    AccountColumnName = firstFile.AccountColumnName,
-                    AmountColumnName = firstFile.AmountColumnName,
-                    TotalAmount = totalAmount,
-                    TotalRows = totalRows,
-                    Status = "processing",
-                    CreatedDate = DateTime.UtcNow,
-                    FileIds = fileIds
-                };
-
-                await _fileSessionRepository.CreateAsync(sessionDocument);
-
-                // 파일들의 session_id 업데이트
-                foreach (var file in selectedFiles)
-                {
-                    await _uploadedFileRepository.UpdateSessionIdAsync(file.Id, sessionDocument.Id);
-                    file.SessionId = sessionDocument.Id; // 메모리에서도 업데이트
-                }
-
-                await progressCallback(85, "세션 데이터 생성 완료...");
-
-                // 화면 표시용 데이터 생성
-                return new SessionDisplayData
-                {
-                    Id = sessionDocument.Id,
-                    SessionName = sessionName,
-                    AccountColumnName = firstFile.AccountColumnName,
-                    AmountColumnName = firstFile.AmountColumnName,
-                    TotalAmount = totalAmount,
-                    TotalAmountFormatted = totalAmount.ToString("N0") + " 원",
-                    TotalRows = totalRows,
-                    TotalRowsFormatted = totalRows.ToString("N0"),
-                    FileCount = selectedFiles.Count,
-                    Status = "processing",
-                    StatusDisplay = "처리중",
-                    CreatedDate = DateTime.UtcNow,
-                    CreatedDateFormatted = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"),
-                    ResultFilePath = null
-                };
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"세션 데이터 생성 오류: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
         /// 개별 파일의 실제 데이터 처리
         /// </summary>
         private async Task<(int RowCount, decimal TotalAmount)> ProcessFileForSession(FileDisplayData file)
@@ -3486,24 +3200,7 @@ namespace FinanceTool
             });
         }
 
-        /// <summary>
-        /// 세션명 자동 생성
-        /// </summary>
-        private string GenerateSessionName(List<FileDisplayData> selectedFiles)
-        {
-            if (selectedFiles.Count == 1)
-            {
-                // 단일 파일인 경우 파일명 기반
-                string baseName = Path.GetFileNameWithoutExtension(selectedFiles[0].OriginalFilename);
-                return $"{baseName}_세션";
-            }
-            else
-            {
-                // 다중 파일인 경우 날짜와 파일 수 기반
-                string dateStr = DateTime.Now.ToString("yyyy-MM-dd");
-                return $"{dateStr}_{selectedFiles[0].AccountColumnName}_{selectedFiles.Count}개파일_세션";
-            }
-        }
+       
 
         /// <summary>
         /// 세션 생성 시에도 AccountName 정보 포함하도록 수정
@@ -4357,8 +4054,6 @@ namespace FinanceTool
         }
 
         
-
-       
     }
 
     /// <summary>
