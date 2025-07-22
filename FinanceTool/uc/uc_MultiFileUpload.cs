@@ -718,59 +718,62 @@ namespace FinanceTool
 
 
         /// <summary>
-        /// 계정명별 파티션 분석 (병렬 처리 적용)
+        /// 계정명별 파티션 분석 (초고속 병렬 처리 버전)
+        /// 192GB 메모리와 멀티코어 CPU를 최대한 활용
         /// </summary>
         private async Task<PartitionAnalysisResult> AnalyzeAccountPartitionsAsync(List<FileDisplayData> selectedFiles, ProcessProgressForm.UpdateProgressDelegate progressCallback)
         {
             try
             {
+                var sw = Stopwatch.StartNew();
                 await progressCallback(5, "파일 그룹화 분석 중...");
 
-                var partitions = new List<AccountPartition>();
-                var accountGroups = new Dictionary<string, List<FileDisplayData>>();
+                Debug.WriteLine($"[파티션분석] 시작 - 선택된 파일: {selectedFiles.Count}개");
 
-                // 파일들을 계정명별로 그룹화
-                foreach (var file in selectedFiles)
-                {
-                    foreach (var accountName in file.AccountContents)
+                // 1단계: 파일별 계정명 데이터를 미리 캐싱 (병렬 처리)
+                var fileAccountCache = await PreloadFileAccountDataAsync(selectedFiles, progressCallback);
+
+                await progressCallback(25, "계정별 그룹화 중...");
+
+                // 2단계: PLINQ를 사용한 초고속 계정별 그룹화
+                var accountGroups = fileAccountCache
+                    .AsParallel()
+                    .WithDegreeOfParallelism(Environment.ProcessorCount * 4)
+                    .SelectMany(kvp => kvp.Value.Keys.Select(accountName => new { AccountName = accountName, File = kvp.Key }))
+                    .GroupBy(x => x.AccountName, x => x.File)
+                    .ToDictionary(g => g.Key, g => g.Distinct().ToList());
+
+                Debug.WriteLine($"[파티션분석] 그룹화 완료 - 계정 그룹: {accountGroups.Count}개");
+
+                await progressCallback(40, "계정별 데이터 병렬 계산 중...");
+
+                // 3단계: 초고속 병렬 파티션 생성 (기존 SemaphoreSlim 제거)
+                var partitionResults = accountGroups
+                    .AsParallel()
+                    .WithDegreeOfParallelism(Environment.ProcessorCount * 4) // 최대 병렬도
+                    .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                    .Select((accountGroup, index) =>
                     {
-                        if (!accountGroups.ContainsKey(accountName))
-                        {
-                            accountGroups[accountName] = new List<FileDisplayData>();
-                        }
-                        accountGroups[accountName].Add(file);
-                    }
-                }
+                        var partition = ProcessAccountGroupUltraFast(
+                            accountGroup.Key,
+                            accountGroup.Value,
+                            fileAccountCache,
+                            index,
+                            accountGroups.Count
+                        );
 
-                await progressCallback(15, "계정별 데이터 계산 중...");
+                        return partition;
+                    })
+                    .Where(p => p != null)
+                    .ToList();
 
-                // 병렬 처리로 각 계정명별 파티션 생성
-                var semaphore = new SemaphoreSlim(Environment.ProcessorCount * 2); // CPU 코어수의 2배로 제한
-                var partitionTasks = new List<Task<AccountPartition>>();
+                sw.Stop();
 
-                int totalGroups = accountGroups.Count;
-                int completedGroups = 0;
-
-                foreach (var accountGroup in accountGroups)
-                {
-                    var task = ProcessAccountGroupAsync(accountGroup.Key, accountGroup.Value, semaphore, async (progress) =>
-                    {
-                        Interlocked.Increment(ref completedGroups);
-                        int overallProgress = 15 + (completedGroups * 60 / totalGroups);
-                        await progressCallback(overallProgress, $"계정별 데이터 계산 중... ({completedGroups}/{totalGroups}) - {accountGroup.Key}");
-                    });
-
-                    partitionTasks.Add(task);
-                }
-
-                // 모든 파티션 처리 완료 대기
-                var results = await Task.WhenAll(partitionTasks);
-                partitions.AddRange(results.Where(r => r != null));
-
-                await progressCallback(80, "파티션 검증 중...");
+                await progressCallback(90, "파티션 검증 중...");
+                Debug.WriteLine($"[파티션분석] 병렬처리 완료 - 소요시간: {sw.ElapsedMilliseconds:N0}ms, 생성된 파티션: {partitionResults.Count}개");
 
                 // 파티션 검증
-                if (partitions.Count == 0)
+                if (partitionResults.Count == 0)
                 {
                     return new PartitionAnalysisResult
                     {
@@ -779,17 +782,19 @@ namespace FinanceTool
                     };
                 }
 
-                await progressCallback(90, "파티션 분석 완료");
+                await progressCallback(100, "파티션 분석 완료");
+
+                Debug.WriteLine($"[파티션분석] 전체 완료 - 총 소요시간: {sw.ElapsedMilliseconds:N0}ms");
 
                 return new PartitionAnalysisResult
                 {
                     IsValid = true,
-                    Partitions = partitions
+                    Partitions = partitionResults
                 };
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"파티션 분석 오류: {ex.Message}");
+                Debug.WriteLine($"[파티션분석] 오류 발생: {ex.Message}");
                 return new PartitionAnalysisResult
                 {
                     IsValid = false,
@@ -799,16 +804,139 @@ namespace FinanceTool
         }
 
         /// <summary>
-        /// 개별 계정 그룹 처리 (병렬 처리용)
+        /// 파일별 계정명 데이터 사전 로드 (초고속 병렬 처리)
+        /// 192GB 메모리를 활용하여 모든 파일 데이터를 메모리에 캐싱
         /// </summary>
-        private async Task<AccountPartition> ProcessAccountGroupAsync(
+        private async Task<Dictionary<FileDisplayData, Dictionary<string, (int RowCount, decimal TotalAmount)>>> PreloadFileAccountDataAsync(
+            List<FileDisplayData> selectedFiles,
+            ProcessProgressForm.UpdateProgressDelegate progressCallback)
+        {
+            var sw = Stopwatch.StartNew();
+            Debug.WriteLine($"[데이터캐싱] 시작 - 캐싱할 파일: {selectedFiles.Count}개");
+
+            // 파일별 계정명 데이터를 병렬로 미리 로드
+            var fileAccountCache = selectedFiles
+                .AsParallel()
+                .WithDegreeOfParallelism(Environment.ProcessorCount * 2) // 디스크 I/O 고려하여 CPU 코어수의 2배
+                .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                .Select((file, index) =>
+                {
+                    try
+                    {
+                        var accountData = LoadFileAccountDataUltraFast(file);
+
+                        // 진행률 업데이트
+                        if ((index + 1) % Math.Max(1, selectedFiles.Count / 10) == 0)
+                        {
+                            var progress = 5 + ((index + 1) * 20 / selectedFiles.Count);
+                            progressCallback(progress, $"파일 데이터 캐싱 중... ({index + 1}/{selectedFiles.Count})");
+                        }
+
+                        Debug.WriteLine($"[데이터캐싱] 완료 - {file.OriginalFilename}: {accountData.Count}개 계정");
+                        return new KeyValuePair<FileDisplayData, Dictionary<string, (int, decimal)>>(file, accountData);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[데이터캐싱] 오류 - {file.OriginalFilename}: {ex.Message}");
+                        return new KeyValuePair<FileDisplayData, Dictionary<string, (int, decimal)>>(file, new Dictionary<string, (int, decimal)>());
+                    }
+                })
+                .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+            sw.Stop();
+            Debug.WriteLine($"[데이터캐싱] 전체 완료 - 소요시간: {sw.ElapsedMilliseconds:N0}ms");
+
+            return fileAccountCache;
+        }
+
+        /// <summary>
+        /// 개별 파일의 계정명별 데이터를 초고속으로 로드
+        /// PLINQ를 사용하여 행 단위 병렬 처리
+        /// </summary>
+        private Dictionary<string, (int RowCount, decimal TotalAmount)> LoadFileAccountDataUltraFast(FileDisplayData file)
+        {
+            try
+            {
+                string filePath = Path.Combine(UPLOAD_FOLDER, file.StoredFilename);
+                var sw = Stopwatch.StartNew();
+
+                using (var document = SpreadsheetDocument.Open(filePath, false))
+                {
+                    var workbookPart = document.WorkbookPart;
+                    var worksheet = workbookPart.WorksheetParts.First().Worksheet;
+                    var sheetData = worksheet.GetFirstChild<SheetData>();
+
+                    var allRows = sheetData.Elements<Row>().ToList();
+                    if (allRows.Count <= 1) return new Dictionary<string, (int, decimal)>();
+
+                    // 헤더에서 컬럼 인덱스 찾기
+                    var headerRow = allRows.First();
+                    var headerCells = headerRow.Elements<Cell>().ToList();
+
+                    int accountColumnIndex = FindColumnIndex(headerCells, file.AccountColumnName, workbookPart);
+                    int amountColumnIndex = FindColumnIndex(headerCells, file.AmountColumnName, workbookPart);
+
+                    if (accountColumnIndex == -1 || amountColumnIndex == -1)
+                        return new Dictionary<string, (int, decimal)>();
+
+                    var dataRows = allRows.Skip(1).ToList();
+
+                    Debug.WriteLine($"[파일로드] {file.OriginalFilename} - 데이터 행: {dataRows.Count:N0}개, 병렬 처리 시작");
+
+                    // PLINQ를 사용한 초고속 병렬 처리
+                    var accountResults = dataRows
+                        .AsParallel()
+                        .WithDegreeOfParallelism(Environment.ProcessorCount * 4)
+                        .WithExecutionMode(ParallelExecutionMode.ForceParallelism)
+                        .Select(row =>
+                        {
+                            var cells = row.Elements<Cell>().ToList();
+                            if (accountColumnIndex >= cells.Count || amountColumnIndex >= cells.Count)
+                                return null;
+
+                            string accountValue = GetCellValue(cells[accountColumnIndex], workbookPart)?.Trim();
+                            if (string.IsNullOrEmpty(accountValue)) return null;
+
+                            string amountValue = GetCellValue(cells[amountColumnIndex], workbookPart);
+                            decimal amount = 0;
+                            if (!string.IsNullOrEmpty(amountValue))
+                            {
+                                decimal.TryParse(amountValue.Replace(",", ""), out amount);
+                            }
+
+                            return new { Account = accountValue, Amount = amount };
+                        })
+                        .Where(x => x != null)
+                        .GroupBy(x => x.Account)
+                        .ToDictionary(
+                            g => g.Key,
+                            g => (RowCount: g.Count(), TotalAmount: g.Sum(x => x.Amount))
+                        );
+
+                    sw.Stop();
+                    Debug.WriteLine($"[파일로드] {file.OriginalFilename} 완료 - 소요시간: {sw.ElapsedMilliseconds:N0}ms, 계정: {accountResults.Count}개");
+
+                    return accountResults;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[파일로드] 오류 - {file.OriginalFilename}: {ex.Message}");
+                return new Dictionary<string, (int, decimal)>();
+            }
+        }
+
+        /// <summary>
+        /// 개별 계정 그룹을 초고속으로 처리 (SemaphoreSlim 제거)
+        /// 메모리 캐시된 데이터를 사용하여 즉시 계산
+        /// </summary>
+        private AccountPartition ProcessAccountGroupUltraFast(
             string accountName,
             List<FileDisplayData> files,
-            SemaphoreSlim semaphore,
-            Func<int, Task> progressCallback)
+            Dictionary<FileDisplayData, Dictionary<string, (int RowCount, decimal TotalAmount)>> fileAccountCache,
+            int index,
+            int totalGroups)
         {
-            await semaphore.WaitAsync();
-
             try
             {
                 var distinctFiles = files.Distinct().ToList();
@@ -823,35 +951,33 @@ namespace FinanceTool
                     TotalAmount = 0
                 };
 
-                // 병렬로 각 파일의 데이터 계산
-                var fileTasks = distinctFiles.Select(async file =>
+                // 캐시된 데이터에서 즉시 계산 (디스크 I/O 없음)
+                foreach (var file in distinctFiles)
                 {
-                    return await Task.Run(() => CalculateAccountSpecificData(file, accountName));
-                });
-
-                var fileResults = await Task.WhenAll(fileTasks);
-
-                // 결과 합산
-                foreach (var result in fileResults)
-                {
-                    partition.TotalRows += result.RowCount;
-                    partition.TotalAmount += result.Amount;
+                    if (fileAccountCache.TryGetValue(file, out var accountData) &&
+                        accountData.TryGetValue(accountName, out var data))
+                    {
+                        partition.TotalRows += data.RowCount;
+                        partition.TotalAmount += data.TotalAmount;
+                    }
                 }
 
-                await progressCallback(0); // 진행률 업데이트 호출
+                // 주기적으로 진행률 로그
+                if ((index + 1) % Math.Max(1, totalGroups / 20) == 0)
+                {
+                    Debug.WriteLine($"[계정처리] 진행률: {((index + 1) * 100 / totalGroups)}% - {accountName}: {partition.TotalRows:N0}행, {partition.TotalAmount:N0}원");
+                }
 
                 return partition;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"계정 그룹 처리 오류 [{accountName}]: {ex.Message}");
+                Debug.WriteLine($"[계정처리] 오류 - {accountName}: {ex.Message}");
                 return null;
             }
-            finally
-            {
-                semaphore.Release();
-            }
         }
+
+      
 
         /// <summary>
         /// 파티션된 세션들 생성 (병렬 처리 적용)
