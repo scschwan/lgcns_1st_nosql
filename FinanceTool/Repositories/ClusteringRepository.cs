@@ -424,7 +424,7 @@ namespace FinanceTool.Repositories
                 var result = await _collection.UpdateOneAsync(filter, update);
                 bool success = result.ModifiedCount > 0;
 
-                Debug.WriteLine($"클러스터 {clusterNumber}의 SubId를 {newSubId}로 업데이트: {(success ? "성공" : "실패")}");
+                //Debug.WriteLine($"클러스터 {clusterNumber}의 SubId를 {newSubId}로 업데이트: {(success ? "성공" : "실패")}");
                 return success;
             }
             catch (Exception ex)

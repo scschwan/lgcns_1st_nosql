@@ -1298,6 +1298,7 @@ public class ClusteringManager
 
             foreach (var row in filteredRows)
             {
+                
                 filteredTable.ImportRow(row);
             }
 
@@ -1477,18 +1478,20 @@ public class ClusteringManager
 
 
     // ClusteringManager 클래스에 추가할 메서드
-    public List<int> SearchWithComplexConditions(string columnName, ParsedKeywords parsedKeywords, bool exactMatch)
+    public List<int> SearchWithComplexConditions(string columnName, ParsedKeywords parsedKeywords, bool exactMatch , bool subClusteringYN = false)
     {
+        List<int> results = new List<int>();
+
         // AND 조건만 있는 경우
         if (parsedKeywords.AndKeywords.Count > 0 && parsedKeywords.OrKeywords.Count == 0)
         {
-            return ProcessAndConditions(columnName, parsedKeywords.AndKeywords, exactMatch);
+            results = ProcessAndConditions(columnName, parsedKeywords.AndKeywords, exactMatch);
         }
 
         // OR 조건만 있는 경우  
         if (parsedKeywords.AndKeywords.Count == 0 && parsedKeywords.OrKeywords.Count > 0)
         {
-            return ProcessOrConditions(columnName, parsedKeywords.OrKeywords, exactMatch);
+            results =  ProcessOrConditions(columnName, parsedKeywords.OrKeywords, exactMatch);
         }
 
         // AND + OR 조건이 모두 있는 경우 (A,B|C = A AND (B OR C))
@@ -1498,11 +1501,67 @@ public class ClusteringManager
             var orResults = ProcessOrConditions(columnName, parsedKeywords.OrKeywords, exactMatch);
 
             // AND 결과와 OR 결과의 교집합
-            return andResults.Intersect(orResults).ToList();
+            results =  andResults.Intersect(orResults).ToList();
         }
 
-        return new List<int>();
+        if (results.Count > 0)
+        {
+            // 자기 자신 제외 로직 추가
+            results = FilterOutSelfReferences(results , subClusteringYN);
+        }
+        
+
+        return results;
     }
+
+    /// <summary>
+    /// 검색 결과에서 자기 자신을 제외하는 필터링 함수
+    /// 검색 결과 내에서 ID, ClusterID, ClusterSubID 값을 추출하여 자동으로 자기 자신을 제외
+    /// </summary>
+    /// <param name="clusterIds">검색된 클러스터 ID 목록</param>
+    /// <returns>필터링된 클러스터 ID 목록</returns>
+    private List<int> FilterOutSelfReferences(List<int> clusterIds , bool subClusteringYN)
+    {
+        if (clusterIds == null || clusterIds.Count == 0)
+            return new List<int>();
+
+        
+        // 필터링 수행 - 제외 목록에 있는 ID는 결과에서 제거
+        List<int> filteredResults = new List<int>();
+        foreach (int id in clusterIds)
+        {
+            var clusterRow = GetClusterRow(id);
+            if (clusterRow == null) continue;
+
+            int clusterID = Convert.ToInt32(clusterRow["ClusterID"]);
+            int clusterSubID = Convert.ToInt32(clusterRow["ClusterSubID"]);
+
+            //병합 클러스터링은 검색결과 제외
+            if (id == clusterID || id == clusterSubID)
+            {
+                Debug.WriteLine($"병합 클러스터링 결과는 제외 ID : {id} , clusterID : {clusterID} , clusterSubID : {clusterSubID}");
+                continue;
+
+            }
+            //세부클러스터링 검색 조회 대상이 아닐 경우
+            else if (subClusteringYN && clusterSubID != -1)
+            {
+                continue;
+            }
+            //클러스터링 검색 조회 대상이 아닐 경우
+            else if (!subClusteringYN && clusterID > 0 )
+            {
+                continue;
+            }
+            else
+            {
+                filteredResults.Add(id);
+            }
+        }
+        Debug.WriteLine($"필터링 결과: 원본 {clusterIds.Count}개 → 필터링 후 {filteredResults.Count}개");
+        return filteredResults;
+    }
+
 
     private List<int> ProcessAndConditions(string columnName, List<string> andKeywords, bool exactMatch)
     {

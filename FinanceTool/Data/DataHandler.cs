@@ -1321,7 +1321,7 @@ namespace FinanceTool
                     {
                         if (cell.ColumnIndex == 0) // 체크박스 컬럼인 경우
                         {
-                            Debug.WriteLine($"cell.RowIndex : {cell.RowIndex}");
+                            //Debug.WriteLine($"cell.RowIndex : {cell.RowIndex}");
                             if (cell.RowIndex >= 0 && cell.RowIndex < dgv.Rows.Count)
                             {
                                 DataGridViewCheckBoxCell checkCell = dgv.Rows[cell.RowIndex].Cells[0] as DataGridViewCheckBoxCell;

@@ -2795,7 +2795,7 @@ namespace FinanceTool
                                 else
                                 {
                                     Interlocked.Increment(ref mergedCount);
-                                    Debug.WriteLine($"병합된 클러스터: id {id}, clusterId: {clusterId}");
+                                    //Debug.WriteLine($"병합된 클러스터: id {id}, clusterId: {clusterId}");
                                 }
 
                                 Interlocked.Increment(ref processedCount);
