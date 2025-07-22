@@ -726,6 +726,7 @@ namespace FinanceTool
             {
                 var sw = Stopwatch.StartNew();
                 await progressCallback(5, "파일 그룹화 분석 중...");
+                await Task.Delay(10);
 
                 Debug.WriteLine($"[파티션분석] 시작 - 선택된 파일: {selectedFiles.Count}개");
 
@@ -735,6 +736,7 @@ namespace FinanceTool
                 Debug.WriteLine($"[파티션분석] 1단계 완료 - 캐시된 파일: {fileAccountCache.Count}개");
 
                 await progressCallback(25, "계정별 그룹화 중...");
+                await Task.Delay(10);
 
                 // 2단계: 메모리 안전한 계정별 그룹화 (청크 단위 처리)
                 Debug.WriteLine($"[파티션분석] 2단계 시작 - 계정별 그룹화");
@@ -768,6 +770,7 @@ namespace FinanceTool
                 Debug.WriteLine($"[파티션분석] 2단계 완료 - 계정 그룹: {accountGroups.Count}개");
 
                 await progressCallback(40, "계정별 데이터 병렬 계산 중...");
+                await Task.Delay(10);
 
                 // 3단계: 안전한 병렬 파티션 생성 (배치 단위 처리)
                 Debug.WriteLine($"[파티션분석] 3단계 시작 - 파티션 생성");
@@ -819,6 +822,7 @@ namespace FinanceTool
                         // 진행률 업데이트
                         var progress = 40 + (processedCount * 40 / accountGroupsList.Count);
                         await progressCallback(progress, $"파티션 생성 중... ({processedCount}/{accountGroupsList.Count})");
+                        await Task.Delay(10);
 
                         Debug.WriteLine($"[파티션분석] 배치 완료 - 처리된 계정: {processedCount}/{accountGroupsList.Count}, 생성된 파티션: {batchResults.Count}개");
 
@@ -858,6 +862,7 @@ namespace FinanceTool
                 sw.Stop();
 
                 await progressCallback(90, "파티션 검증 중...");
+                await Task.Delay(10);
                 Debug.WriteLine($"[파티션분석] 3단계 완료 - 소요시간: {sw.ElapsedMilliseconds:N0}ms, 생성된 파티션: {partitionResults.Count}개");
 
                 // 파티션 검증
