@@ -16,23 +16,6 @@ namespace FinanceTool
             InitializeComponent();
         }
 
-        private void SetFormLayout()
-        {
-            // DPI 변경 이벤트 처리 - 해상도가 변경될 때 호출됨
-            this.DpiChanged += (sender, e) =>
-            {
-                // DPI 변경 시 컨트롤 크기 및 위치 재조정
-                this.SuspendLayout();
-                ResizeControls();
-                this.ResumeLayout();
-            };
-
-            // 폼 리사이즈 이벤트 처리
-            this.ResizeEnd += (sender, e) =>
-            {
-                ResizeControls();
-            };
-        }
 
         /// <summary>
         /// 컨트롤 크기 및 위치를 재조정하는 메소드

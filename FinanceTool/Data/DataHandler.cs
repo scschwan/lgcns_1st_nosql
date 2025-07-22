@@ -53,20 +53,7 @@ namespace FinanceTool
         public static int moneyIndex = 0;
         public static List<int> levelList = new List<int>();
         public static List<string> levelName = new List<string>();
-        /*
-        public static HashSet<string> separator = new HashSet<string> { " ", ",", ".", "/", "(", ")", "_", "#", "~", "*", "[", "]", "!", ":", "%", "-", "'", "&" };
-
-        public static HashSet<string> remover = new HashSet<string> { 
-                                               // 월
-                                               "12월", "11월", "10월", "9월", "8월", "7월", "6월", "5월", "4월", "3월", "2월", "1월",
-                                               // 명수
-                                               "9명", "8명", "7명", "6명", "5명", "4명", "3명", "2명", "1명", "0명",
-                                               // 연도
-                                               "1년", "2년", "3년", "4년", "5년", "6년", "7년", "8년", "9년",
-                                               // 숫자
-                                               "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
-                                            };
-        */
+       
 
         // 다른 CS 파일에서
         //public static SeparatorManager spManager = new SeparatorManager();
@@ -548,52 +535,6 @@ namespace FinanceTool
 
             return output;
         }
-
-        public static List<string> FindMachEqualsKeyword(List<string> listA, string search_keyword)
-        {
-            // 결과를 저장할 리스트
-            List<string> output = new List<string>();
-
-            // search_keyword가 쉼표를 포함하는지 확인
-            if (search_keyword.Contains(","))
-            {
-                // 쉼표로 분리하여 리스트로 변환
-                List<string> searchKeywords = search_keyword.Split(',')
-                                                           .Select(k => k.Trim())
-                                                           .Where(k => !string.IsNullOrEmpty(k))
-                                                           .ToList();
-
-                // 각 검색 키워드에 대해
-                foreach (string keyword in searchKeywords)
-                {
-                    foreach (string valueA in listA)
-                    {
-                        // 정확히 일치하는지 확인
-                        if (keyword.Equals(valueA))
-                        {
-                            // 일치하면 출력 리스트에 추가
-                            output.Add(valueA);
-                            break; // 현재 keyword에 대한 검색 종료
-                        }
-                    }
-                }
-            }
-            else
-            {
-                // 쉼표가 없는 경우 기존 로직 유지
-                foreach (string valueA in listA)
-                {
-                    if (search_keyword.Equals(valueA))
-                    {
-                        output.Add(valueA);
-                        break;
-                    }
-                }
-            }
-
-            return output;
-        }
-
 
 
         public static string SaveDataTableToExcel(DataTable firstTable, DataTable secondTable = null)
@@ -1654,14 +1595,7 @@ namespace FinanceTool
             return _currentSessionId;
         }
 
-        /// <summary>
-        /// 현재 세션 ID 초기화
-        /// </summary>
-        public static void ClearCurrentSessionId()
-        {
-            _currentSessionId = ObjectId.Empty;
-            Debug.WriteLine("현재 세션 ID 초기화");
-        }
+       
 
         /// <summary>
         /// Excel 완료 폴더 존재 확인 및 생성
@@ -1721,13 +1655,7 @@ namespace FinanceTool
             }
         }
 
-        /// <summary>
-        /// Excel 완료 폴더 경로 가져오기
-        /// </summary>
-        public static string GetExcelCompletedFolderPath()
-        {
-            return EXCEL_COMPLETED_FOLDER;
-        }
+    
     }
 
 }

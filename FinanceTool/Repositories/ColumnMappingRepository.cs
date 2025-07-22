@@ -46,32 +46,5 @@ namespace FinanceTool.Repositories
         }
 
 
-        /// <summary>
-        /// 보이는 컬럼들만 sequence 순서로 조회
-        /// </summary>
-        public async Task<List<ColumnMappingDocument>> GetVisibleColumnsBySequenceAsync()
-        {
-            try
-            {
-                var filter = Builders<ColumnMappingDocument>.Filter.Eq("is_visible", true);
-                var sort = Builders<ColumnMappingDocument>.Sort.Ascending("sequence");
-
-                var cursor = await _collection.FindAsync(filter, new FindOptions<ColumnMappingDocument>
-                {
-                    Sort = sort
-                });
-
-                return await cursor.ToListAsync();
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"보이는 컬럼 조회 오류: {ex.Message}");
-                return new List<ColumnMappingDocument>();
-            }
-        }
-
-        
-
-
     }
 }

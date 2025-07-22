@@ -298,8 +298,6 @@ namespace FinanceTool
             return false;
         }
 
-        // Lv1 항목 가져오기 (인덱스 기반)
-      
 
         // Lv1 항목 가져오기 (이름 기반)
         public Lv1Item GetLv1Item(string name)
@@ -313,9 +311,5 @@ namespace FinanceTool
         public List<string> Lv1List => _config.Lv1Items.Select(item => item.Name).ToList();
 
        
-
-     
-
-     
     }
 }

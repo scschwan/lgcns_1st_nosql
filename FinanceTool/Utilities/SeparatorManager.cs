@@ -184,24 +184,6 @@ namespace FinanceTool
             return false;
         }
 
-        // 구분자 가져오기 (인덱스 기반)
-        public string GetSeparatorAt(int index)
-        {
-            if (index >= 0 && index < _config.Separators.Count)
-            {
-                return _config.Separators[index];
-            }
-            return null;
-        }
-
-        // 불용어 가져오기 (인덱스 기반)
-        public string GetRemoverAt(int index)
-        {
-            if (index >= 0 && index < _config.Removers.Count)
-            {
-                return _config.Removers[index];
-            }
-            return null;
-        }
+      
     }
 }

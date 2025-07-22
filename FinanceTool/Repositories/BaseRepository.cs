@@ -64,16 +64,6 @@ namespace FinanceTool.Repositories
             await _collection.InsertManyAsync(documents);
         }
 
-        /// <summary>
-        /// ID로 문서 조회
-        /// </summary>
-        ///
-        
-        public virtual async Task<T> GetByIdAsync(string id)
-        {
-            var filter = Builders<T>.Filter.Eq("_id", id);
-            return await _collection.Find(filter).FirstOrDefaultAsync();
-        }
         
 
         /// <summary>

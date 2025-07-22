@@ -77,44 +77,7 @@ public class ClusterDataManager
         }
     }
 
-    /// <summary>
-    /// 정확한 값 검색 - 클러스터 ID 반환으로 수정
-    /// </summary>
-    public List<int> SearchExactClusterIds(string columnName, string keyword)
-    {
-        try
-        {
-            if (string.IsNullOrEmpty(keyword) || !_columnIndexes.ContainsKey(columnName))
-            {
-                return new List<int>();
-            }
-
-            var columnIndex = _columnIndexes[columnName];
-            var clusterIds = new HashSet<int>();
-
-            // 영어 검색인지 확인
-            bool isEnglishSearch = IsEnglishText(keyword);
-
-            // 매칭되는 키워드들 찾기
-            var matchingKeys = FindExactMatches(columnIndex, keyword, isEnglishSearch);
-
-            // 각 매칭 키워드의 클러스터 ID들 수집
-            foreach (string matchingKey in matchingKeys)
-            {
-                if (columnIndex.TryGetValue(matchingKey, out HashSet<int> ids))
-                {
-                    clusterIds.UnionWith(ids);
-                }
-            }
-
-            return clusterIds.ToList();
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"SearchExactClusterIds 오류: {ex.Message}");
-            return new List<int>();
-        }
-    }
+   
 
 
 
@@ -317,8 +280,6 @@ public class ClusterDataManager
     }
 
     
-
-
     /// <summary>
     /// 메모리에 전체 클러스터 데이터 로딩 및 인덱스 구축
     /// </summary>
@@ -335,7 +296,6 @@ public class ClusterDataManager
     }
 
   
-
     private void BuildSearchIndexes()
     {
         _columnIndexes = new Dictionary<string, Dictionary<string, HashSet<int>>>();
@@ -1260,7 +1220,6 @@ public class SearchCriteria
     public bool IsSubSearchMode { get; set; } = false;
     public List<int> BaseSearchResults { get; set; } = new List<int>();
 
-    public bool UseSubClustering { get; set; } = false; // 기본값 false
 
 
     public static SearchCriteria FromMultiColumn(Dictionary<string, SearchColumnCriteria> columnCriteria, List<string> excludeKeywords = null)
@@ -1499,9 +1458,6 @@ public class ClusteringManager
         return _dataManager.GetClusterIdsByKeywords(columnName, matchingKeywords);
     }
 
-
-
-    
     /// <summary>
     /// 부분 문자열 검색 (DataHandler.FindMachKeyword 대체)
     /// </summary>
@@ -1518,10 +1474,6 @@ public class ClusteringManager
         var matchingKeywords = _dataManager.SearchContainsValues(columnName, keyword);
         return _dataManager.GetClusterIdsByKeywords(columnName, matchingKeywords);
     }
-
-
-
-
 
 
     // ClusteringManager 클래스에 추가할 메서드
@@ -1629,8 +1581,6 @@ public class ClusteringManager
     }
 
 
-
-
     /// <summary>
     /// 표시명을 컬럼명으로 변환 (ConvertDisplayNameToColumnName 대체)
     /// </summary>
@@ -1656,20 +1606,6 @@ public class ClusteringManager
     }
 
     /// <summary>
-    /// 직접입력 전용 컬럼 확인
-    /// </summary>
-    public bool IsDirectInputOnlyColumn(string columnName)
-    {
-        var directInputOnlyColumns = new[]
-        {
-        DataHandler.levelName?.Count > 1 ? DataHandler.levelName[1] : "",
-        DataHandler.sub_acc_col_name
-    };
-
-        return directInputOnlyColumns.Contains(columnName);
-    }
-
-    /// <summary>
     /// 검색 가능한 컬럼의 실제 데이터 존재 여부 확인
     /// </summary>
     public bool HasDataInColumn(string columnName)
@@ -1682,22 +1618,6 @@ public class ClusteringManager
         catch
         {
             return false;
-        }
-    }
-
-    /// <summary>
-    /// 컬럼별 고유값 개수 조회 (성능 모니터링용)
-    /// </summary>
-    public int GetColumnValueCount(string columnName)
-    {
-        try
-        {
-            var values = GetColumnValues(columnName);
-            return values?.Count ?? 0;
-        }
-        catch
-        {
-            return 0;
         }
     }
 
