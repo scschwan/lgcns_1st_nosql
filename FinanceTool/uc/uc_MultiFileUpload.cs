@@ -733,7 +733,7 @@ namespace FinanceTool
                 // 1단계: 파일별 계정명 데이터를 미리 캐싱 (병렬 처리)
                 var fileAccountCache = await PreloadFileAccountDataAsync(selectedFiles, progressCallback);
 
-                await progressCallback(25, "계정별 그룹화 중...");
+                //await progressCallback(25, "계정별 그룹화 중...");
 
                 // 2단계: PLINQ를 사용한 초고속 계정별 그룹화
                 var accountGroups = fileAccountCache
