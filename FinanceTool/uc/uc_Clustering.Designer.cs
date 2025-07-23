@@ -391,6 +391,7 @@
             // 
             merge_cluster_table.AllowUserToAddRows = false;
             merge_cluster_table.AllowUserToDeleteRows = false;
+            merge_cluster_table.AllowUserToOrderColumns = true;
             merge_cluster_table.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             merge_cluster_table.BackgroundColor = Color.White;
             merge_cluster_table.BorderStyle = BorderStyle.Fixed3D;
@@ -1030,6 +1031,7 @@
             // 
             merge_check_table.AllowUserToAddRows = false;
             merge_check_table.AllowUserToDeleteRows = false;
+            merge_check_table.AllowUserToOrderColumns = true;
             merge_check_table.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             merge_check_table.BackgroundColor = Color.White;
             merge_check_table.BorderStyle = BorderStyle.Fixed3D;

@@ -32,8 +32,10 @@
             pnl_left = new Panel();
             tableLayoutLeft = new TableLayoutPanel();
             pnl_original_section = new Panel();
+            label10 = new Label();
             dataGridView_origin = new DataGridView();
             pnl_keyword_section = new Panel();
+            label4 = new Label();
             dataGridView_keyword = new DataGridView();
             pnl_pagination_section = new Panel();
             button5 = new Button();
@@ -47,6 +49,7 @@
             pnl_right = new Panel();
             tableLayoutRight = new TableLayoutPanel();
             groupBox1 = new GroupBox();
+            label1 = new Label();
             label3 = new Label();
             dataGridView_classify = new DataGridView();
             groupBox3 = new GroupBox();
@@ -54,9 +57,6 @@
             del_col_list_allcheck = new CheckBox();
             dataGridView_delete_col2 = new DataGridView();
             restore_col_btn = new Button();
-            label10 = new Label();
-            label4 = new Label();
-            label1 = new Label();
             tableLayoutMain.SuspendLayout();
             pnl_left.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
@@ -127,10 +127,24 @@
             pnl_original_section.Size = new Size(1283, 452);
             pnl_original_section.TabIndex = 0;
             // 
+            // label10
+            // 
+            label10.Anchor = AnchorStyles.None;
+            label10.BackColor = Color.SteelBlue;
+            label10.Font = new Font("Pretendard", 18F, FontStyle.Bold);
+            label10.ForeColor = Color.White;
+            label10.Location = new Point(432, 7);
+            label10.Name = "label10";
+            label10.Size = new Size(380, 40);
+            label10.TabIndex = 57;
+            label10.Text = "원본 테이블";
+            label10.TextAlign = ContentAlignment.MiddleCenter;
+            // 
             // dataGridView_origin
             // 
             dataGridView_origin.AllowUserToAddRows = false;
             dataGridView_origin.AllowUserToDeleteRows = false;
+            dataGridView_origin.AllowUserToOrderColumns = true;
             dataGridView_origin.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGridView_origin.BackgroundColor = Color.White;
             dataGridView_origin.BorderStyle = BorderStyle.Fixed3D;
@@ -155,10 +169,24 @@
             pnl_keyword_section.Size = new Size(1283, 452);
             pnl_keyword_section.TabIndex = 1;
             // 
+            // label4
+            // 
+            label4.Anchor = AnchorStyles.None;
+            label4.BackColor = Color.SteelBlue;
+            label4.Font = new Font("Pretendard", 18F, FontStyle.Bold);
+            label4.ForeColor = Color.White;
+            label4.Location = new Point(432, 7);
+            label4.Name = "label4";
+            label4.Size = new Size(380, 40);
+            label4.TabIndex = 58;
+            label4.Text = "Export 결과";
+            label4.TextAlign = ContentAlignment.MiddleCenter;
+            // 
             // dataGridView_keyword
             // 
             dataGridView_keyword.AllowUserToAddRows = false;
             dataGridView_keyword.AllowUserToDeleteRows = false;
+            dataGridView_keyword.AllowUserToOrderColumns = true;
             dataGridView_keyword.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGridView_keyword.BackgroundColor = Color.White;
             dataGridView_keyword.BorderStyle = BorderStyle.Fixed3D;
@@ -235,7 +263,7 @@
             cmb_pageSize.FormattingEnabled = true;
             cmb_pageSize.Location = new Point(130, 14);
             cmb_pageSize.Name = "cmb_pageSize";
-            cmb_pageSize.Size = new Size(121, 33);
+            cmb_pageSize.Size = new Size(121, 31);
             cmb_pageSize.TabIndex = 58;
             // 
             // lbl_pageSizeText
@@ -244,7 +272,7 @@
             lbl_pageSizeText.Font = new Font("Pretendard", 14F);
             lbl_pageSizeText.Location = new Point(10, 17);
             lbl_pageSizeText.Name = "lbl_pageSizeText";
-            lbl_pageSizeText.Size = new Size(125, 25);
+            lbl_pageSizeText.Size = new Size(105, 23);
             lbl_pageSizeText.TabIndex = 57;
             lbl_pageSizeText.Text = "페이지 크기 :";
             // 
@@ -254,7 +282,7 @@
             lbl_pagination.Font = new Font("Pretendard", 14F);
             lbl_pagination.Location = new Point(455, 18);
             lbl_pagination.Name = "lbl_pagination";
-            lbl_pagination.Size = new Size(80, 25);
+            lbl_pagination.Size = new Size(68, 23);
             lbl_pagination.TabIndex = 54;
             lbl_pagination.Text = "페이지 :";
             // 
@@ -263,7 +291,7 @@
             num_pageNumber.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             num_pageNumber.Location = new Point(543, 16);
             num_pageNumber.Name = "num_pageNumber";
-            num_pageNumber.Size = new Size(52, 33);
+            num_pageNumber.Size = new Size(52, 30);
             num_pageNumber.TabIndex = 56;
             // 
             // lbl_pagination2
@@ -272,7 +300,7 @@
             lbl_pagination2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
             lbl_pagination2.Location = new Point(601, 19);
             lbl_pagination2.Name = "lbl_pagination2";
-            lbl_pagination2.Size = new Size(118, 25);
+            lbl_pagination2.Size = new Size(102, 23);
             lbl_pagination2.TabIndex = 55;
             lbl_pagination2.Text = "/ 0 (총 0 행)";
             // 
@@ -316,6 +344,17 @@
             groupBox1.TabStop = false;
             groupBox1.Text = "Clustering 결과";
             // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Font = new Font("Pretendard", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            label1.ForeColor = Color.IndianRed;
+            label1.Location = new Point(10, 62);
+            label1.Name = "label1";
+            label1.Size = new Size(345, 16);
+            label1.TabIndex = 49;
+            label1.Text = "※ 각 항목을 우클릭하여 세부 클러스터링 메뉴로 이동할 수 있습니다.";
+            // 
             // label3
             // 
             label3.AutoSize = true;
@@ -323,7 +362,7 @@
             label3.ForeColor = Color.IndianRed;
             label3.Location = new Point(10, 40);
             label3.Name = "label3";
-            label3.Size = new Size(249, 17);
+            label3.Size = new Size(209, 16);
             label3.TabIndex = 48;
             label3.Text = "※ 클러스터명은 직접 수정이 가능합니다.";
             // 
@@ -331,6 +370,7 @@
             // 
             dataGridView_classify.AllowUserToAddRows = false;
             dataGridView_classify.AllowUserToDeleteRows = false;
+            dataGridView_classify.AllowUserToOrderColumns = true;
             dataGridView_classify.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGridView_classify.BackgroundColor = Color.White;
             dataGridView_classify.BorderStyle = BorderStyle.Fixed3D;
@@ -368,7 +408,7 @@
             label7.ForeColor = Color.IndianRed;
             label7.Location = new Point(10, 40);
             label7.Name = "label7";
-            label7.Size = new Size(267, 17);
+            label7.Size = new Size(223, 16);
             label7.TabIndex = 45;
             label7.Text = "※ 선택한 열 정보만 출력하도록 지원합니다.";
             // 
@@ -377,9 +417,9 @@
             del_col_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_col_list_allcheck.AutoSize = true;
             del_col_list_allcheck.Font = new Font("Pretendard", 14.25F);
-            del_col_list_allcheck.Location = new Point(350, 65);
+            del_col_list_allcheck.Location = new Point(366, 65);
             del_col_list_allcheck.Name = "del_col_list_allcheck";
-            del_col_list_allcheck.Size = new Size(114, 29);
+            del_col_list_allcheck.Size = new Size(98, 27);
             del_col_list_allcheck.TabIndex = 43;
             del_col_list_allcheck.Text = "전체 선택";
             del_col_list_allcheck.UseVisualStyleBackColor = true;
@@ -416,43 +456,6 @@
             restore_col_btn.Text = "선택 열 적용";
             restore_col_btn.UseVisualStyleBackColor = false;
             restore_col_btn.Click += restore_col_btn_Click;
-            // 
-            // label10
-            // 
-            label10.Anchor = AnchorStyles.None;
-            label10.BackColor = Color.SteelBlue;
-            label10.Font = new Font("Pretendard", 18F, FontStyle.Bold);
-            label10.ForeColor = Color.White;
-            label10.Location = new Point(432, 7);
-            label10.Name = "label10";
-            label10.Size = new Size(380, 40);
-            label10.TabIndex = 57;
-            label10.Text = "원본 테이블";
-            label10.TextAlign = ContentAlignment.MiddleCenter;
-            // 
-            // label4
-            // 
-            label4.Anchor = AnchorStyles.None;
-            label4.BackColor = Color.SteelBlue;
-            label4.Font = new Font("Pretendard", 18F, FontStyle.Bold);
-            label4.ForeColor = Color.White;
-            label4.Location = new Point(432, 7);
-            label4.Name = "label4";
-            label4.Size = new Size(380, 40);
-            label4.TabIndex = 58;
-            label4.Text = "Export 결과";
-            label4.TextAlign = ContentAlignment.MiddleCenter;
-            // 
-            // label1
-            // 
-            label1.AutoSize = true;
-            label1.Font = new Font("Pretendard", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            label1.ForeColor = Color.IndianRed;
-            label1.Location = new Point(10, 62);
-            label1.Name = "label1";
-            label1.Size = new Size(417, 17);
-            label1.TabIndex = 49;
-            label1.Text = "※ 각 항목을 우클릭하여 세부 클러스터링 메뉴로 이동할 수 있습니다.";
             // 
             // uc_Classification
             // 

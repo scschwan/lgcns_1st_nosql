@@ -183,6 +183,7 @@
             // 
             dataGridView_2nd.AllowUserToAddRows = false;
             dataGridView_2nd.AllowUserToDeleteRows = false;
+            dataGridView_2nd.AllowUserToOrderColumns = true;
             dataGridView_2nd.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGridView_2nd.BackgroundColor = Color.White;
             dataGridView_2nd.BorderStyle = BorderStyle.Fixed3D;
@@ -317,6 +318,7 @@
             // 
             dataGridView_transform.AllowUserToAddRows = false;
             dataGridView_transform.AllowUserToDeleteRows = false;
+            dataGridView_transform.AllowUserToOrderColumns = true;
             dataGridView_transform.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGridView_transform.BackgroundColor = Color.White;
             dataGridView_transform.BorderStyle = BorderStyle.Fixed3D;

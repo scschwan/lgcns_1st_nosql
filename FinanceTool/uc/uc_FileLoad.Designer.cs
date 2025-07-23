@@ -251,6 +251,7 @@
             // 
             dataGridView_process.AllowUserToAddRows = false;
             dataGridView_process.AllowUserToDeleteRows = false;
+            dataGridView_process.AllowUserToOrderColumns = true;
             dataGridView_process.AllowUserToResizeRows = false;
             dataGridView_process.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             dataGridView_process.BackgroundColor = Color.White;
@@ -268,6 +269,7 @@
             // 
             dataGridView_target.AllowUserToAddRows = false;
             dataGridView_target.AllowUserToDeleteRows = false;
+            dataGridView_target.AllowUserToOrderColumns = true;
             dataGridView_target.AllowUserToResizeRows = false;
             dataGridView_target.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
             dataGridView_target.BackgroundColor = Color.White;
@@ -319,7 +321,7 @@
             lbl_pagination2.Font = new Font("Pretendard", 12F);
             lbl_pagination2.Location = new Point(682, 19);
             lbl_pagination2.Name = "lbl_pagination2";
-            lbl_pagination2.Size = new Size(100, 21);
+            lbl_pagination2.Size = new Size(88, 19);
             lbl_pagination2.TabIndex = 48;
             lbl_pagination2.Text = "/ 0 (총 0 행)";
             // 
@@ -329,7 +331,7 @@
             num_pageNumber.Font = new Font("Pretendard", 12F);
             num_pageNumber.Location = new Point(629, 16);
             num_pageNumber.Name = "num_pageNumber";
-            num_pageNumber.Size = new Size(52, 29);
+            num_pageNumber.Size = new Size(52, 27);
             num_pageNumber.TabIndex = 49;
             // 
             // lbl_pagination
@@ -339,7 +341,7 @@
             lbl_pagination.Font = new Font("Pretendard", 12F);
             lbl_pagination.Location = new Point(552, 19);
             lbl_pagination.Name = "lbl_pagination";
-            lbl_pagination.Size = new Size(68, 21);
+            lbl_pagination.Size = new Size(59, 19);
             lbl_pagination.TabIndex = 25;
             lbl_pagination.Text = "페이지 :";
             // 
@@ -362,7 +364,7 @@
             cmb_pageSize.FormattingEnabled = true;
             cmb_pageSize.Location = new Point(130, 16);
             cmb_pageSize.Name = "cmb_pageSize";
-            cmb_pageSize.Size = new Size(121, 29);
+            cmb_pageSize.Size = new Size(121, 27);
             cmb_pageSize.TabIndex = 51;
             // 
             // lbl_pageSizeText
@@ -371,7 +373,7 @@
             lbl_pageSizeText.Font = new Font("Pretendard", 12F);
             lbl_pageSizeText.Location = new Point(15, 19);
             lbl_pageSizeText.Name = "lbl_pageSizeText";
-            lbl_pageSizeText.Size = new Size(106, 21);
+            lbl_pageSizeText.Size = new Size(91, 19);
             lbl_pageSizeText.TabIndex = 50;
             lbl_pageSizeText.Text = "페이지 크기 :";
             // 
@@ -442,7 +444,7 @@
             label7.ForeColor = Color.IndianRed;
             label7.Location = new Point(6, 3);
             label7.Name = "label7";
-            label7.Size = new Size(244, 15);
+            label7.Size = new Size(204, 14);
             label7.TabIndex = 44;
             label7.Text = "※ 선택한 열 정보만 출력하도록 지원합니다.";
             // 
@@ -451,9 +453,9 @@
             del_col_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_col_list_allcheck.AutoSize = true;
             del_col_list_allcheck.Font = new Font("Pretendard", 11F);
-            del_col_list_allcheck.Location = new Point(404, 28);
+            del_col_list_allcheck.Location = new Point(414, 28);
             del_col_list_allcheck.Name = "del_col_list_allcheck";
-            del_col_list_allcheck.Size = new Size(93, 24);
+            del_col_list_allcheck.Size = new Size(83, 22);
             del_col_list_allcheck.TabIndex = 43;
             del_col_list_allcheck.Text = "전체 선택";
             del_col_list_allcheck.UseVisualStyleBackColor = true;
@@ -551,7 +553,7 @@
             label4.Font = new Font("Pretendard", 11F);
             label4.Location = new Point(6, 8);
             label4.Name = "label4";
-            label4.Size = new Size(102, 20);
+            label4.Size = new Size(89, 18);
             label4.TabIndex = 3;
             label4.Text = "기준 열 선택 :";
             // 
@@ -560,9 +562,9 @@
             del_data_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             del_data_list_allcheck.AutoSize = true;
             del_data_list_allcheck.Font = new Font("Pretendard", 11F);
-            del_data_list_allcheck.Location = new Point(358, 81);
+            del_data_list_allcheck.Location = new Point(368, 81);
             del_data_list_allcheck.Name = "del_data_list_allcheck";
-            del_data_list_allcheck.Size = new Size(93, 24);
+            del_data_list_allcheck.Size = new Size(83, 22);
             del_data_list_allcheck.TabIndex = 44;
             del_data_list_allcheck.Text = "전체 선택";
             del_data_list_allcheck.UseVisualStyleBackColor = true;
@@ -575,7 +577,7 @@
             stand_col_combo.FormattingEnabled = true;
             stand_col_combo.Location = new Point(113, 5);
             stand_col_combo.Name = "stand_col_combo";
-            stand_col_combo.Size = new Size(384, 28);
+            stand_col_combo.Size = new Size(384, 26);
             stand_col_combo.TabIndex = 2;
             stand_col_combo.SelectedIndexChanged += stand_col_combo_SelectedIndexChanged;
             // 
@@ -586,7 +588,7 @@
             delete_search_keyword.Location = new Point(245, 43);
             delete_search_keyword.Name = "delete_search_keyword";
             delete_search_keyword.PlaceholderText = "검색 키워드 입력";
-            delete_search_keyword.Size = new Size(176, 25);
+            delete_search_keyword.Size = new Size(176, 23);
             delete_search_keyword.TabIndex = 46;
             delete_search_keyword.KeyDown += delete_search_keyword_KeyDown;
             // 
@@ -648,7 +650,7 @@
             label12.Font = new Font("Pretendard", 11F);
             label12.Location = new Point(11, 68);
             label12.Name = "label12";
-            label12.Size = new Size(102, 20);
+            label12.Size = new Size(89, 18);
             label12.TabIndex = 50;
             label12.Text = "변경 열 선택 :";
             // 
@@ -659,7 +661,7 @@
             comboBox_standard_target.FormattingEnabled = true;
             comboBox_standard_target.Location = new Point(118, 65);
             comboBox_standard_target.Name = "comboBox_standard_target";
-            comboBox_standard_target.Size = new Size(384, 28);
+            comboBox_standard_target.Size = new Size(384, 26);
             comboBox_standard_target.TabIndex = 49;
             // 
             // label11
@@ -668,7 +670,7 @@
             label11.Font = new Font("Pretendard", 11F);
             label11.Location = new Point(10, 30);
             label11.Name = "label11";
-            label11.Size = new Size(95, 20);
+            label11.Size = new Size(87, 18);
             label11.TabIndex = 48;
             label11.Text = "key 열 선택 :";
             // 
@@ -679,7 +681,7 @@
             comboBox_standard_key.FormattingEnabled = true;
             comboBox_standard_key.Location = new Point(117, 27);
             comboBox_standard_key.Name = "comboBox_standard_key";
-            comboBox_standard_key.Size = new Size(384, 28);
+            comboBox_standard_key.Size = new Size(384, 26);
             comboBox_standard_key.TabIndex = 47;
             // 
             // dataGridView_standard
@@ -747,7 +749,7 @@
             prod_col_combo.FormattingEnabled = true;
             prod_col_combo.Location = new Point(140, 155);
             prod_col_combo.Name = "prod_col_combo";
-            prod_col_combo.Size = new Size(361, 28);
+            prod_col_combo.Size = new Size(361, 26);
             prod_col_combo.TabIndex = 39;
             // 
             // label10
@@ -756,7 +758,7 @@
             label10.Font = new Font("Pretendard", 11F);
             label10.Location = new Point(15, 158);
             label10.Name = "label10";
-            label10.Size = new Size(97, 20);
+            label10.Size = new Size(85, 18);
             label10.TabIndex = 40;
             label10.Text = "공급업체 열 :";
             // 
@@ -767,7 +769,7 @@
             cmb_target.FormattingEnabled = true;
             cmb_target.Location = new Point(140, 225);
             cmb_target.Name = "cmb_target";
-            cmb_target.Size = new Size(361, 28);
+            cmb_target.Size = new Size(361, 26);
             cmb_target.TabIndex = 14;
             // 
             // label1
@@ -776,7 +778,7 @@
             label1.Font = new Font("Pretendard", 11F);
             label1.Location = new Point(15, 228);
             label1.Name = "label1";
-            label1.Size = new Size(67, 20);
+            label1.Size = new Size(59, 18);
             label1.TabIndex = 15;
             label1.Text = "타겟 열 :";
             // 
@@ -787,7 +789,7 @@
             cmb_money.FormattingEnabled = true;
             cmb_money.Location = new Point(140, 190);
             cmb_money.Name = "cmb_money";
-            cmb_money.Size = new Size(361, 28);
+            cmb_money.Size = new Size(361, 26);
             cmb_money.TabIndex = 18;
             // 
             // label3
@@ -796,7 +798,7 @@
             label3.Font = new Font("Pretendard", 11F);
             label3.Location = new Point(15, 193);
             label3.Name = "label3";
-            label3.Size = new Size(67, 20);
+            label3.Size = new Size(59, 18);
             label3.TabIndex = 19;
             label3.Text = "금액 열 :";
             // 
@@ -807,7 +809,7 @@
             dept_col_combo.FormattingEnabled = true;
             dept_col_combo.Location = new Point(140, 120);
             dept_col_combo.Name = "dept_col_combo";
-            dept_col_combo.Size = new Size(361, 28);
+            dept_col_combo.Size = new Size(361, 26);
             dept_col_combo.TabIndex = 21;
             // 
             // label6
@@ -816,7 +818,7 @@
             label6.Font = new Font("Pretendard", 11F);
             label6.Location = new Point(15, 123);
             label6.Name = "label6";
-            label6.Size = new Size(117, 20);
+            label6.Size = new Size(102, 18);
             label6.TabIndex = 22;
             label6.Text = "코스트센터 열  :";
             // 
@@ -827,7 +829,7 @@
             sub_acc_col_combo.FormattingEnabled = true;
             sub_acc_col_combo.Location = new Point(140, 85);
             sub_acc_col_combo.Name = "sub_acc_col_combo";
-            sub_acc_col_combo.Size = new Size(361, 28);
+            sub_acc_col_combo.Size = new Size(361, 26);
             sub_acc_col_combo.TabIndex = 23;
             // 
             // label5
@@ -836,7 +838,7 @@
             label5.Font = new Font("Pretendard", 11F);
             label5.Location = new Point(15, 88);
             label5.Name = "label5";
-            label5.Size = new Size(67, 20);
+            label5.Size = new Size(59, 18);
             label5.TabIndex = 24;
             label5.Text = "세목 열 :";
             // 
