@@ -337,6 +337,12 @@ namespace FinanceTool
                     var headerCells = headerRow.Elements<Cell>().ToList();
                     var columnMapping = BuildColumnMapping(headerCells, workbookPart);
 
+                    var allColumnNames = headerCells
+                        .Select((cell, index) => new { Cell = cell, Index = index })
+                        .Where(item => !string.IsNullOrWhiteSpace(GetCellValue(item.Cell, workbookPart)))
+                        .Select(item => GetCellValue(item.Cell, workbookPart).Trim())
+                        .ToList();
+
                     int accountColumnIndex = FindColumnIndex(headerCells, sessionData.AccountColumnName, workbookPart);
                     if (accountColumnIndex == -1)
                     {
@@ -370,7 +376,8 @@ namespace FinanceTool
                                 if (!isMatchingAccount) return null;
 
                                 // RawDataDocument 생성
-                                return CreateRawDataDocumentFast(cells, columnMapping, workbookPart);
+                                //return CreateRawDataDocumentFast(cells, columnMapping, workbookPart);
+                                return CreateRawDataDocumentWithAllColumns(cells, allColumnNames, workbookPart);
                             }
                             catch (Exception ex)
                             {
@@ -394,6 +401,7 @@ namespace FinanceTool
             }
         }
 
+        /*
         /// <summary>
         /// RawDataDocument 고속 생성 (메모리 최적화)
         /// </summary>
@@ -435,6 +443,56 @@ namespace FinanceTool
             return new RawDataDocument
             {
                 Data = cellValues,
+                ImportDate = DateTime.UtcNow,
+                IsHidden = false
+            };
+        }
+        */
+
+        /// <summary>
+        /// 헤더의 모든 컬럼을 보장하는 RawDataDocument 생성 (개선된 버전)
+        /// 모든 컬럼이 data Dictionary에 포함되도록 보장
+        /// </summary>
+        private RawDataDocument CreateRawDataDocumentWithAllColumns(
+            List<Cell> cells,
+            List<string> allColumnNames,
+            WorkbookPart workbookPart)
+        {
+            var data = new Dictionary<string, object>(allColumnNames.Count); // 미리 용량 할당
+
+            // ✅ 핵심 개선: 헤더의 모든 컬럼을 순회하여 data Dictionary에 추가
+            for (int columnIndex = 0; columnIndex < allColumnNames.Count; columnIndex++)
+            {
+                string columnName = allColumnNames[columnIndex];
+
+                if (columnIndex < cells.Count)
+                {
+                    string cellValue = GetCellValue(cells[columnIndex], workbookPart);
+
+                    // ✅ 수정된 부분: null이나 빈 값이어도 Dictionary에 추가
+                    if (string.IsNullOrWhiteSpace(cellValue))
+                    {
+                        data[columnName] = null; // null 값도 명시적으로 저장
+                    }
+                    else
+                    {
+                        // 고속 숫자 변환
+                        object value = decimal.TryParse(cellValue.Replace(",", ""), out decimal numericValue)
+                            ? (object)numericValue
+                            : cellValue.Trim();
+                        data[columnName] = value;
+                    }
+                }
+                else
+                {
+                    // ✅ 셀이 존재하지 않는 경우에도 null로 추가
+                    data[columnName] = null;
+                }
+            }
+
+            return new RawDataDocument
+            {
+                Data = data,
                 ImportDate = DateTime.UtcNow,
                 IsHidden = false
             };
