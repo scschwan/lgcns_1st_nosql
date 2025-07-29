@@ -742,8 +742,12 @@ namespace FinanceTool
                 {
                     string cellValue = GetCellValue(cells[columnIndex], workbookPart);
 
-                    // 빈 값이 아닌 경우만 추가
-                    if (!string.IsNullOrWhiteSpace(cellValue))
+                    // ✅ 수정된 부분: 빈 값도 null로 명시적 저장
+                    if (string.IsNullOrWhiteSpace(cellValue))
+                    {
+                        data[columnName] = null;
+                    }
+                    else
                     {
                         // 숫자 변환 시도
                         if (decimal.TryParse(cellValue.Replace(",", ""), out decimal numericValue))
@@ -755,6 +759,11 @@ namespace FinanceTool
                             data[columnName] = cellValue.Trim();
                         }
                     }
+                }
+                else
+                {
+                    // ✅ 추가된 부분: 셀이 없어도 null로 추가
+                    data[columnName] = null;
                 }
             }
 
