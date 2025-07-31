@@ -38,6 +38,8 @@ namespace FinanceTool
         private bool equalsSearchYN = false;
         private bool andSearchYN = false;
 
+        private bool isCheckedTableObject = false;
+
         List<string> merge_keyword_list;
         List<string> check_keyword_list;
         List<string> supplier_keyword_list;
@@ -86,6 +88,9 @@ namespace FinanceTool
 
         private void UpdateMergeAllCheckState()
         {
+            isCheckedTableObject = true;
+
+
             try
             {
                 // 현재 검색 결과의 모든 ID 수집
@@ -108,6 +113,10 @@ namespace FinanceTool
             catch (Exception ex)
             {
                 Debug.WriteLine($"전체 선택 상태 업데이트 오류: {ex.Message}");
+            }
+            finally
+            {
+                isCheckedTableObject = false;
             }
         }
 
@@ -2010,7 +2019,7 @@ namespace FinanceTool
                             // 병합되는 클러스터들의 ClusterID를 기존 클러스터 번호로 변경
                             foreach (int targetId in targetIds)
                             {
-                                var updatedElement = clusteringRepo.UpdateClusterIdAsync(targetId, newClusterNumber);
+                                var updatedElement = clusteringRepo.UpdateSubClusterIdAsync(targetId, newClusterNumber);
 
                                 if (updatedElement != null)
                                 {
@@ -2132,7 +2141,7 @@ namespace FinanceTool
                         var affectedChildren = childClusters.Where(c => c.ClusterSubId == targetId).ToList();
                         foreach (var child in childClusters)
                         {
-                            await clusteringRepo.UpdateClusterIdAsync(child.ClusterNumber, -1);
+                            await clusteringRepo.UpdateSubClusterIdAsync(child.ClusterNumber, -1);
                             //Debug.WriteLine($"클러스터 {child.ClusterNumber}의 병합 상태 해제");
                         }
 
@@ -2318,6 +2327,11 @@ namespace FinanceTool
 
         private void merge_all_check_CheckedChanged(object sender, EventArgs e)
         {
+            if (isCheckedTableObject)
+            {
+                return;
+            }
+
             try
             {
                 bool selectAll = merge_all_check.Checked;

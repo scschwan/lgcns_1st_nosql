@@ -539,6 +539,13 @@ namespace FinanceTool
                     progressForm.Show();
                     await progressForm.UpdateProgressHandler(10, mapping_keyword + " 해제 작업 시작");
 
+                    // *** 핵심 수정: _isSubClusterMode가 false인 경우에도 세부클러스터 처리 ***
+                    if (!_isSubClusterMode)
+                    {
+                        // *** 추가: 병합 클러스터 해제 시 세부클러스터링 객체 처리 ***
+                        await HandleSubClusteringObjectsForUnmerge(selectedClusterIds, clusteringRepo);
+                    }
+
                     // *** 1단계: 부모 클러스터와 모든 하위 클러스터 정보 미리 수집 ***
                     await progressForm.UpdateProgressHandler(20, "클러스터 정보 수집 중");
 
@@ -693,12 +700,16 @@ namespace FinanceTool
                         foreach (int clusterId in selectedClusterIds)
                         {
                             await clusteringRepo.UpdateClusterIdAsync(clusterId, -1);
+                            //2025.07.31
+                            //subclusterid도 변경
+                            await clusteringRepo.UpdateSubClusterIdAsync(clusterId, -1);
 
                             // 메모리 상의 DataHandler.finalClusteringData도 즉시 업데이트
                             var memoryRows = DataHandler.finalClusteringData.Select($"ID = {clusterId}");
                             if (memoryRows.Length > 0)
                             {
                                 memoryRows[0]["ClusterID"] = -1;
+                                memoryRows[0]["ClusterSubID"] = -1;
                             }
 
                             processedCount++;
@@ -798,6 +809,183 @@ namespace FinanceTool
                 Debug.WriteLine(mapping_keyword + $" 해제 오류: {ex.Message}");
                 MessageBox.Show(mapping_keyword + $" 해제 중 오류가 발생했습니다: {ex.Message}", "오류",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 병합 클러스터 해제 시 세부클러스터링 객체 처리
+        /// </summary>
+        private async Task HandleSubClusteringObjectsForUnmerge(List<int> selectedClusterIds, ClusteringRepository repo)
+        {
+            try
+            {
+                Debug.WriteLine("병합 해제 시 세부클러스터링 객체 처리 시작");
+
+                var affectedSubClusterIds = new HashSet<int>();
+
+                // 선택된 클러스터들이 가진 모든 세부클러스터 ID 수집
+                foreach (int clusterId in selectedClusterIds)
+                {
+                    var cluster = await repo.GetByClusterNumberAsync(clusterId);
+                    if (cluster != null && cluster.ClusterSubId > 0)
+                    {
+                        affectedSubClusterIds.Add(cluster.ClusterSubId);
+                    }
+
+                    /*
+                    // 해당 클러스터의 하위 클러스터들도 확인
+                    var childClusters = await repo.GetChildClustersAsync(clusterId);
+                    foreach (var child in childClusters)
+                    {
+                        if (child.ClusterSubId > 0)
+                        {
+                            subClusterIdsToDelete.Add(child.ClusterSubId);
+                        }
+                    }
+                    */
+                }
+
+                // *** 2단계: 각 세부클러스터별로 재계산 수행 (UpdateAffectedSubClusters와 동일 로직) ***
+                //세부클러스터 원장 데이터만 수정하는 것이므로 소속된 원소 항목은 수정되는 것이 아님
+                foreach (int subClusterId in affectedSubClusterIds)
+                {
+                    await UpdateSingleSubClusterForUnmerge(subClusterId, selectedClusterIds, repo);
+                }
+
+                Debug.WriteLine("세부클러스터링 객체 처리 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세부클러스터링 객체 처리 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 단일 세부클러스터의 병합 해제 후 재계산
+        /// </summary>
+        private async Task UpdateSingleSubClusterForUnmerge(int subClusterId, List<int> removingClusterIds, ClusteringRepository repo)
+        {
+            try
+            {
+                Debug.WriteLine($"세부클러스터 {subClusterId} 병합 해제 후 재계산 시작");
+
+                // *** 1단계: 현재 세부클러스터 정보 조회 ***
+                var currentSubCluster = await repo.GetByClusterNumberAsync(subClusterId);
+                if (currentSubCluster == null)
+                {
+                    Debug.WriteLine($"세부클러스터 {subClusterId}를 찾을 수 없음");
+                    return;
+                }
+
+                // *** 2단계: 해당 세부클러스터에 속한 모든 하위 클러스터 조회 ***
+                var allSubChildren = await repo.GetSubChildClustersAsync(subClusterId);
+                Debug.WriteLine($"세부클러스터 {subClusterId}의 전체 하위 클러스터: {allSubChildren.Count}개");
+
+                // *** 3단계: 해제될 클러스터들을 제외한 나머지 클러스터들만 필터링 ***
+                var remainingChildren = allSubChildren
+                    .Where(child => !removingClusterIds.Contains(child.ClusterNumber))
+                    .ToList();
+
+                Debug.WriteLine($"해제 후 남은 하위 클러스터: {remainingChildren.Count}개");
+
+                // *** 4단계: 남은 하위 클러스터가 없으면 세부클러스터 삭제 ***
+                if (remainingChildren.Count == 0)
+                {
+                    Debug.WriteLine($"세부클러스터 {subClusterId}에 남은 하위 클러스터가 없어 삭제");
+
+                    // MongoDB에서 삭제
+                    await repo.DeleteByClusterNumberAsync(subClusterId);
+
+                    // DataHandler.finalClusteringData에서도 해당 행 삭제
+                    var rowsToDelete = DataHandler.finalClusteringData.AsEnumerable()
+                        .Where(row => Convert.ToInt32(row["ID"]) == subClusterId)
+                        .ToList();
+
+                    foreach (var row in rowsToDelete)
+                    {
+                        DataHandler.finalClusteringData.Rows.Remove(row);
+                        Debug.WriteLine($"DataHandler.finalClusteringData에서 세부클러스터 {subClusterId} 행 삭제");
+                    }
+
+                    // *** 즉시 변경사항 적용 ***
+                    DataHandler.finalClusteringData.AcceptChanges();
+                    return;
+                }
+
+                // *** 5단계: 남은 하위 클러스터들로 새로운 집계 데이터 계산 ***
+                int newCount = remainingChildren.Sum(child => child.Count);
+                decimal newTotalAmount = remainingChildren.Sum(child => child.TotalAmount);
+
+                // 키워드 중복 제거하여 병합
+                var newKeywords = new HashSet<string>();
+                foreach (var child in remainingChildren)
+                {
+                    foreach (var keyword in child.Keywords ?? new List<string>())
+                    {
+                        if (!string.IsNullOrWhiteSpace(keyword))
+                        {
+                            newKeywords.Add(keyword.Trim());
+                        }
+                    }
+                }
+
+                // DataIndices 중복 제거하여 병합
+                var newDataIndices = new HashSet<string>();
+                foreach (var child in remainingChildren)
+                {
+                    foreach (var index in child.DataIndices ?? new List<string>())
+                    {
+                        if (!string.IsNullOrWhiteSpace(index))
+                        {
+                            newDataIndices.Add(index.Trim());
+                        }
+                    }
+                }
+
+                Debug.WriteLine($"세부클러스터 {subClusterId} 재계산 결과:");
+                Debug.WriteLine($"  Count: {currentSubCluster.Count} → {newCount}");
+                Debug.WriteLine($"  Amount: {currentSubCluster.TotalAmount} → {newTotalAmount}");
+
+                // *** 6단계: MongoDB에서 세부클러스터 정보 업데이트 ***
+                bool updateSuccess = await repo.UpdateClusterFullInfoAsync(
+                    subClusterId,
+                    currentSubCluster.ClusterName, // 클러스터명은 유지
+                    newKeywords.ToList(),
+                    newCount,
+                    newTotalAmount,
+                    newDataIndices.ToList()
+                );
+
+                if (!updateSuccess)
+                {
+                    throw new Exception($"세부클러스터 {subClusterId} MongoDB 업데이트 실패");
+                }
+
+                // *** 7단계: DataHandler.finalClusteringData에서도 해당 행 업데이트 ***
+                var memoryRows = DataHandler.finalClusteringData.AsEnumerable()
+                    .Where(row => Convert.ToInt32(row["ID"]) == subClusterId)
+                    .ToList();
+
+                foreach (var row in memoryRows)
+                {
+                    row["Count"] = newCount;
+                    row["합산금액"] = newTotalAmount;
+                    row["키워드목록"] = string.Join(",", newKeywords);
+                    row["dataIndex"] = string.Join(",", newDataIndices);
+
+                    Debug.WriteLine($"DataHandler.finalClusteringData에서 세부클러스터 {subClusterId} 행 업데이트 완료");
+                }
+
+                // *** 즉시 변경사항 적용 ***
+                DataHandler.finalClusteringData.AcceptChanges();
+
+                Debug.WriteLine($"세부클러스터 {subClusterId} 병합 해제 후 재계산 완료");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세부클러스터 {subClusterId} 병합 해제 후 재계산 오류: {ex.Message}");
+                throw;
             }
         }
 

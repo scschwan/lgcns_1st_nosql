@@ -157,6 +157,16 @@ namespace FinanceTool.Repositories
             return result.ModifiedCount > 0;
         }
 
+        public async Task<bool> UpdateSubClusterIdAsync(int clusterNumber, int newSubClusterId)
+        {
+            var filter = Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterNumber, clusterNumber);
+            var update = Builders<ClusteringResultDocument>.Update
+                .Set(c => c.ClusterSubId, newSubClusterId);
+
+            var result = await _collection.UpdateOneAsync(filter, update);
+            return result.ModifiedCount > 0;
+        }
+
 
 
         // 클러스터 번호로 클러스터 삭제
@@ -174,6 +184,17 @@ namespace FinanceTool.Repositories
         {
             var filter = Builders<ClusteringResultDocument>.Filter.And(
                 Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterId, parentClusterNumber),
+                Builders<ClusteringResultDocument>.Filter.Ne(c => c.ClusterNumber, parentClusterNumber),
+                Builders<ClusteringResultDocument>.Filter.Where(c => c.ClusterNumber != c.ClusterSubId)
+            );
+
+            return await _collection.Find(filter).ToListAsync();
+        }
+
+        public async Task<List<ClusteringResultDocument>> GetChildClustersWithSubClusterAsync(int parentClusterNumber)
+        {
+            var filter = Builders<ClusteringResultDocument>.Filter.And(
+                Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterId, parentClusterNumber),
                 Builders<ClusteringResultDocument>.Filter.Ne(c => c.ClusterNumber, parentClusterNumber)
             );
 
@@ -183,13 +204,25 @@ namespace FinanceTool.Repositories
         /// <summary>
         /// 세부 클러스터의 하위 클러스터들 조회 (새로 추가)
         /// </summary>
-        public async Task<List<ClusteringResultDocument>> GetSubChildClustersAsync(int parentClusterSubId)
-        {
-            var filter = Builders<ClusteringResultDocument>.Filter.And(
-                Builders<ClusteringResultDocument>.Filter.Eq(c => c.ClusterSubId, parentClusterSubId),
-                Builders<ClusteringResultDocument>.Filter.Ne(c => c.ClusterNumber, parentClusterSubId)
-            );
-            return await _collection.Find(filter).ToListAsync();
+        public async Task<List<ClusteringResultDocument>> GetSubChildClustersAsync(int subClusterId)
+        {           
+            try
+            {
+                var filter = Builders<ClusteringResultDocument>.Filter.And(
+                    Builders<ClusteringResultDocument>.Filter.Eq(d => d.ClusterSubId, subClusterId),
+                    Builders<ClusteringResultDocument>.Filter.Ne(d => d.ClusterNumber, subClusterId) // 자기 자신 제외
+                );
+
+                var clusters = await _collection.Find(filter).ToListAsync();
+
+                Debug.WriteLine($"세부 클러스터 {subClusterId}의 하위 클러스터 {clusters?.Count ?? 0}개 조회");
+                return clusters ?? new List<ClusteringResultDocument>();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세부 하위 클러스터 조회 오류 (세부클러스터: {subClusterId}): {ex.Message}");
+                return new List<ClusteringResultDocument>();
+            }
         }
 
 
@@ -414,22 +447,21 @@ namespace FinanceTool.Repositories
         /// <summary>
         /// 세부 클러스터 ID 업데이트
         /// </summary>
-        public async Task<bool> UpdateClusterSubIdAsync(int clusterNumber, int newSubId)
+        public async Task<bool> UpdateClusterSubIdAsync(int clusterNumber, int newSubClusterId)
         {
             try
             {
                 var filter = Builders<ClusteringResultDocument>.Filter.Eq(d => d.ClusterNumber, clusterNumber);
-                var update = Builders<ClusteringResultDocument>.Update.Set(d => d.ClusterSubId, newSubId);
+                var update = Builders<ClusteringResultDocument>.Update.Set(d => d.ClusterSubId, newSubClusterId);
 
                 var result = await _collection.UpdateOneAsync(filter, update);
-                bool success = result.ModifiedCount > 0;
 
-                //Debug.WriteLine($"클러스터 {clusterNumber}의 SubId를 {newSubId}로 업데이트: {(success ? "성공" : "실패")}");
-                return success;
+                //Debug.WriteLine($"클러스터 {clusterNumber}의 ClusterSubID를 {newSubClusterId}로 업데이트: {result.ModifiedCount > 0}");
+                return result.ModifiedCount > 0;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"세부 클러스터 ID 업데이트 오류: {ex.Message}");
+                Debug.WriteLine($"ClusterSubID 업데이트 오류 (클러스터: {clusterNumber}): {ex.Message}");
                 return false;
             }
         }

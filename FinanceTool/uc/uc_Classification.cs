@@ -812,6 +812,13 @@ namespace FinanceTool
             // columnList에 명시된 컬럼만 추가
             foreach (string columnName in columnList)
             {
+                
+                //생략 컬럼 추가
+                if ("_id".Equals(columnName) || "is_hidden".Equals(columnName))
+                {
+                    continue;
+                }
+                
                 Debug.WriteLine($" 표기하는 컬럼 정보 : {columnName}");
                 if (!dataTable.Columns.Contains(columnName))
                 {
