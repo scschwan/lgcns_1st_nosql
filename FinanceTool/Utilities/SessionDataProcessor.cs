@@ -965,115 +965,7 @@ namespace FinanceTool
             }
         }
 
-        /// <summary>
-        /// 초고속 메모리 최적화 페이징 갱신 (대안 방법)
-        /// 메모리 사용량을 더욱 줄이고 싶은 경우 사용
-        /// </summary>
-        private async Task RefreshDataHandlerWithStreamingAsync(long totalCount)
-        {
-            try
-            {
-                const int pageSize = 50000; // 5만 건씩 처리 (메모리 안정성 우선)
-                var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
-
-                Debug.WriteLine($"[스트리밍갱신] 시작 - 총 {totalPages}페이지, 페이지당 {pageSize:N0}건");
-
-                DataTable finalTable = null;
-                var totalProcessed = 0;
-
-                // 병렬 처리를 위한 배치 그룹 구성
-                const int batchSize = 3; // 3페이지씩 병렬 처리
-
-                for (int batchStart = 0; batchStart < totalPages; batchStart += batchSize)
-                {
-                    int batchEnd = Math.Min(batchStart + batchSize, totalPages);
-                    Debug.WriteLine($"[스트리밍갱신] 배치 처리 시작 - 페이지 {batchStart + 1}~{batchEnd}/{totalPages}");
-
-                    // 배치 내 페이지들을 병렬로 처리
-                    var batchTasks = new List<Task<DataTable>>();
-
-                    for (int page = batchStart; page < batchEnd; page++)
-                    {
-                        int skip = page * pageSize;
-                        var pageTask = ProcessPageAsync(skip, pageSize, page + 1);
-                        batchTasks.Add(pageTask);
-                    }
-
-                    // 배치 완료 대기
-                    var batchTables = await Task.WhenAll(batchTasks);
-
-                    // 배치 결과 병합
-                    foreach (var pageTable in batchTables)
-                    {
-                        if (pageTable != null && pageTable.Rows.Count > 0)
-                        {
-                            if (finalTable == null)
-                            {
-                                finalTable = pageTable.Clone();
-                                Debug.WriteLine($"[스트리밍갱신] 최종 테이블 스키마 생성");
-                            }
-
-                            foreach (DataRow row in pageTable.Rows)
-                            {
-                                finalTable.ImportRow(row);
-                            }
-
-                            totalProcessed += pageTable.Rows.Count;
-                            pageTable.Dispose();
-                        }
-                    }
-
-                    Debug.WriteLine($"[스트리밍갱신] 배치 완료 - 누적 처리: {totalProcessed:N0}행");
-
-                    // 배치마다 GC
-                    GC.Collect();
-                }
-
-                // 최종 처리
-                await EnsureColumnMappingExistsAsync(finalTable);
-                var sortedTable = await SortColumnsBySequenceAsync(finalTable);
-
-                DataHandler.excelData = sortedTable;
-                DataHandler.processTable = sortedTable;
-
-                Debug.WriteLine($"[스트리밍갱신] 완료 - 최종: {sortedTable.Rows.Count:N0}행");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[스트리밍갱신] 오류: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// 개별 페이지 처리 (병렬 처리용)
-        /// </summary>
-        private async Task<DataTable> ProcessPageAsync(int skip, int pageSize, int pageNumber)
-        {
-            try
-            {
-                var sw = Stopwatch.StartNew();
-                var pageData = await _rawDataRepository.GetPagedAsync(skip, pageSize, includeHidden: false);
-
-                if (pageData.Count == 0)
-                {
-                    Debug.WriteLine($"[페이지처리] 페이지 {pageNumber}: 데이터 없음");
-                    return null;
-                }
-
-                var pageTable = ConvertRawDataToDataTable(pageData);
-                sw.Stop();
-
-                Debug.WriteLine($"[페이지처리] 페이지 {pageNumber} 완료: {pageData.Count:N0}개 → {pageTable.Rows.Count:N0}행, {sw.ElapsedMilliseconds}ms");
-
-                return pageTable;
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[페이지처리] 페이지 {pageNumber} 오류: {ex.Message}");
-                return null;
-            }
-        }
+      
 
         /// <summary>
         /// 일반적인 DataHandler 갱신 (기존 로직 유지)
@@ -1110,6 +1002,7 @@ namespace FinanceTool
 
                 foreach (DataColumn column in dataTable.Columns)
                 {
+                    Debug.WriteLine($"[EnsureColumnMappingExistsAsync] column_mapping : {column.ColumnName} , sequence : {sequence + 1}");
                     if (!existingColumnNames.Contains(column.ColumnName))
                     {
                         var mapping = new ColumnMappingDocument
@@ -1259,7 +1152,8 @@ namespace FinanceTool
                 dataTable.Columns.Add("is_hidden", typeof(bool));
 
                 // 데이터 컬럼들 추가 (동적)
-                foreach (var key in allKeys.OrderBy(k => k))
+                //foreach (var key in allKeys.OrderBy(k => k))
+                foreach (var key in allKeys)
                 {
                     dataTable.Columns.Add(key, typeof(object));
                 }

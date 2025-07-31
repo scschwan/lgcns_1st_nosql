@@ -54,6 +54,11 @@ namespace FinanceTool
         private List<string> _allColumns = new List<string>();
         private DataTable _standardMappingData = null;
 
+        // 클래스 멤버 변수 추가
+        private System.Windows.Forms.Timer _columnOrderUpdateTimer;
+        private bool _columnOrderChanged = false;
+        private MongoDataConverter _mongoConverter = new MongoDataConverter();
+
         public uc_FileLoad()
         {
             InitializeComponent();
@@ -278,6 +283,12 @@ namespace FinanceTool
                     await progress.UpdateProgressHandler(5, "파일 업로드 준비 중...");
                     Application.DoEvents(); //
 
+                    // ✅ 컬럼 순서 초기화 추가
+                    await DataHandler.LoadColumnOrderFromMongoDB();
+
+                    // ✅ 컬럼 이벤트 핸들러 초기화
+                    InitializeColumnOrderHandling();
+
                     Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
                     await progress.UpdateProgressHandler(10, "Excel 파일 스트리밍 로딩 중...");
@@ -499,7 +510,9 @@ namespace FinanceTool
                 dataTable.Rows.Add(row);
             }
 
-            return dataTable;
+            //return dataTable;
+            // ✅ 컬럼 순서 적용하여 반환
+            return DataHandler.ApplyColumnOrder(dataTable);
         }
 
 
@@ -2592,29 +2605,6 @@ namespace FinanceTool
             public int BatchIndex { get; set; }
         }
 
-        /// <summary>
-        /// 매핑 데이터에서 Key별 표준값(최다 빈도) 추출
-        /// </summary>
-        private Dictionary<string, string> GetStandardValuesFromMapping()
-        {
-            var standardValues = new Dictionary<string, string>();
-
-            var keyGroups = _standardMappingData.AsEnumerable()
-                .GroupBy(row => row["KeyValue"].ToString());
-
-            foreach (var keyGroup in keyGroups)
-            {
-                // 각 Key별로 Count가 가장 높은 항목을 표준값으로 설정
-                var standardRow = keyGroup.OrderByDescending(row => Convert.ToInt32(row["Count"])).FirstOrDefault();
-                if (standardRow != null)
-                {
-                    standardValues[keyGroup.Key] = standardRow["TargetValue"].ToString();
-                }
-            }
-
-            return standardValues;
-        }
-
         
 
         /// <summary>
@@ -2640,84 +2630,111 @@ namespace FinanceTool
             return Builders<BsonDocument>.Filter.Or(filters);
         }
 
+        // InitializeComponent() 후에 호출할 초기화 메서드
+        private void InitializeColumnOrderHandling()
+        {
+            // 컬럼 순서 변경 이벤트 등록
+            dataGridView_target.ColumnDisplayIndexChanged += DataGridView_ColumnDisplayIndexChanged;
+            dataGridView_process.ColumnDisplayIndexChanged += DataGridView_ColumnDisplayIndexChanged;
+
+            // 타이머 초기화
+            _columnOrderUpdateTimer = new System.Windows.Forms.Timer();
+            _columnOrderUpdateTimer.Interval = 500; // 500ms 디바운싱
+            _columnOrderUpdateTimer.Tick += ColumnOrderUpdateTimer_Tick;
+        }
+
         /// <summary>
-        /// 특정 키값의 존재 여부를 정확히 확인하는 디버깅 함수
+        /// 컬럼 순서 변경 이벤트 핸들러
         /// </summary>
-        private async Task DebugSpecificKey(string keyColumn, string keyValue)
+        private void DataGridView_ColumnDisplayIndexChanged(object sender, DataGridViewColumnEventArgs e)
         {
             try
             {
-                // 함수 시작 부분에 추가
-                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
+                var dgv = sender as DataGridView;
+                if (dgv == null) return;
 
-                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
-                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("raw_data");
+                // 시스템 컬럼은 순서 변경 대상에서 제외
+                if (IsSystemColumn(e.Column.Name)) return;
 
-                Debug.WriteLine($"=== '{keyValue}' 키값 존재 여부 확인 ===");
+                _columnOrderChanged = true;
 
-                // 해당 키값을 가진 문서 직접 검색
-                //var specificFilter = Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$numberDecimal", keyValue);
-                //var specificFilter = Builders<BsonDocument>.Filter.Eq($"data.{keyColumn}._v.$", keyValue);
-                var filter = CreateUniversalFilter(keyColumn, keyValue);
-                var specificCount = await collection.CountDocumentsAsync(filter);
+                // 1. 즉시 메모리 업데이트
+                DataHandler.UpdateColumnDisplayOrder(dgv);
 
-                Debug.WriteLine($"정확한 필터로 찾은 '{keyValue}' 문서 수: {specificCount}개");
+                // 2. 디바운싱된 DB 업데이트
+                _columnOrderUpdateTimer.Stop();
+                _columnOrderUpdateTimer.Start();
 
-                if (specificCount > 0)
-                {
-                    // 실제 문서 몇 개 조회해서 구조 확인
-                    var specificDocs = await collection.Find(filter).Limit(3).ToListAsync();
-                    Debug.WriteLine($"'{keyValue}' 키값을 가진 실제 문서들:");
-                    foreach (var doc in specificDocs)
-                    {
-                        Debug.WriteLine($"  - {keyColumn}: {doc["data"][keyColumn]}");
-                        if (doc["data"].AsBsonDocument.Contains(targetColumn))
-                        {
-                            Debug.WriteLine($"  - {targetColumn}: {doc["data"][targetColumn]}");
-                        }
-                        Debug.WriteLine("  ---");
-                    }
-                }
-                else
-                {
-                    // 전체 고유 키값들 조회 (처음 20개만)
-                    var uniqueKeysPipeline = new[]
-                        {
-                        new BsonDocument("$project", new BsonDocument
-                        {
-                            ["keyValue"] = new BsonDocument("$cond", new BsonArray
-                            {
-                                // 복합 타입인지 확인
-                                new BsonDocument("$eq", new BsonArray { new BsonDocument("$type", $"$data.{keyColumn}"), "object" }),
-                                // 복합 타입이면 _v 값 사용
-                                $"$data.{keyColumn}._v",
-                                // 아니면 직접 값 사용
-                                $"$data.{keyColumn}"
-                            })
-                        }),
-                        new BsonDocument("$group", new BsonDocument
-                        {
-                            ["_id"] = "$keyValue",
-                            ["count"] = new BsonDocument("$sum", 1)
-                        }),
-                        new BsonDocument("$sort", new BsonDocument("count", -1)),
-                        new BsonDocument("$limit", 20)
-                    };
+                // 3. 다른 DataGridView들 즉시 갱신
+                RefreshOtherDataGridViewOrders(dgv);
 
-                    var uniqueKeys = await collection.Aggregate<BsonDocument>(uniqueKeysPipeline).ToListAsync();
-                    Debug.WriteLine($"실제 데이터베이스의 상위 20개 {keyColumn} 값들:");
-                    foreach (var keyDoc in uniqueKeys)
-                    {
-                        Debug.WriteLine($"  - {keyDoc["_id"]} (문서 수: {keyDoc["count"]})");
-                    }
-                }
-
-                Debug.WriteLine("=== 키값 확인 완료 ===");
+                Debug.WriteLine($"컬럼 순서 변경됨: {e.Column.Name} → DisplayIndex: {e.Column.DisplayIndex}");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"특정 키값 디버깅 오류: {ex.Message}");
+                Debug.WriteLine($"컬럼 순서 변경 처리 오류: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 디바운싱된 DB 업데이트
+        /// </summary>
+        private async void ColumnOrderUpdateTimer_Tick(object sender, EventArgs e)
+        {
+            _columnOrderUpdateTimer.Stop();
+
+            if (_columnOrderChanged)
+            {
+                try
+                {
+                    await DataHandler.SaveColumnOrderToMongoDB();
+                    _columnOrderChanged = false;
+                    Debug.WriteLine("컬럼 순서 MongoDB 저장 완료");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"컬럼 순서 저장 오류: {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// 다른 DataGridView들의 컬럼 순서 갱신
+        /// </summary>
+        private void RefreshOtherDataGridViewOrders(DataGridView excludeDgv)
+        {
+            try
+            {
+                var dataGridViews = new[] { dataGridView_target, dataGridView_process };
+
+                foreach (var dgv in dataGridViews)
+                {
+                    if (dgv == excludeDgv || dgv.DataSource == null) continue;
+
+                    // 현재 DataSource를 순서 적용하여 재설정
+                    if (dgv.DataSource is DataTable currentTable)
+                    {
+                        var orderedTable = DataHandler.ApplyColumnOrder(currentTable);
+                        dgv.DataSource = orderedTable;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"다른 DataGridView 갱신 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 시스템 컬럼 여부 확인
+        /// </summary>
+        private bool IsSystemColumn(string columnName)
+        {
+            return columnName == "id" ||
+                   columnName == "_id" ||
+                   columnName == "import_date" ||
+                   columnName == "is_hidden" ||
+                   columnName == "hiddenYN";
         }
 
         /// <summary>
@@ -2828,5 +2845,9 @@ namespace FinanceTool
 
             this.Controls.Add(messageLabel);
         }
+
+       
+
+        
     }
 }

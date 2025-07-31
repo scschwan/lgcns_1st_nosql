@@ -77,7 +77,178 @@ namespace FinanceTool
 
         public static List<string> visibleColumns  = new List<string>();
 
-        
+        // 컬럼 순서 관리용 추가 변수
+        public static Dictionary<string, int> columnDisplayOrder = new Dictionary<string, int>();
+        private static bool isColumnOrderInitialized = false;
+
+
+
+        /// <summary>
+        /// MongoDB에서 컬럼 순서 정보 로드
+        /// </summary>
+        public static async Task LoadColumnOrderFromMongoDB()
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var columnCollection = await mongoManager.GetCollectionAsync<ColumnMappingDocument>("column_mapping");
+
+                var columnMappings = await columnCollection.Find(_ => true)
+                    .SortBy(c => c.Sequence)
+                    .ToListAsync();
+
+                columnDisplayOrder.Clear();
+                foreach (var mapping in columnMappings)
+                {
+                    columnDisplayOrder[mapping.OriginalName] = mapping.Sequence;
+                }
+
+                isColumnOrderInitialized = true;
+                Debug.WriteLine($"컬럼 순서 로드 완료: {columnDisplayOrder.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 순서 로드 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// DataGridView의 현재 컬럼 순서를 메모리에 업데이트
+        /// </summary>
+        public static void UpdateColumnDisplayOrder(DataGridView dgv)
+        {
+            try
+            {
+                columnDisplayOrder.Clear();
+
+                // DisplayIndex 순서대로 정렬하여 sequence 부여
+                var sortedColumns = dgv.Columns.Cast<DataGridViewColumn>()
+                    .Where(col => col.Visible && !IsSystemColumn(col.Name))
+                    .OrderBy(col => col.DisplayIndex)
+                    .ToList();
+
+                for (int i = 0; i < sortedColumns.Count; i++)
+                {
+                    columnDisplayOrder[sortedColumns[i].Name] = i;
+                }
+
+                Debug.WriteLine($"메모리 컬럼 순서 업데이트 완료: {columnDisplayOrder.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 순서 업데이트 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 컬럼 순서를 적용하여 DataTable 생성
+        /// </summary>
+        public static DataTable ApplyColumnOrder(DataTable sourceTable)
+        {
+            if (!isColumnOrderInitialized || columnDisplayOrder.Count == 0)
+            {
+                return sourceTable; // 순서 정보가 없으면 원본 반환
+            }
+
+            try
+            {
+                var orderedTable = sourceTable.Clone(); // 구조만 복사
+
+                // 시스템 컬럼 먼저 추가 (id, import_date, is_hidden 등)
+                var systemColumns = sourceTable.Columns.Cast<DataColumn>()
+                    .Where(col => IsSystemColumn(col.ColumnName))
+                    .ToList();
+
+                // 사용자 정의 순서대로 컬럼 재배치
+                var userColumns = sourceTable.Columns.Cast<DataColumn>()
+                    .Where(col => !IsSystemColumn(col.ColumnName) && columnDisplayOrder.ContainsKey(col.ColumnName))
+                    .OrderBy(col => columnDisplayOrder[col.ColumnName])
+                    .ToList();
+
+                // 순서가 없는 컬럼들 (새로 추가된 컬럼)
+                var unorderedColumns = sourceTable.Columns.Cast<DataColumn>()
+                    .Where(col => !IsSystemColumn(col.ColumnName) && !columnDisplayOrder.ContainsKey(col.ColumnName))
+                    .ToList();
+
+                // 시스템 컬럼 제거 후 사용자 순서대로 재추가
+                orderedTable.Columns.Clear();
+
+                // 1. 시스템 컬럼 추가
+                foreach (var sysCol in systemColumns)
+                {
+                    //2025.07.31
+                    //시스템컬럼은 미사용
+                    //orderedTable.Columns.Add(sysCol.ColumnName, sysCol.DataType);
+                }
+
+                // 2. 순서가 있는 사용자 컬럼 추가
+                foreach (var userCol in userColumns)
+                {
+                    orderedTable.Columns.Add(userCol.ColumnName, userCol.DataType);
+                }
+
+                // 3. 순서가 없는 컬럼 추가
+                foreach (var unorderedCol in unorderedColumns)
+                {
+                    orderedTable.Columns.Add(unorderedCol.ColumnName, unorderedCol.DataType);
+                }
+
+                // 데이터 복사
+                foreach (DataRow row in sourceTable.Rows)
+                {
+                    orderedTable.ImportRow(row);
+                }
+
+                return orderedTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 순서 적용 오류: {ex.Message}");
+                return sourceTable; // 오류 시 원본 반환
+            }
+        }
+
+        /// <summary>
+        /// 시스템 컬럼 여부 확인
+        /// </summary>
+        private static bool IsSystemColumn(string columnName)
+        {
+            return columnName == "id" ||
+                   columnName == "_id" ||
+                   columnName == "import_date" ||
+                   columnName == "is_hidden" ||
+                   columnName == "hiddenYN";
+        }
+
+        /// <summary>
+        /// MongoDB에 컬럼 순서 저장
+        /// </summary>
+        public static async Task SaveColumnOrderToMongoDB()
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var columnCollection = await mongoManager.GetCollectionAsync<ColumnMappingDocument>("column_mapping");
+
+                var updateTasks = new List<Task>();
+
+                foreach (var kvp in columnDisplayOrder)
+                {
+                    var filter = Builders<ColumnMappingDocument>.Filter.Eq(c => c.OriginalName, kvp.Key);
+                    var update = Builders<ColumnMappingDocument>.Update.Set(c => c.Sequence, kvp.Value);
+
+                    updateTasks.Add(columnCollection.UpdateOneAsync(filter, update));
+                }
+
+                await Task.WhenAll(updateTasks);
+                Debug.WriteLine($"컬럼 순서 MongoDB 저장 완료: {columnDisplayOrder.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 순서 저장 오류: {ex.Message}");
+            }
+        }
+
 
         public static async Task<DataTable> CreateDataTableFromColumnNamesAsync(DataTable sourceTable, List<string> columnNames)
         {

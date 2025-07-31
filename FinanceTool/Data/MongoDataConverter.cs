@@ -571,8 +571,61 @@ namespace FinanceTool
             }
         }
 
+        /// <summary>
+        /// DataGridView의 컬럼 순서를 MongoDB에 저장
+        /// </summary>
+        public async Task UpdateColumnSequenceFromDataGridView(DataGridView dgv)
+        {
+            try
+            {
+                var columnOrders = new Dictionary<string, int>();
+
+                // DisplayIndex 순서대로 정렬하여 sequence 생성
+                var sortedColumns = dgv.Columns.Cast<DataGridViewColumn>()
+                    .Where(col => col.Visible && !IsSystemColumn(col.Name))
+                    .OrderBy(col => col.DisplayIndex)
+                    .ToList();
+
+                for (int i = 0; i < sortedColumns.Count; i++)
+                {
+                    columnOrders[sortedColumns[i].Name] = i;
+                }
+
+                // MongoDB 업데이트
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var columnCollection = await mongoManager.GetCollectionAsync<ColumnMappingDocument>("column_mapping");
+
+                var updateTasks = new List<Task>();
+                foreach (var kvp in columnOrders)
+                {
+                    var filter = Builders<ColumnMappingDocument>.Filter.Eq(c => c.OriginalName, kvp.Key);
+                    var update = Builders<ColumnMappingDocument>.Update.Set(c => c.Sequence, kvp.Value);
+
+                    updateTasks.Add(columnCollection.UpdateOneAsync(filter, update));
+                }
+
+                await Task.WhenAll(updateTasks);
+                Debug.WriteLine($"DataGridView 컬럼 순서 MongoDB 저장 완료: {columnOrders.Count}개");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"컬럼 순서 저장 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 시스템 컬럼 여부 확인
+        /// </summary>
+        private bool IsSystemColumn(string columnName)
+        {
+            return columnName == "id" ||
+                   columnName == "_id" ||
+                   columnName == "import_date" ||
+                   columnName == "is_hidden" ||
+                   columnName == "hiddenYN";
+        }
 
 
-       
     }
 }
