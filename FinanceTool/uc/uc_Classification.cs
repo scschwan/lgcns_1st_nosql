@@ -794,7 +794,7 @@ namespace FinanceTool
 
 
             // 기본 컬럼 추가
-            //dataTable.Columns.Add("id", typeof(string));
+            dataTable.Columns.Add("id", typeof(string));
             //dataTable.Columns.Add("import_date", typeof(DateTime));
 
             // 클러스터명 컬럼 추가 (없을 경우)
@@ -832,7 +832,7 @@ namespace FinanceTool
             foreach (var doc in documents)
             {
                 DataRow row = dataTable.NewRow();
-                //row["id"] = doc.Id;
+                row["id"] = doc.Id;
                 //row["import_date"] = doc.ImportDate;
 
                 // 동적 데이터 필드 추가 (columnList에 있는 것만)
@@ -920,11 +920,11 @@ namespace FinanceTool
                 {
                     var row = exportData.Rows[i];
 
-                    // documents의 인덱스를 사용해서 ID 매핑
-                    if (i < documents.Count)
-                    {
-                        string docId = documents[i].Id;
+                    // DataTable의 "ID" 컬럼에서 직접 MongoDB 문서 ID 가져오기
+                    string docId = row["id"]?.ToString();
 
+                    if (!string.IsNullOrEmpty(docId))
+                    {
                         // 클러스터명 매핑
                         if (docIdToClusterMap.TryGetValue(docId, out int clusterId) &&
                             clusterNameMap.TryGetValue(clusterId, out string clusterName))

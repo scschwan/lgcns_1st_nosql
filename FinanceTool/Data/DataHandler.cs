@@ -735,7 +735,10 @@ namespace FinanceTool
                             // 두 번째 테이블이 있으면 추가
                             if (secondTable != null && secondTable.Rows.Count > 0)
                             {
-                                var secondSheet = workbook.Worksheets.Add(secondTable, "Clustering 원본");
+                                //var secondSheet = workbook.Worksheets.Add(secondTable, "Clustering 원본");
+                                // *** 개선: "id" 컬럼을 제거한 복사본 생성 ***
+                                DataTable filteredSecondTable = RemoveIdColumnFromDataTable(secondTable);
+                                var secondSheet = workbook.Worksheets.Add(filteredSecondTable, "Clustering 원본");
                             }
 
                             workbook.SaveAs(filePath);
@@ -769,6 +772,50 @@ namespace FinanceTool
             return fileName;
         }
 
+        /// <summary>
+        /// DataTable에서 "id" 컬럼을 제거한 복사본을 생성
+        /// </summary>
+        private static DataTable RemoveIdColumnFromDataTable(DataTable sourceTable)
+        {
+            if (sourceTable == null)
+                return null;
+
+            try
+            {
+                // 새로운 DataTable 생성
+                DataTable resultTable = new DataTable();
+
+                // "id" 컬럼을 제외한 모든 컬럼 추가
+                foreach (DataColumn column in sourceTable.Columns)
+                {
+                    if (column.ColumnName.ToLower() != "id")  // "id" 컬럼 제외
+                    {
+                        resultTable.Columns.Add(column.ColumnName, column.DataType);
+                    }
+                }
+
+                // 데이터 복사 ("id" 컬럼 제외)
+                foreach (DataRow sourceRow in sourceTable.Rows)
+                {
+                    DataRow newRow = resultTable.NewRow();
+
+                    foreach (DataColumn column in resultTable.Columns)
+                    {
+                        newRow[column.ColumnName] = sourceRow[column.ColumnName];
+                    }
+
+                    resultTable.Rows.Add(newRow);
+                }
+
+                Debug.WriteLine($"id 컬럼 제거 완료: 원본 {sourceTable.Columns.Count}개 컬럼 → 결과 {resultTable.Columns.Count}개 컬럼");
+                return resultTable;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"id 컬럼 제거 중 오류: {ex.Message}");
+                return sourceTable; // 오류 시 원본 반환
+            }
+        }
         public static DataTable ExtractColumnToNewTable(DataTable inputTable, int index)
         {
             // 유효성 검사
