@@ -7,6 +7,60 @@
     <Compile Update="popup\uc_ClusterDetailPopup.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Update="uc\DB\uc_ClassificationMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\DB\uc_ClusteringMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\DB\uc_DataTransformMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\DB\uc_DetailClusteringMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\DB\uc_FileLoadMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\DB\uc_MultiFileUploadMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\DB\uc_PreprocessingMongoDB.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_ClassificationProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_ClusteringProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_ClusteringSearchEngine.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_DataTransformProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_DetailClusteringProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_DetailClusteringSearchEngine.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_FileLoadProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_MultiFileUploadExcelProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_MultiFileUploadFileProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_MultiFileUploadSessionProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="uc\Process\uc_PreprecessingProcess.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
     <Compile Update="uc\uc_MultiFileUpload.cs">
       <SubType>UserControl</SubType>
     </Compile>

@@ -222,5 +222,66 @@ namespace FinanceTool.Repositories
                 return false;
             }
         }
+
+        /// <summary>
+        /// ID로 단일 문서 조회
+        /// </summary>
+        /// <param name="id">문서 ID</param>
+        /// <returns>문서 또는 null</returns>
+        public virtual async Task<T> GetByIdAsync(ObjectId id)
+        {
+            try
+            {
+                var filter = Builders<T>.Filter.Eq("_id", id);
+                return await _collection.Find(filter).FirstOrDefaultAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 문서 조회 오류: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 문서 업데이트
+        /// </summary>
+        /// <param name="id">문서 ID</param>
+        /// <param name="document">업데이트할 문서</param>
+        /// <returns>업데이트 성공 여부</returns>
+        public virtual async Task<bool> UpdateAsync(ObjectId id, T document)
+        {
+            try
+            {
+                var filter = Builders<T>.Filter.Eq("_id", id);
+                var result = await _collection.ReplaceOneAsync(filter, document);
+
+                Debug.WriteLine($"{typeof(T).Name} 문서 업데이트: ID={id}, 수정된 문서 수={result.ModifiedCount}");
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 문서 업데이트 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 여러 ID로 문서들 조회
+        /// </summary>
+        /// <param name="ids">문서 ID 목록</param>
+        /// <returns>문서 목록</returns>
+        public virtual async Task<List<T>> GetByIdsAsync(List<ObjectId> ids)
+        {
+            try
+            {
+                var filter = Builders<T>.Filter.In("_id", ids);
+                return await _collection.Find(filter).ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"{typeof(T).Name} 다중 문서 조회 오류: {ex.Message}");
+                return new List<T>();
+            }
+        }
     }
 }

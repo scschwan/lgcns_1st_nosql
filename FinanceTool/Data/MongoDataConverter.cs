@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using FinanceTool.Data;
 using FinanceTool.MongoModels;
-using FinanceTool.Utilities;
 using MongoDB.Bson;
 using MongoDB.Driver;
 

@@ -2,6 +2,7 @@
 using DocumentFormat.OpenXml.Spreadsheet;
 using FinanceTool.MongoModels;
 using FinanceTool.Repositories;
+using SessionDisplayData = FinanceTool.uc_MultiFileUpload.SessionDisplayData;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
@@ -42,7 +43,7 @@ namespace FinanceTool
         /// 전체 워크플로우 실행 (기존 btn_selectFile_Click 대체)
         /// </summary>
         public async Task<ProcessingResult> ProcessFullWorkflowAsync(
-            List<uc_MultiFileUpload.SessionDisplayData> selectedSessions,
+            List<SessionDisplayData> selectedSessions,
             UpdateProgressDelegate progressCallback)
         {
             var result = new ProcessingResult();
@@ -160,7 +161,7 @@ namespace FinanceTool
         /// 선택된 세션들 분석
         /// </summary>
         private async Task<SessionAnalysisResult> AnalyzeSelectedSessionsAsync(
-            List<uc_MultiFileUpload.SessionDisplayData> selectedSessions)
+            List<SessionDisplayData> selectedSessions)
         {
             var result = new SessionAnalysisResult();
             var sessionDataList = new List<SessionProcessingData>();

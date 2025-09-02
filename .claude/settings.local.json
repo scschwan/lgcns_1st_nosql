@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(dotnet build:*)",
+      "Bash(git checkout:*)",
+      "Bash(git log:*)",
+      "Bash(sed:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

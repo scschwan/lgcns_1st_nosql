@@ -1,5 +1,4 @@
 ﻿using DocumentFormat.OpenXml.Wordprocessing;
-using FinanceTool.Utilities;
 using System.Data;
 
 namespace FinanceTool
