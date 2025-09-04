@@ -16,6 +16,14 @@ namespace FinanceTool
     public partial class uc_FileLoad
     {
         // uc_FileLoad.cs에 추가
+        /// <summary>
+        /// 컨트롤의 표시 상태 변경 시 호출되는 이벤트 핸들러
+        /// </summary>
+        /// <param name="e">이벤트 인수</param>
+        /// <remarks>
+        /// 컨트롤이 사용자에게 보여질 때마다 호출되어 필요한 초기화 작업 수행
+        /// UI 레이아웃 갱신 및 사용자 환경 설정 적용
+        /// </remarks>
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
@@ -27,6 +35,13 @@ namespace FinanceTool
             }
         }
 
+        /// <summary>
+        /// 모든 레이아웃을 새로고침
+        /// </summary>
+        /// <remarks>
+        /// UI 컨트롤들의 위치와 크기를 재조정하여 사용자 화면에 적절히 표시
+        /// 다양한 화면 해상도와 창 크기에 따른 레이아웃 자동 조정 기능
+        /// </remarks>
         private void RefreshLayouts()
         {
             this.SuspendLayout();
@@ -43,6 +58,14 @@ namespace FinanceTool
             this.PerformLayout();
         }
 
+        /// <summary>
+        /// 페이징 컨트롤들을 초기화
+        /// </summary>
+        /// <param name="attachEvents">이벤트 핸들러 연결 여부</param>
+        /// <remarks>
+        /// 대용량 데이터의 효율적 표시를 위한 페이징 기능 설정
+        /// 페이지 크기, 네비게이션 버튼, 상태 표시 등을 초기화
+        /// </remarks>
         public void InitializePagingControls(bool attachEvents)
         {
             // 콤보박스 초기화
@@ -74,6 +97,13 @@ namespace FinanceTool
         }
 
         // 페이징 이벤트 등록 메서드 (별도로 분리)
+        /// <summary>
+        /// 페이징 관련 이벤트 핸들러들을 연결
+        /// </summary>
+        /// <remarks>
+        /// 다음/이전 페이지 버튼, 페이지 사이즈 변경 등의 이벤트를 연결
+        /// 대용량 데이터의 효율적 표시를 위한 페이징 기능 제공
+        /// </remarks>
         private void AttachPagingEvents()
         {
             // 이벤트 등록
@@ -84,6 +114,14 @@ namespace FinanceTool
         }
 
         // 페이징 컨트롤 활성화/비활성화 메서드
+        /// <summary>
+        /// 페이징 컨트롤들의 활성/비활성 설정
+        /// </summary>
+        /// <param name="enabled">활성 여부 (true: 활성, false: 비활성)</param>
+        /// <remarks>
+        /// 데이터 로딩 중이나 오류 상황에서 사용자 인터랙션 제어
+        /// 페이징 버튼, 페이지 사이즈 선택 등의 UI 요소들을 일괄 제어
+        /// </remarks>
         private void EnablePagingControls(bool enabled)
         {
             btn_prevPage.Enabled = enabled;
@@ -92,94 +130,16 @@ namespace FinanceTool
             cmb_pageSize.Enabled = enabled;
         }
 
-        private async Task LoadExcelDataAsync(string filePath)
-        {
-            try
-            {
-                using (var progress = new ProcessProgressForm())
-                {
-                    progress.Show();
-                    await progress.UpdateProgressHandler(5, "파일 업로드 준비 중...");
-                    Application.DoEvents(); //
-
-                    // ✅ 컬럼 순서 초기화 추가
-                    await DataHandler_fileLoad.LoadColumnOrderFromMongoDB();
-
-                    // ✅ 컬럼 이벤트 핸들러 초기화
-                    InitializeColumnOrderHandling();
-
-                    Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-
-                    await progress.UpdateProgressHandler(10, "Excel 파일 스트리밍 로딩 중...");
-                    Application.DoEvents(); //
-
-                    Stopwatch sw = Stopwatch.StartNew();
-
-                    var excelData = new DataTable();
-                    int cpuCount = Environment.ProcessorCount;
-
-                    using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (var reader = ExcelReaderFactory.CreateReader(stream))
-                    {
-                        var result = reader.AsDataSet(new ExcelDataSetConfiguration
-                        {
-                            ConfigureDataTable = (_) => new ExcelDataTableConfiguration
-                            {
-                                UseHeaderRow = true
-                            }
-                        });
-
-                        excelData = result.Tables[0];
-                    }
-
-                    sw.Stop();
-                    Debug.WriteLine($"[ExcelDataReader] 엑셀 파싱 완료: {sw.ElapsedMilliseconds}ms, 행 수: {excelData.Rows.Count}, 열 수: {excelData.Columns.Count}");
-
-                    await progress.UpdateProgressHandler(40, "MongoDB 저장 준비 중...");
-                    Application.DoEvents();
-
-                    var mongoConverter = new MongoDataConverter();
-
-                    // 병렬 처리 옵션: CPU 코어 수 × 2
-                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = cpuCount * 2 };
-
-                    // MongoDB 저장
-                    List<RawDataDocument> documents = await mongoConverter.ConvertExcelToMongoDBAsync(
-                        excelData, Path.GetFileName(filePath), progress.UpdateProgressHandler, parallelOptions);
-
-                    await progress.UpdateProgressHandler(90, "UI 초기화 중...");
-
-                    if (!_fileLoaded)
-                    {
-                        AttachPagingEvents();
-                        _fileLoaded = true;
-                    }
-
-                    EnablePagingControls(true);
-                    DataHandler.excelData = excelData;
-                    currentPage = 1;
-                    pageSize = 1000;
-                    await LoadMongoPagedDataAsync(true);
-                    await AddMongoColumnsToGrid(dataGridView_delete_col, excelData.Columns);
-                    await progress.UpdateProgressHandler(95, "컬럼 정보 설정 중...");
-                    GetMongoColumnList(excelData.Columns);
-                    SetupColumnLists();
-
-                    await progress.UpdateProgressHandler(100, "데이터 로드 완료!");
-                    progress.Close();
-
-                    Debug.WriteLine("✅ Excel → MongoDB 업로드 완료");
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"엑셀 파일 로드 중 오류 발생: {ex.Message}", "오류",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                Debug.WriteLine($"엑셀 로딩 오류: {ex.Message}");
-            }
-        }
-
-        // MongoDB 컬럼 목록을 그리드에 추가
+        /// <summary>
+        /// MongoDB 컬럼 목록을 DataGridView에 추가
+        /// </summary>
+        /// <param name="targetDgv">컬럼을 추가할 대상 DataGridView</param>
+        /// <param name="columns">추가할 컬럼 정보가 포함된 DataColumnCollection</param>
+        /// <remarks>
+        /// MongoDB의 컬럼 정보를 UI DataGridView에 동적으로 추가하여 사용자가 확인할 수 있도록 함
+        /// 각 컬럼의 타입과 속성을 분석하여 적절한 표시 형식으로 변환
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">targetDgv 또는 columns가 null인 경우</exception>
         public async Task AddMongoColumnsToGrid(DataGridView targetDgv, DataColumnCollection columns)
         {
             // 대상 DataGridView 초기화
@@ -237,6 +197,15 @@ namespace FinanceTool
         }
 
         // MongoDB 컬럼 목록 가져오기
+        /// <summary>
+        /// MongoDB에서 컬럼 목록을 가져와서 UI에 설정
+        /// </summary>
+        /// <param name="columns">MongoDB 컬럼 정보가 포함된 DataColumnCollection</param>
+        /// <remarks>
+        /// MongoDB의 데이터 스키마를 기반으로 UI 컬럼 목록을 동적 생성
+        /// 데이터 타입 및 제약 조건을 고려한 컬럼 설정
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">columns가 null인 경우</exception>
         public void GetMongoColumnList(DataColumnCollection columns)
         {
             process_col_list = new List<string>();
@@ -269,6 +238,14 @@ namespace FinanceTool
         }
 
         // 컬럼 목록 설정
+        /// <summary>
+        /// 컬럼 목록 설정 및 초기화
+        /// </summary>
+        /// <remarks>
+        /// 데이터 원본, 목표, 처리 컬럼들의 목록을 설정하고 동기화
+        /// ComboBox 컨트롤들을 업데이트하여 사용자에게 선택 옵션 제공
+        /// 데이터 처리 파이프라인의 기초가 되는 컬럼 정보 준비
+        /// </remarks>
         public void SetupColumnLists()
         {
             try
@@ -290,6 +267,16 @@ namespace FinanceTool
         }
 
         // ComboBox 설정 공통 로직
+        /// <summary>
+        /// ComboBox 컨트롤의 기본 설정을 구성
+        /// </summary>
+        /// <param name="comboBox">설정할 ComboBox 컨트롤</param>
+        /// <param name="defaultText">기본적으로 표시할 텍스트</param>
+        /// <remarks>
+        /// 드롭다운 컨트롤의 초기값 설정 및 스타일 지정
+        /// 사용자 인터페이스의 일관성을 위한 표준화된 ComboBox 설정
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">comboBox가 null인 경우</exception>
         private void SetupComboBox(ComboBox comboBox, string defaultText)
         {
             comboBox.Items.Clear();
@@ -305,6 +292,17 @@ namespace FinanceTool
         }
 
 
+        /// <summary>
+        /// DataGridView의 설정을 구성
+        /// </summary>
+        /// <param name="dataTable">바인딩할 데이터 테이블</param>
+        /// <param name="dataGridView">설정할 DataGridView 컨트롤</param>
+        /// <remarks>
+        /// DataTable을 DataGridView에 바인딩하고 적절한 시각적 서식 적용
+        /// 컬럼 너비, 행 스타일, 선택 모드 등을 비즈니스 요구에 맞게 설정
+        /// 대용량 데이터 표시를 위한 성능 최적화 적용
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">dataTable 또는 dataGridView가 null인 경우</exception>
         public void ConfigureDataGridView(DataTable dataTable, DataGridView dataGridView)
         {
             // DataGridView의 DataSource를 DataTable로 설정
@@ -356,6 +354,13 @@ namespace FinanceTool
         }
 
         // 페이징 정보 업데이트
+        /// <summary>
+        /// 페이지네이션 정보를 업데이트
+        /// </summary>
+        /// <remarks>
+        /// 현재 페이지 번호, 전체 페이지 수, 데이터 개수 등을 계산하여 UI에 표시
+        /// 대용량 데이터의 현재 상태와 네비게이션 정보를 사용자에게 제공
+        /// </remarks>
         private void UpdatePaginationInfo()
         {
             // NumericUpDown 범위 설정
@@ -374,6 +379,13 @@ namespace FinanceTool
         }
 
         // 그리드 형식 적용
+        /// <summary>
+        /// DataGridView에 서식 및 스타일을 적용
+        /// </summary>
+        /// <remarks>
+        /// 컬럼, 행 스타일, 셀 포매트, 컬럼 너비 등을 설정하여 데이터의 가독성 향상
+        /// 비즈니스 데이터의 표준화된 시각적 표현을 위한 UI 서식 적용
+        /// </remarks>
         private void ApplyGridFormatting()
         {
             foreach (DataGridView dgv in new[] { dataGridView_target, dataGridView_process })
@@ -396,6 +408,16 @@ namespace FinanceTool
 
 
         //체크 항목 데이터 수집
+        /// <summary>
+        /// 체크된 행들의 데이터를 가져오는 메서드
+        /// </summary>
+        /// <param name="dgv">대상 DataGridView</param>
+        /// <returns>체크된 행들의 데이터 목록</returns>
+        /// <remarks>
+        /// 사용자가 체크박스로 선택한 행들의 데이터를 추출
+        /// 선택된 데이터를 배치 처리하거나 다른 작업에 활용 가능
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">dgv가 null인 경우</exception>
         public List<string> GetCheckedRowsData(DataGridView dgv)
         {
             List<string> checkedData = new List<string>();
@@ -423,7 +445,17 @@ namespace FinanceTool
             public string Value { get; set; }
         }
 
-        // 숫자 컬럼 체크 함수 - MongoDB 버전
+        /// <summary>
+        /// 지정된 컬럼의 숫자 데이터 여부를 비동기적으로 검사
+        /// </summary>
+        /// <param name="columnName">검사할 컬럼 이름</param>
+        /// <returns>숫자 여부와 비숫자 데이터 목록을 포함한 튜플</returns>
+        /// <remarks>
+        /// 대용량 데이터에서 수치 연산이 가능한 컬럼인지 비동기적으로 검증
+        /// 비숫자 데이터가 발견되면 상세 내역을 NonNumericData 객체로 반환
+        /// 성능: Task 기반 비동기 처리로 대용량 데이터 효율적 처리
+        /// </remarks>
+        /// <exception cref="ArgumentException">columnName이 null이거나 비어있는 경우</exception>
         private async Task<(bool isAllNumeric, List<NonNumericData> nonNumericList)> CheckNumericColumnAsync(string columnName)
         {
             var nonNumericList = new List<NonNumericData>();
@@ -476,7 +508,13 @@ namespace FinanceTool
             }
         }
 
-        // 모든 행 표시 상태 및 스타일 복원
+        /// <summary>
+        /// 모든 행의 표시 상태를 복원
+        /// </summary>
+        /// <remarks>
+        /// 필터링이나 검색으로 숨겨진 행들을 다시 보이도록 설정
+        /// DataGridView의 모든 행을 다시 visible 상태로 돌리는 기능
+        /// </remarks>
         private void RestoreAllRowsVisibility()
         {
             // Process 그리드
@@ -493,7 +531,13 @@ namespace FinanceTool
             }
         }
 
-        // 그리드 커서 초기화 메서드 분리
+        /// <summary>
+        /// 커서를 초기 상태로 설정
+        /// </summary>
+        /// <remarks>
+        /// 데이터 로딩 중이나 처리 작업 후 커서를 기본 상태로 복원
+        /// 사용자 경험 향상을 위한 UI 상태 관리
+        /// </remarks>
         private void InitializeCursors()
         {
             // 모든 그리드 선택 해제
@@ -518,7 +562,15 @@ namespace FinanceTool
         }
 
 
-        // 처리된 행을 삭제 데이터 그리드에서 제거
+        /// <summary>
+        /// 처리된 행들을 제거
+        /// </summary>
+        /// <param name="values">제거할 값들의 목록</param>
+        /// <remarks>
+        /// 지정된 값에 해당하는 데이터 행들을 DataGridView에서 제거
+        /// 데이터 정리 및 버전 관리를 위한 사횩 행 제거 기능
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">values가 null인 경우</exception>
         private void RemoveProcessedRows(List<string> values)
         {
             for (int i = dataGridView_delete_data.Rows.Count - 1; i >= 0; i--)
@@ -533,7 +585,15 @@ namespace FinanceTool
         }
 
 
-        // 필터링된 결과로 DataGridView 채우기 - 기존 함수 유지
+        /// <summary>
+        /// 필터링된 결과로 삭제 대상 DataGridView를 채움
+        /// </summary>
+        /// <param name="filteredValues">필터링된 값들의 목록</param>
+        /// <remarks>
+        /// 사용자가 선택한 조건에 따라 필터링된 데이터를 삭제 대상 그리드에 표시
+        /// 삭제 작업 전 미리보기를 위한 데이터 시각화 기능
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">filteredValues가 null인 경우</exception>
         private void PopulateDeleteDataGridWithResults(List<string> filteredValues)
         {
             // DataGridView 초기화
@@ -587,12 +647,14 @@ namespace FinanceTool
         // 필터링된 결과로 DataGridView 채우기
 
 
-        //2025.07.16
-        //공급업체 표준화 함수
-
         /// <summary>
-        /// 공급업체명 표준화 관련 컨트롤 초기화
+        /// 공급업체명 표준화 관련 컨트롤 초기화 및 이벤트 연결
         /// </summary>
+        /// <remarks>
+        /// 데이터 표준화를 위한 UI 컨트롤들을 설정하고 초기값을 지정
+        /// 표준화 매핑 규칙과 사용자 인터페이스를 연결하여 일관된 데이터 처리 환경 제공
+        /// </remarks>
+        /// <exception cref="InvalidOperationException">컨트롤 초기화 중 오류 발생 시</exception>
         public async Task InitializeStandardizationControls()
         {
             try
@@ -640,6 +702,15 @@ namespace FinanceTool
         /// <summary>
         /// MongoDB에서 컬럼 목록 로드 (숫자형 컬럼 자동 감지)
         /// </summary>
+        /// <summary>
+        /// 컬럼 목록을 비동기적으로 로드
+        /// </summary>
+        /// <remarks>
+        /// MongoDB에서 컬럼 정보를 비동기적으로 가져와서 UI 컬럼 목록을 업데이트
+        /// 대용량 컬럼 데이터를 효율적으로 처리하기 위한 비동기 로딩
+        /// UI 블록킹 없이 백그라운드에서 데이터 로드 수행
+        /// </remarks>
+        /// <exception cref="InvalidOperationException">데이터 로드 중 오류 발생 시</exception>
         private async Task LoadColumnListsAsync()
         {
             try
@@ -722,8 +793,6 @@ namespace FinanceTool
                 Debug.WriteLine($"표준화 DataGridView 초기화 오류: {ex.Message}");
             }
         }
-
-        // 핵심 분석 및 처리 함수
 
         /// <summary>
         /// Key-Target 매핑 분석 및 표시
@@ -922,9 +991,16 @@ namespace FinanceTool
             }
         }
 
+
         /// <summary>
         /// 다른 DataGridView들의 컬럼 순서 갱신
         /// </summary>
+        /// <param name="excludeDgv">제외할 DataGridView (갱신 대상에서 제외)</param>
+        /// <remarks>
+        /// 지정된 DataGridView를 제외하고 다른 모든 DataGridView의 컬럼 순서를 업데이트
+        /// 컬럼 순서 변경 시 다른 그리드에도 일관성 있게 적용하는 기능
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">excludeDgv가 null인 경우</exception>
         private void RefreshOtherDataGridViewOrders(DataGridView excludeDgv)
         {
             try
@@ -961,37 +1037,7 @@ namespace FinanceTool
                    columnName == "hiddenYN";
         }
 
-        /// <summary>
-        /// MongoDB에서 특정 Target 값 일괄 변경
-        /// </summary>
-        private async Task UpdateTargetValueInMongoDB(string keyValue, string oldTargetValue, string newTargetValue)
-        {
-            try
-            {
-                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
-                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("raw_data");
-                string keyColumn = comboBox_standard_key.SelectedItem.ToString();
-                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
-
-                var keyFilter = CreateUniversalFilter(keyColumn, keyValue);
-                var filter = Builders<BsonDocument>.Filter.And(
-                    keyFilter,
-                    Builders<BsonDocument>.Filter.Eq($"data.{targetColumn}", oldTargetValue)
-                );
-
-                var update = Builders<BsonDocument>.Update.Set($"data.{targetColumn}", newTargetValue);
-
-                var result = await collection.UpdateManyAsync(filter, update);
-
-                Debug.WriteLine($"Target 값 변경 완료: {result.ModifiedCount}개 문서 업데이트 ({oldTargetValue} → {newTargetValue})");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Target 값 변경 오류: {ex.Message}");
-                throw;
-            }
-        }
-
+        
         /// <summary>
         /// 표준화 선택 유효성 검사
         /// </summary>
@@ -1020,17 +1066,6 @@ namespace FinanceTool
 
             return true;
         }
-
-
-
-
-
-
-
-
-
-
-
 
 
 

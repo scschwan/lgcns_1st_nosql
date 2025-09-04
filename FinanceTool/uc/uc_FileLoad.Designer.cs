@@ -30,8 +30,6 @@
         {
             tableLayoutMain = new TableLayoutPanel();
             pnl_header = new Panel();
-            btn_selectFile = new Button();
-            lbl_filename = new Label();
             tableLayoutContent = new TableLayoutPanel();
             tableLayoutLeft = new TableLayoutPanel();
             pnl_data_headers = new Panel();
@@ -86,7 +84,6 @@
             label2 = new Label();
             dataGridView2 = new DataGridView();
             tableLayoutMain.SuspendLayout();
-            pnl_header.SuspendLayout();
             tableLayoutContent.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
             pnl_data_headers.SuspendLayout();
@@ -126,8 +123,6 @@
             // pnl_header
             // 
             pnl_header.BackColor = Color.WhiteSmoke;
-            pnl_header.Controls.Add(btn_selectFile);
-            pnl_header.Controls.Add(lbl_filename);
             pnl_header.Dock = DockStyle.Fill;
             pnl_header.Location = new Point(0, 0);
             pnl_header.Margin = new Padding(0);
@@ -135,36 +130,6 @@
             pnl_header.Padding = new Padding(10);
             pnl_header.Size = new Size(1904, 100);
             pnl_header.TabIndex = 0;
-            // 
-            // btn_selectFile
-            // 
-            btn_selectFile.AutoSize = true;
-            btn_selectFile.BackColor = Color.DodgerBlue;
-            btn_selectFile.FlatStyle = FlatStyle.Flat;
-            btn_selectFile.Font = new Font("Pretendard", 16F, FontStyle.Bold);
-            btn_selectFile.ForeColor = Color.White;
-            btn_selectFile.Location = new Point(15, 25);
-            btn_selectFile.MinimumSize = new Size(120, 40);
-            btn_selectFile.Name = "btn_selectFile";
-            btn_selectFile.Size = new Size(150, 50);
-            btn_selectFile.TabIndex = 1;
-            btn_selectFile.Text = "파일 선택";
-            btn_selectFile.UseVisualStyleBackColor = false;
-            btn_selectFile.Visible = false;
-            btn_selectFile.Click += btn_selectFile_Click;
-            // 
-            // lbl_filename
-            // 
-            lbl_filename.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-            lbl_filename.Font = new Font("Pretendard", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            lbl_filename.ForeColor = Color.DarkSlateGray;
-            lbl_filename.Location = new Point(180, 35);
-            lbl_filename.Name = "lbl_filename";
-            lbl_filename.Size = new Size(1700, 30);
-            lbl_filename.TabIndex = 0;
-            lbl_filename.Text = "Excel 파일을 Upload 해주세요(.xls,xlsx) : ";
-            lbl_filename.TextAlign = ContentAlignment.MiddleLeft;
-            lbl_filename.Visible = false;
             // 
             // tableLayoutContent
             // 
@@ -873,8 +838,6 @@
             Size = new Size(1904, 1017);
             Load += uc_FileLoad_Load;
             tableLayoutMain.ResumeLayout(false);
-            pnl_header.ResumeLayout(false);
-            pnl_header.PerformLayout();
             tableLayoutContent.ResumeLayout(false);
             tableLayoutLeft.ResumeLayout(false);
             pnl_data_headers.ResumeLayout(false);
@@ -905,8 +868,6 @@
 
         private System.Windows.Forms.TableLayoutPanel tableLayoutMain;
         private System.Windows.Forms.Panel pnl_header;
-        private System.Windows.Forms.Button btn_selectFile;
-        private System.Windows.Forms.Label lbl_filename;
         private System.Windows.Forms.TableLayoutPanel tableLayoutContent;
         private System.Windows.Forms.TableLayoutPanel tableLayoutLeft;
         private System.Windows.Forms.Panel pnl_data_headers;

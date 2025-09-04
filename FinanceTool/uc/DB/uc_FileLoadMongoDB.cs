@@ -567,6 +567,38 @@ namespace FinanceTool
             return dataTable;
         }
 
+        /// <summary>
+        /// MongoDB에서 특정 Target 값 일괄 변경
+        /// </summary>
+        private async Task UpdateTargetValueInMongoDB(string keyValue, string oldTargetValue, string newTargetValue)
+        {
+            try
+            {
+                var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
+                var collection = await mongoManager.GetCollectionAsync<BsonDocument>("raw_data");
+                string keyColumn = comboBox_standard_key.SelectedItem.ToString();
+                string targetColumn = comboBox_standard_target.SelectedItem.ToString();
+
+                var keyFilter = CreateUniversalFilter(keyColumn, keyValue);
+                var filter = Builders<BsonDocument>.Filter.And(
+                    keyFilter,
+                    Builders<BsonDocument>.Filter.Eq($"data.{targetColumn}", oldTargetValue)
+                );
+
+                var update = Builders<BsonDocument>.Update.Set($"data.{targetColumn}", newTargetValue);
+
+                var result = await collection.UpdateManyAsync(filter, update);
+
+                Debug.WriteLine($"Target 값 변경 완료: {result.ModifiedCount}개 문서 업데이트 ({oldTargetValue} → {newTargetValue})");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Target 값 변경 오류: {ex.Message}");
+                throw;
+            }
+        }
+
+
 
         /// <summary>
         /// MongoDB 일괄 표준화 수행 (최종 최적화 버전)

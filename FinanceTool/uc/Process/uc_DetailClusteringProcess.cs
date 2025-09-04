@@ -8,6 +8,18 @@ using System.Threading.Tasks;
 
 namespace FinanceTool
 {
+    /// <summary>
+    /// 세부 클러스터링 처리를 위한 사용자 컨트롤 클래스
+    /// 대용량 클러스터 내의 세부 클러스터링 및 관리 기능 제공
+    /// </summary>
+    /// <remarks>
+    /// 이 클래스는 다음과 같은 주요 기능을 제공합니다:
+    /// - 대형 클러스터 내의 세부 데이터 처리
+    /// - ClusterSubID를 통한 하위 클러스터 관리
+    /// - 세부 클러스터 병합/해제 처리
+    /// - 하위 레벨 키워드 및 공급업체 집계
+    /// - 세부 클러스터 정보 시각화
+    /// </remarks>
     public partial class uc_DetailClustering
     {
 
@@ -16,11 +28,27 @@ namespace FinanceTool
         /// 현재 필터 결과의 전체 선택 상태 관리
         /// </summary>
 
+        /// <summary>
+        /// 현재 필터링된 세부 클러스터의 ID 목록을 반환
+        /// </summary>
+        /// <returns>현재 필터링된 세부 클러스터 ID들의 HashSet</returns>
+        /// <remarks>
+        /// 세부 클러스터링 매니저에서 현재 결과를 기반으로 클러스터 ID 목록을 가져옵니다.
+        /// 상위 클러스터링과 달리 하위 레벨에서 동작합니다.
+        /// </remarks>
         private HashSet<int> GetCurrentFilterClusterIds()
         {
             return _clusteringManager.GetCurrentResultClusterIds().ToHashSet();
         }
 
+        /// <summary>
+        /// 세부 클러스터링에서 전체 선택 체크박스의 상태를 업데이트
+        /// </summary>
+        /// <remarks>
+        /// 현재 필터링된 모든 세부 클러스터가 선택되었는지 확인하여 전체 선택 체크박스 상태를 동기화합니다.
+        /// 재귀 호출 방지를 위해 이벤트 핸들러를 임시 제거합니다.
+        /// </remarks>
+        /// <exception cref="Exception">전체 선택 상태 업데이트 중 오류 발생 시</exception>
         private void UpdateMergeAllCheckState()
         {
             isCheckedTableObject = true;
@@ -55,7 +83,18 @@ namespace FinanceTool
             }
         }
 
-        // *** 새로 추가: 나머지 UI 초기화 작업들 (기존 코드 모두 포함) ***
+        /// <summary>
+        /// 세부 클러스터링 UI 컴포넌트들의 초기화 작업을 비동기적으로 수행
+        /// </summary>
+        /// <returns>비동기 작업을 나타내는 Task</returns>
+        /// <remarks>
+        /// 세부 클러스터링 화면에 특화된 UI 초기화 작업을 수행합니다:
+        /// - 세부 클러스터 DataGridView들 초기화
+        /// - 하위 레벨 이벤트 핸들러 설정
+        /// - 세부 클러스터 전용 속성 구성
+        /// - 초기 데이터 로드 및 집계 업데이트
+        /// </remarks>
+        /// <exception cref="Exception">UI 초기화 중 오류 발생 시</exception>
         private async Task InitializeRemainingUI()
         {
             await Task.Run(() =>
@@ -155,7 +194,14 @@ namespace FinanceTool
             });
         }
 
-        // 3. 공급업체별 요약 테이블 초기화 메서드
+        /// <summary>
+        /// 세부 클러스터링에서 공급업체별 요약 테이블을 초기화
+        /// </summary>
+        /// <remarks>
+        /// 공급업체 컬럼이 필수가 아닌 경우 초기화만 수행하고 종료합니다.
+        /// 세부 클러스터링 환경에 맞는 DataGridView 속성을 설정합니다.
+        /// </remarks>
+        /// <exception cref="Exception">공급업체별 요약 테이블 초기화 중 오류 발생 시</exception>
         private void InitializeSupplySummaryTable()
         {
             try
@@ -204,6 +250,13 @@ namespace FinanceTool
         }
 
 
+        /// <summary>
+        /// 세부 클러스터링에서 추천 키워드 매니저를 초기화하고 1차 키워드 목록을 로드
+        /// </summary>
+        /// <remarks>
+        /// RecomandKeywordManager를 초기화하고 중복을 제거한 1차 키워드 목록을 가져와
+        /// 세부 클러스터링 전용 dataGridView_lv1에 표시합니다.
+        /// </remarks>
         private void LoadSeparatorsAndRemovers()
         {
             // 프로그램 시작 시 로드
@@ -224,6 +277,16 @@ namespace FinanceTool
 
         }
 
+        /// <summary>
+        /// 세부 클러스터링에서 DataGridView에 키워드 테이블을 생성
+        /// </summary>
+        /// <param name="dgv">대상 DataGridView 컨트롤</param>
+        /// <param name="data_list">표시할 키워드 데이터 목록</param>
+        /// <param name="lv1yn">1차 키워드 여부 (기본값: true)</param>
+        /// <remarks>
+        /// 세부 클러스터링에 특화된 체크박스와 데이터 컬럼을 포함한 테이블을 생성합니다.
+        /// lv1yn 매개변수에 따라 적절한 이벤트 핸들러가 등록됩니다.
+        /// </remarks>
         private void create_keyword_table(DataGridView dgv, List<string> data_list, bool lv1yn = true)
         {
             Debug.WriteLine("lv1 table init start");
@@ -287,6 +350,17 @@ namespace FinanceTool
         }
 
 
+        /// <summary>
+        /// 세부 클러스터링에서 체크박스가 포함된 DataGridView를 생성
+        /// </summary>
+        /// <param name="dgv">대상 DataGridView 컨트롤</param>
+        /// <param name="dt">원본 데이터 테이블</param>
+        /// <param name="filterWords">필터링에 사용할 키워드 목록</param>
+        /// <remarks>
+        /// ClusterSubID를 기준으로 세부 병합 클러스터만 표시하며 (ClusterSubID == ID && ClusterSubID > 0),
+        /// 키워드 필터링 조건에 맞는 데이터만 포함합니다.
+        /// 세부 클러스터명으로 헤더 이름이 변경되고, 합산금액은 한국 단위로 포맷팅됩니다.
+        /// </remarks>
         public void CreateCheckDataGridView(DataGridView dgv, DataTable dt, List<string> filterWords)
         {
             // DataGridView 초기화
@@ -452,6 +526,15 @@ namespace FinanceTool
         }
 
 
+        /// <summary>
+        /// 세부 클러스터링에서 DataGridView의 체크된 행들의 문자열 데이터를 반환
+        /// </summary>
+        /// <param name="dgv">대상 DataGridView 컨트롤</param>
+        /// <returns>체크된 행들의 첫 번째 데이터 컬럼 값들의 목록</returns>
+        /// <remarks>
+        /// 체크박스(0번째 컬럼)가 체크된 행들의 1번째 컬럼 값을 수집합니다.
+        /// 세부 클러스터링에서 사용됩니다.
+        /// </remarks>
         public List<string> GetCheckedRowsStringData(DataGridView dgv)
         {
             List<string> checkedData = new List<string>();
@@ -473,7 +556,15 @@ namespace FinanceTool
             return checkedData;
         }
 
-        //체크 항목 데이터 수집
+        /// <summary>
+        /// 세부 클러스터링에서 DataGridView의 체크된 행들의 ID 데이터를 수집
+        /// </summary>
+        /// <param name="dgv">대상 DataGridView 컨트롤</param>
+        /// <returns>체크된 행들의 ID 목록</returns>
+        /// <remarks>
+        /// merge_cluster_table인 경우 세부 클러스터링 매니저에서 선택된 ID를 반환하고,
+        /// 다른 DataGridView인 경우 체크박스가 체크된 행의 ID 컬럼 값을 반환합니다.
+        /// </remarks>
         public List<int> GetCheckedRowsData(DataGridView dgv)
         {
             // 현재 페이지의 선택 상태 저장
@@ -503,6 +594,14 @@ namespace FinanceTool
             return checkedData;
         }
 
+        /// <summary>
+        /// 세부 클러스터링에서 DataGridView의 체크된 첫 번째 행의 인덱스를 반환
+        /// </summary>
+        /// <param name="dgv">대상 DataGridView 컨트롤</param>
+        /// <returns>체크된 첫 번째 행의 인덱스 (체크된 행이 없으면 0)</returns>
+        /// <remarks>
+        /// 세부 클러스터링에서 체크박스가 체크된 첫 번째 행의 인덱스만 반환합니다.
+        /// </remarks>
         public int GetCheckedRowsIndex(DataGridView dgv)
         {
             int checkedData = 0;
@@ -520,6 +619,16 @@ namespace FinanceTool
         }
 
 
+        /// <summary>
+        /// 세부 클러스터링에서 숫자를 한국 단위로 포맷팅 (원, 천원, 만원, 억원)
+        /// </summary>
+        /// <param name="number">포맷팅할 숫자</param>
+        /// <returns>한국 단위로 포맷팅된 문자열</returns>
+        /// <remarks>
+        /// decimalDivider와 decimalDividerName을 사용하여 적절한 단위로 변환합니다.
+        /// 소수점 자릿수는 자동으로 조정되며 음수 처리를 지원합니다.
+        /// 세부 클러스터링에서 금액 데이터 시각화에 사용됩니다.
+        /// </remarks>
         public string FormatToKoreanUnit(decimal number)
         {
             // 절대값으로 계산 후 나중에 부호 처리
@@ -563,9 +672,15 @@ namespace FinanceTool
         }
 
 
-        //2025.04.25
-        //추천 키워드 갱신 함수
-        // uc_DetailClustering.cs에 추가할 새 메서드
+        /// <summary>
+        /// 세부 클러스터링에서 미병합 클러스터의 키워드 집계 데이터로 DataGridView를 업데이트
+        /// </summary>
+        /// <remarks>
+        /// mergeClusterDataTable에서 미병합 세부 클러스터(ClusterSubID == -1)를 필터링하여
+        /// 키워드별로 Count와 합산금액을 집계한 후 dataGridView_modified에 표시합니다.
+        /// UI 스레드 안전성을 보장하며 SuspendLayout/ResumeLayout을 사용하여 성능을 최적화합니다.
+        /// </remarks>
+        /// <exception cref="Exception">DataGridView 업데이트 중 오류 발생 시</exception>
         private void UpdateModifiedDataGridView()
         {
             // UI 스레드에서 실행되는지 확인
@@ -707,6 +822,15 @@ namespace FinanceTool
             }
         }
 
+        /// <summary>
+        /// 세부 클러스터링에서 미병합 클러스터의 공급업체별 집계 데이터로 DataGridView를 업데이트
+        /// </summary>
+        /// <remarks>
+        /// 공급업체 컬럼이 필수가 아닌 경우 초기화만 수행합니다.
+        /// mergeClusterDataTable에서 미병합 세부 클러스터(ClusterSubID == -1)를 필터링하여
+        /// 공급업체별로 Count와 합산금액을 집계한 후 dataGridView_supply_summary에 표시합니다.
+        /// </remarks>
+        /// <exception cref="Exception">DataGridView 업데이트 중 오류 발생 시</exception>
         private void UpdateSupplySummaryDataGridView()
         {
             // UI 스레드에서 실행되는지 확인
@@ -860,8 +984,16 @@ namespace FinanceTool
             }
         }
 
-        // 5. 클러스터 세부 정보 표시 메서드 추가
-        // 5. ShowMergeClusterDetail 함수 수정
+        /// <summary>
+        /// 세부 클러스터링에서 선택된 병합 세부 클러스터의 정보를 팝업으로 표시
+        /// </summary>
+        /// <remarks>
+        /// merge_check_table에서 체크된 병합 세부 클러스터 중 하나를 선택하여
+        /// ClusterDetailPopup을 통해 세부 정보를 표시합니다.
+        /// ClusterSubID를 기준으로 세부 클러스터링 모드로 동작하며,
+        /// 병합 해제 이벤트를 처리하여 UI를 자동으로 갱신합니다.
+        /// </remarks>
+        /// <exception cref="Exception">클러스터 세부 정보 표시 중 오류 발생 시</exception>
         private void ShowMergeClusterDetail()
         {
             // 체크된 행에서 클러스터 ID 가져오기

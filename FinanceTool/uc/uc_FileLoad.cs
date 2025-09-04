@@ -92,106 +92,6 @@ namespace FinanceTool
             // 초기화 시 아무 작업도 하지 않음
         }
 
-        private async void btn_selectFile_Click(object sender, EventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog
-            {
-                Filter = "Excel Files|*.xlsx;*.xls",
-                Title = "엑셀 파일 선택"
-            };
-
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
-            {
-                try
-                {
-                    // MongoDB 초기화 상태 확인
-                    var mongoManager = FinanceTool.Data.MongoDBManager.Instance;
-                    bool isInitialized = await mongoManager.EnsureInitializedAsync();
-
-                    if (!isInitialized)
-                    {
-                        MessageBox.Show("MongoDB 초기화에 실패했습니다.", "오류",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-
-                    // MongoDB 데이터 존재 여부 확인
-                    var rawDataCollection = await mongoManager.GetCollectionAsync<RawDataDocument>("raw_data");
-                    var filter = Builders<RawDataDocument>.Filter.Empty;
-                    long documentCount = await rawDataCollection.CountDocumentsAsync(filter);
-
-                    bool dataExists = documentCount > 0;
-                    bool resetRequired = MongoDBManager.ResetDatabaseOnStartup;
-
-                    // 파일 최초 load의 경우 바로 초기화
-                    if (excelLoadinitFlag && resetRequired)
-                    {
-                        using (var progressForm = new ProcessProgressForm())
-                        {
-                            progressForm.Show();
-                            progressForm.UpdateProgressHandler(0, "MongoDB 데이터베이스 초기화 준비 중...");
-
-                            // MongoDB 데이터베이스 초기화 - 진행 상황을 표시하면서 초기화
-                            await mongoManager.ResetDatabaseAsync(progressForm.UpdateProgressHandler);
-
-                            // 완료 메시지
-                            await progressForm.UpdateProgressHandler(100, "초기화 완료");
-                            await Task.Delay(500); // 사용자가 완료 메시지를 볼 수 있도록 짧은 지연
-                            progressForm.Close();
-                        }
-                        excelLoadinitFlag = false;
-                    }
-                    // 기존 데이터가 있거나 MongoDB 리셋이 필요한 경우
-                    else if (dataExists || resetRequired)
-                    {
-                        if (dataExists)
-                        {
-                            DialogResult result = MessageBox.Show(
-                                "파일을 새로 업로드 할 경우 \n기존 업로드 내역 및 작업 내용이 모두 초기화 됩니다.\n" +
-                                "파일을 계속 업로드 하시겠습니까?",
-                                "경고",
-                                MessageBoxButtons.OKCancel,
-                                MessageBoxIcon.Warning
-                            );
-
-                            if (result == DialogResult.Cancel)
-                            {
-                                return; // 사용자가 취소함
-                            }
-                        }
-
-                        // 컬렉션의 문서 수에 따라 프로그레스바 표시
-                        using (var progressForm = new ProcessProgressForm())
-                        {
-                            progressForm.Show();
-                            progressForm.UpdateProgressHandler(0, "MongoDB 데이터베이스 초기화 중...");
-
-                            // MongoDB 데이터베이스 초기화 - 진행 상황을 표시하면서 초기화
-                            await mongoManager.ResetDatabaseAsync(progressForm.UpdateProgressHandler);
-
-                            // 완료 메시지
-                            await progressForm.UpdateProgressHandler(100, "초기화 완료");
-                            await Task.Delay(500); // 사용자가 완료 메시지를 볼 수 있도록 짧은 지연
-                            progressForm.Close();
-                        }
-                        Debug.WriteLine("MongoDB 데이터베이스 초기화 완료");
-                    }
-
-                    // 파일 로드 진행
-                    string filePath = openFileDialog.FileName;
-                    await LoadExcelDataAsync(filePath);
-                    lbl_filename.Text = filePath;
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"파일 로드 준비 중 오류가 발생했습니다: {ex.Message}", "오류",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    Debug.WriteLine($"파일 로드 준비 오류: {ex.Message}\n{ex.StackTrace}");
-                }
-            }
-        }
-
-
 
         // 이전 페이지 이동
         private async void btn_prevPage_Click(object sender, EventArgs e)
@@ -882,31 +782,6 @@ namespace FinanceTool
             }
         }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      
 
     }
 

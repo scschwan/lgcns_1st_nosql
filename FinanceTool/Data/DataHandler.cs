@@ -22,60 +22,189 @@ using System.Windows.Forms;
 
 namespace FinanceTool
 {
+    /// <summary>
+    /// 전역 데이터 처리 및 관리를 담당하는 정적 클래스
+    /// </summary>
+    /// <remarks>
+    /// 책임: 애플리케이션 전반의 데이터 상태 관리 및 데이터 리포지토리 인스턴스 관리
+    /// 계층: Data Layer - 비즈니스 로직과 UI 간의 데이터 중간 계층
+    /// 패턴: Singleton 패턴 및 Static Factory 패턴
+    /// 의존성: MongoDB Repository 인스턴스들, DataTable 기반 데이터 처리
+    /// </remarks>
     public class DataHandler
     {
-        //2025.02.17
-        //fileload page 에서 정제된 table
+        /// <summary>
+        /// 파일로드 페이지에서 정제된 주 데이터 테이블
+        /// </summary>
+        /// <value>사용자가 업로드한 원시 데이터를 가공한 결과</value>
+        /// <remarks>전체 애플리케이션에서 공용하는 메인 데이터소스</remarks>
         public static DataTable processTable = new DataTable();
 
+        /// <summary>
+        /// Excel 파일에서 직접 로드한 원시 데이터
+        /// </summary>
+        /// <value>Excel 파일의 원시 내용</value>
         public static DataTable excelData = new DataTable();
+        
+        /// <summary>
+        /// 전처리 작업이 완료된 데이터
+        /// </summary>
+        /// <value>데이터 정제 및 표준화가 적용된 데이터</value>
         public static DataTable preprocessedData = new DataTable();
+        
+        /// <summary>
+        /// 계정 계층 및 레벨 정보가 포함된 데이터
+        /// </summary>
+        /// <value>치수 데이터 및 계정 찬성 정보</value>
         public static DataTable lowLevelData = new DataTable();
+        
+        /// <summary>
+        /// 금액 데이터 전용 테이블
+        /// </summary>
+        /// <value>수치 데이터만 추출한 금액 전용 데이터</value>
         public static DataTable moneyDataTable = new DataTable();
 
+        /// <summary>
+        /// 추천 키워드 데이터 테이블
+        /// </summary>
+        /// <value>AI 기반으로 추출된 추천 키워드 목록</value>
         public static DataTable recomandKeywordTable = new DataTable();
 
-        //2025.02.13
-        //clustering 저장 테이블
+        /// <summary>
+        /// 1차 클러스터링 결과 데이터
+        /// </summary>
+        /// <value>초기 클러스터링 작업 결과</value>
         public static DataTable firstClusteringData = new DataTable();
+        
+        /// <summary>
+        /// 2차 클러스터링 결과 데이터
+        /// </summary>
+        /// <value>세부 클러스터링 작업 결과</value>
         public static DataTable secondClusteringData = new DataTable();
+        
+        /// <summary>
+        /// 최종 클러스터링 결과 데이터
+        /// </summary>
+        /// <value>모든 클러스터링 작업이 완료된 최종 데이터</value>
         public static DataTable finalClusteringData = new DataTable();
 
-
-        //subClustering 전용 저장 테이블
+        /// <summary>
+        /// 서브 클러스터링 전용 저장 테이블
+        /// </summary>
+        /// <value>세부 클러스터 분류 작업을 위한 전용 데이터</value>
         public static DataTable subClusteringData = new DataTable();
 
+        /// <summary>
+        /// 현재 세션 ID (MongoDB ObjectId)
+        /// </summary>
+        /// <value>현재 작업 중인 세션의 고유 식별자</value>
+        /// <remarks>빈 값인 경우 ObjectId.Empty 상태</remarks>
         public static ObjectId _currentSessionId = ObjectId.Empty;
         
 
+        /// <summary>
+        /// 금액 컸의 인덱스 위치
+        /// </summary>
+        /// <value>데이터 테이블에서 금액 컸의 위치 인덱스</value>
         public static int moneyIndex = 0;
+        
+        /// <summary>
+        /// 계정 레벨 목록
+        /// </summary>
+        /// <value>계정의 계층 구조 인덱스 목록</value>
         public static List<int> levelList = new List<int>();
+        
+        /// <summary>
+        /// 계정 레벨명 목록
+        /// </summary>
+        /// <value>계정의 계층 구조 이름 목록</value>
         public static List<string> levelName = new List<string>();
        
-
-        // 다른 CS 파일에서
-        //public static SeparatorManager spManager = new SeparatorManager();
+        /// <summary>
+        /// 분리자 관리 매니저 인스턴스
+        /// </summary>
+        /// <value>텍스트 분리 및 처리를 담당하는 매니저</value>
+        /// <remarks>지연 초기화 패턴 사용</remarks>
         public static SeparatorManager spManager;
 
+        /// <summary>
+        /// 부서 컸 명
+        /// </summary>
+        /// <value>부서 정보를 나타내는 컸의 이름</value>
         public static string dept_col_name;
+        
+        /// <summary>
+        /// 상품 컸 명
+        /// </summary>
+        /// <value>상품 정보를 나타내는 컸의 이름</value>
         public static string prod_col_name;
+        
+        /// <summary>
+        /// 하위계정 컸 명
+        /// </summary>
+        /// <value>하위계정 정보를 나타내는 컸의 이름</value>
         public static string sub_acc_col_name;
 
+        /// <summary>
+        /// 부서 컸 사용 여부
+        /// </summary>
+        /// <value>부서 컸을 분석에 포함할지 여부</value>
         public static bool dept_col_yn = true;
+        
+        /// <summary>
+        /// 상품 컸 사용 여부
+        /// </summary>
+        /// <value>상품 컸을 분석에 포함할지 여부</value>
         public static bool prod_col_yn = true;
 
+        /// <summary>
+        /// 숨겨진 데이터 표시 여부
+        /// </summary>
+        /// <value>숨겨진 데이터를 UI에 표시할지 여부</value>
         public static bool hiddenData = false;
 
+        /// <summary>
+        /// 임시 파일 저장 경로
+        /// </summary>
+        /// <value>데이터 처리 중 사용할 임시 JSON 파일 경로</value>
+        /// <remarks>시스템 임시 디렉토리를 기반으로 생성</remarks>
         public static string tempFilePath = Path.Combine(Path.GetTempPath(), "finance_data_temp.json");
+        
+        /// <summary>
+        /// MongoDB 연결 및 관리 매니저 인스턴스
+        /// </summary>
+        /// <value>MongoDB 데이터베이스 연결 및 처리를 담당하는 싱글턴 인스턴스</value>
         public static Data.MongoDBManager mongoDBManager = Data.MongoDBManager.Instance;
 
+        /// <summary>
+        /// 원시 데이터 리포지토리 인스턴스
+        /// </summary>
+        /// <value>Excel 파일에서 로드된 원시 데이터 처리 리포지토리</value>
         public static RawDataRepository rawDataRepo = new RawDataRepository();
+        
+        /// <summary>
+        /// 가공된 데이터 리포지토리 인스턴스
+        /// </summary>
+        /// <value>전처리 및 정제가 완료된 데이터 처리 리포지토리</value>
         public static ProcessDataRepository processDataRepo = new ProcessDataRepository();
+        
+        /// <summary>
+        /// 클러스터링 데이터 리포지토리 인스턴스
+        /// </summary>
+        /// <value>클러스터링 작업 결과를 관리하는 리포지토리</value>
         public static ClusteringRepository clusteringRepo = new ClusteringRepository();
 
+        /// <summary>
+        /// 표시 가능한 컸 목록
+        /// </summary>
+        /// <value>UI에 표시되는 컸들의 이름 목록</value>
         public static List<string> visibleColumns  = new List<string>();
 
-        // 컬럼 순서 관리용 추가 변수
+        /// <summary>
+        /// 컸 표시 순서 관리 딕셔너리
+        /// </summary>
+        /// <value>컸명과 해당 컸의 표시 순서 인덱스를 매핑</value>
+        /// <remarks>DataGridView의 컸 순서를 사용자 선호에 따라 동적으로 관리</remarks>
         public static Dictionary<string, int> columnDisplayOrder = new Dictionary<string, int>();
         
 
@@ -83,18 +212,33 @@ namespace FinanceTool
 
 
 
-        //2025.01.23
-        //progress dialog 창
+        /// <summary>
+        /// 진행 상태 표시 대화상자 클래스
+        /// </summary>
+        /// <remarks>
+        /// 장시간 실행되는 작업의 진행 상황을 사용자에게 시각적으로 표시
+        /// 비동기 작업의 진행률과 상태 메시지를 실시간으로 업데이트
+        /// </remarks>
         public class ProgressDialog : Form
         {
             public ProgressBar progressBar;
             private Label statusLabel;
 
+            /// <summary>
+            /// ProgressDialog 생성자
+            /// </summary>
             public ProgressDialog()
             {
                 InitializeComponents();
             }
 
+            /// <summary>
+            /// UI 컨포넌트들을 초기화
+            /// </summary>
+            /// <remarks>
+            /// ProgressBar와 Label 컨트롤을 생성하고 레이아웃 설정
+            /// 대화상자의 크기, 위치, 스타일 등을 사용자 친화적으로 구성
+            /// </remarks>
             private void InitializeComponents()
             {
                 this.Width = 400;
@@ -128,6 +272,16 @@ namespace FinanceTool
                 this.Controls.Add(statusLabel);
             }
 
+            /// <summary>
+            /// 진행률과 상태 메시지를 비동기적으로 업데이트
+            /// </summary>
+            /// <param name="percentage">진행률 (0-100)</param>
+            /// <param name="status">선택적 상태 메시지 (null인 경우 기본 메시지 사용)</param>
+            /// <remarks>
+            /// UI 스레드에서 안전하게 호출하기 위한 Invoke 기반 비동기 업데이트
+            /// 백그라운드 작업에서 UI 컨트롤을 안전하게 조작하는 기능
+            /// </remarks>
+            /// <exception cref="ArgumentOutOfRangeException">percentage가 0-100 범위를 벗어난 경우</exception>
             public async Task UpdateProgress(int percentage, string status = null)
             {
                 if (InvokeRequired)
@@ -149,6 +303,19 @@ namespace FinanceTool
 
        
 
+        /// <summary>
+        /// DataTable의 특정 컬럼 값들을 문자열 리스트로 변환
+        /// </summary>
+        /// <param name="table">데이터를 추출할 DataTable</param>
+        /// <param name="columnIndex">추출할 컬럼의 인덱스</param>
+        /// <returns>지정된 컬럼의 모든 값들을 담은 문자열 리스트</returns>
+        /// <remarks>
+        /// DataTable의 특정 컬럼 데이터를 순회하며 모든 행의 값을 리스트로 추출
+        /// null 값은 빈 문자열로 변환되어 처리
+        /// 데이터 분석 및 키워드 추출에 사용
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">table이 null인 경우</exception>
+        /// <exception cref="IndexOutOfRangeException">columnIndex가 유효하지 않은 경우</exception>
         public static List<string> GetColumnValuesAsList(DataTable table, int columnIndex)
         {
             // 반환할 리스트 초기화
@@ -166,8 +333,16 @@ namespace FinanceTool
 
      
 
-        //2025.02.13
-        //키워드 기준 매칭 데이터 비교
+        /// <summary>
+        /// 키워드 기준으로 매칭 데이터를 찾는 메서드
+        /// </summary>
+        /// <param name="listA">검색 대상 문자열 리스트</param>
+        /// <param name="search_keyword">검색할 키워드</param>
+        /// <returns>매칭된 문자열 리스트</returns>
+        /// <remarks>
+        /// 입력된 키워드와 리스트 아이템들 간의 포함 관계를 찾아
+        /// 매칭되는 데이터를 반환하는 키워드 기반 데이터 필터링 기능
+        /// </remarks>
         public static List<string> FindMachKeyword(List<string> listA, string search_keyword)
         {
             // 결과를 저장할 리스트
@@ -195,9 +370,16 @@ namespace FinanceTool
 
        
 
-        //2025.02.13
-        //키워드 비교 함수
-        //2글자씩 slice 하여 비교
+        /// <summary>
+        /// 두 단어를 2글자씩 분할하여 유사도 비교
+        /// </summary>
+        /// <param name="baseWord">비교 기준이 되는 단어</param>
+        /// <param name="targetWord">비교 대상 단어</param>
+        /// <returns>두 단어가 유사한지 여부 (true: 유사, false: 비유사)</returns>
+        /// <remarks>
+        /// 단어를 2글자씩 분할하여 공통 부분이 있는지 확인하는 문자열 유사도 비교 알고리즘
+        /// 한글 키워드 매칭에 특화된 방식으로 부분 일치도를 검사
+        /// </remarks>
         public static bool CompareByTwoChars(string baseWord, string targetWord)
         {
 
@@ -232,10 +414,21 @@ namespace FinanceTool
             return baseParts.Any(b => targetParts.Contains(b));
         }
 
-        //2025.02.13
-        //dataTable Clustering 함수 구현
-        //2025.05.12 -> mongodb 변환에 따라 삭제 예정
-
+        /// <summary>
+        /// 그룹 데이터 테이블을 비동기적으로 생성
+        /// </summary>
+        /// <param name="sourceTable">원본 데이터 테이블</param>
+        /// <param name="moneyDataTable">금액 데이터 테이블</param>
+        /// <param name="secondyn">2차 처리 여부 (기본값: false)</param>
+        /// <returns>클러스터링 결과가 포함된 데이터 테이블</returns>
+        /// <remarks>
+        /// 클러스터링 작업을 위한 데이터 그룹화 및 집계 처리
+        /// 성능: 대용량 데이터 처리를 위한 비동기 연산 및 메모리 최적화
+        /// 의존성: DataTable 기반 데이터 조작, 금액 계산 로직
+        /// 버전 관리: MongoDB 전환에 따라 삭제 예정 (레거시 기능)
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">sourceTable 또는 moneyDataTable이 null인 경우</exception>
+        /// <exception cref="InvalidOperationException">데이터 처리 중 오류 발생 시</exception>
         public static async Task<DataTable> CreateSetGroupDataTableAsync(DataTable sourceTable, DataTable moneyDataTable, bool secondyn = false)
         {
             // 시작 시간 측정 (성능 모니터링용)
@@ -617,6 +810,15 @@ namespace FinanceTool
         }
 
         // 헬퍼 메서드들
+        /// <summary>
+        /// 지정된 컬럼명이 메타데이터 컬럼인지 확인
+        /// </summary>
+        /// <param name="columnName">확인할 컬럼명</param>
+        /// <returns>메타데이터 컬럼인 경우 true, 그렇지 않으면 false</returns>
+        /// <remarks>
+        /// 시스템에서 사용하는 메타데이터 컬럼들(raw_data_id, id, process_data_id, import_date)을
+        /// 일반 데이터 컬럼과 구분하기 위한 유틸리티 메서드
+        /// </remarks>
         private static bool IsMetaDataColumn(string columnName)
         {
             // 메타데이터 컬럼 목록
@@ -624,6 +826,18 @@ namespace FinanceTool
             return metaColumns.Contains(columnName);
         }
 
+        /// <summary>
+        /// 데이터 처리를 위한 최적의 배치 크기를 계산
+        /// </summary>
+        /// <param name="totalItems">전체 처리할 항목 수</param>
+        /// <returns>최적화된 배치 크기</returns>
+        /// <remarks>
+        /// 데이터 크기에 따라 최적의 배치 처리 크기를 결정
+        /// - 10,000개 미만: 1,000개 배치
+        /// - 100,000개 미만: 10,000개 배치
+        /// - 100,000개 이상: 20,000개 배치
+        /// 메모리 사용량과 처리 성능의 균형을 고려한 설정
+        /// </remarks>
         private static int CalculateOptimalBatchSize(int totalItems)
         {
             // 최적의 배치 크기 계산 (항목 수 기준)
@@ -632,6 +846,17 @@ namespace FinanceTool
             return 20000;
         }
 
+        /// <summary>
+        /// 전체 항목을 최적의 배치 단위로 분할
+        /// </summary>
+        /// <param name="totalItems">전체 항목 수</param>
+        /// <param name="batchSize">각 배치의 크기</param>
+        /// <returns>시작과 종료 인덱스를 포함하는 배치 범위 리스트</returns>
+        /// <remarks>
+        /// 대용량 데이터를 효율적으로 처리하기 위해 지정된 크기로 분할
+        /// 각 배치는 (Start, End) 튜플 형태로 반환되며 End는 포함되지 않는 인덱스
+        /// 병렬 처리 및 메모리 관리 최적화에 사용
+        /// </remarks>
         private static List<(int Start, int End)> SplitIntoOptimalBatches(int totalItems, int batchSize)
         {
             var batches = new List<(int Start, int End)>();
@@ -643,6 +868,15 @@ namespace FinanceTool
             return batches;
         }
 
+        /// <summary>
+        /// ID 집합을 지정된 배치 크기로 분할
+        /// </summary>
+        /// <param name="ids">분할할 ID 집합</param>
+        /// <param name="batchSize">배치 크기</param>
+        /// <returns>분할된 ID 리스트들</returns>
+        /// <remarks>
+        /// 대량 데이터 소오스 쿠리 최적화를 위한 배치 처리 유틸리티
+        /// </remarks>
         private static IEnumerable<List<string>> BatchIdsForQuery(HashSet<string> ids, int batchSize)
         {
             var idList = ids.ToList();
@@ -652,8 +886,15 @@ namespace FinanceTool
             }
         }
 
-        //2025.02.18
-        //clustering 결과 datagridview 생성 함수
+        /// <summary>
+        /// 클러스터링 결과를 DataGridView에 표시하기 위한 설정
+        /// </summary>
+        /// <param name="dgv">설정할 DataGridView 객체</param>
+        /// <param name="dt">클러스터링 결과 데이터 테이블</param>
+        /// <remarks>
+        /// 클러스터링 결과 데이터를 필터링하고 DataGridView에 적절한 형식으로 표시
+        /// 컬럼 숨김, 데이터 포맷, 스타일 등을 클러스터링 결과 표시에 맞게 구성
+        /// </remarks>
         public static void SetupDataGridView(DataGridView dgv, DataTable dt)
         {
             // 조건에 맞는 데이터만 필터링
@@ -716,8 +957,25 @@ namespace FinanceTool
         // DataGridView별로 선택된 셀들을 추적하기 위한 딕셔너리
         // 마우스 다운/업 이벤트를 사용하여 선택 영역 추적
         
+        /// <summary>
+        /// DataGridView별 선택된 셀들을 추적하기 위한 딕셔너리
+        /// </summary>
+        /// <value>각 DataGridView와 해당 그리드에서 선택된 셀들의 목록</value>
+        /// <remarks>
+        /// 마우스 드래그 선택 및 다중 셀 선택 기능을 지원하기 위한 전역 상태 관리
+        /// 사용자의 다양한 선택 패턴을 추적하여 UI/UX 향상
+        /// </remarks>
         public static Dictionary<DataGridView, List<DataGridViewCell>> dragSelections = new Dictionary<DataGridView, List<DataGridViewCell>>();
 
+        /// <summary>
+        /// DataGridView를 드래그 선택 시스템에 등록
+        /// </summary>
+        /// <param name="dgv">등록할 DataGridView 컨트롤</param>
+        /// <remarks>
+        /// 새로운 DataGridView에 마우스 이벤트 핸들러들을 연결하고 선택 관리 초기화
+        /// 다중 셀 선택 기능과 드래그 선택 기능을 활성화
+        /// </remarks>
+        /// <exception cref="ArgumentNullException">dgv가 null인 경우</exception>
         public static void RegisterDataGridView(DataGridView dgv)
         {
             // 초기화
@@ -730,6 +988,15 @@ namespace FinanceTool
 
        
 
+        /// <summary>
+        /// DataGridView에서 마우스 버튼을 떼 때 발생하는 이벤트 핸들러
+        /// </summary>
+        /// <param name="sender">이벤트를 발생시킨 DataGridView 객체</param>
+        /// <param name="e">마우스 이벤트 인수</param>
+        /// <remarks>
+        /// 마우스 드래그 선택 작업을 종료하고 선택된 영역을 확정
+        /// 다중 셀 선택 기능의 핀기 역할을 담당
+        /// </remarks>
         public static void DataGridView_MouseUp(object sender, MouseEventArgs e)
         {
             
@@ -747,6 +1014,16 @@ namespace FinanceTool
             Debug.WriteLine($"선택된 셀 수: {dragSelections[dgv].Count}");
         }
 
+        /// <summary>
+        /// DataGridView에서 셀 콘텐츠 클릭 시 발생하는 이벤트 핸들러
+        /// </summary>
+        /// <param name="sender">이벤트를 발생시킨 DataGridView 객체</param>
+        /// <param name="e">셀 이벤트 인수 (행/컸 인덱스 포함)</param>
+        /// <remarks>
+        /// 체크박스 컸 클릭 시 다중 체크/다중 체크 해제 기능 처리
+        /// 사용자의 선택 상태를 추적하고 집단 작업을 위한 선택 관리
+        /// UI 선택 영역 갱신 및 사용자 피드백 제공
+        /// </remarks>
         public static void DataGridView_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
 
@@ -804,7 +1081,16 @@ namespace FinanceTool
             //Debug.WriteLine("DataGridView_CellContentClick end");
         }
 
-        // 커스텀 정렬 이벤트 핸들러
+        /// <summary>
+        /// 금액 컸에 대한 커스텀 정렬 비교 이벤트 핸들러
+        /// </summary>
+        /// <param name="sender">이벤트를 발생시킨 DataGridView 객체</param>
+        /// <param name="e">정렬 비교 이벤트 인수</param>
+        /// <remarks>
+        /// 금액 데이터를 숫자 값으로 올바르게 정렬하기 위한 커스텀 비교 로직
+        /// 문자열 형태의 금액을 숫자로 변환하여 정렬 수행
+        /// 통화 기호 및 천 단위 구분자 처리 포함
+        /// </remarks>
         public static void money_SortCompare(object sender, DataGridViewSortCompareEventArgs e)
         {
             // 디버깅을 위한 로깅 추가
@@ -945,8 +1231,6 @@ namespace FinanceTool
 
 
         
-        //2025.07.16
-        //엑셀 파일 관련 함수
         /// <summary>
         /// 현재 세션 ID 설정
         /// </summary>
