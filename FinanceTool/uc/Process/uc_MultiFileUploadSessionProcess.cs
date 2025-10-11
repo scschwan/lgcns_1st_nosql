@@ -31,6 +31,7 @@ namespace FinanceTool
             public ObjectId Id { get; set; }
             public bool IsSelected { get; set; } = false; // 체크박스용 속성 추가
             public string SessionName { get; set; }
+            public string WorkerName { get; set; }
             public string AccountColumnName { get; set; }
             public string AmountColumnName { get; set; }
             public decimal TotalAmount { get; set; }
@@ -90,6 +91,7 @@ namespace FinanceTool
             {
                 Id = session.Id,
                 SessionName = session.SessionName,
+                WorkerName = session.WorkerName,
                 AccountColumnName = session.AccountColumnName,
                 AmountColumnName = session.AmountColumnName,
                 AccountName = session.AccountName,
@@ -180,7 +182,7 @@ namespace FinanceTool
             var sessionNameColumn = new DataGridViewTextBoxColumn
             {
                 Name = "SessionName",
-                HeaderText = "세션명 (편집가능)",
+                HeaderText = "세션명",
                 DataPropertyName = "SessionName",
                 Width = 250,
                 DefaultCellStyle = {
@@ -191,6 +193,23 @@ namespace FinanceTool
 
             };
             dgv_sessions.Columns.Add(sessionNameColumn);
+
+            // 작업자명 컬럼
+            // *** 작업자명 컬럼 (편집 가능) ***
+            var workerNameColumn = new DataGridViewTextBoxColumn
+            {
+                Name = "WorkerName",
+                HeaderText = "작업자명",
+                DataPropertyName = "WorkerName",
+                Width = 100,
+                DefaultCellStyle = {
+                    BackColor =System.Drawing.Color.LightYellow
+                },
+                Frozen = true, // 스크롤 시에도 고정
+                ReadOnly = false // 편집 가능하도록 설정
+
+            };
+            dgv_sessions.Columns.Add(workerNameColumn);
 
             // 계정명 컬럼
             var accountColumnColumn = new DataGridViewTextBoxColumn
@@ -1023,7 +1042,7 @@ namespace FinanceTool
                 // 1. 먼저 화면 전환 (Handle 생성)
                 if (this.ParentForm is Form1 form)
                 {
-                    form.LoadUserControl(userControlHandler.uc_fileLoad);
+                    form.LoadUserControl(userControlHandler.uc_fileLoad , form.fileLoadToolStripMenuItem);
                 }
 
                 // 2. UI가 로드된 후 약간의 딜레이

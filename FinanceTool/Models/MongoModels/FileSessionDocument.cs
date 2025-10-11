@@ -11,6 +11,9 @@ namespace FinanceTool.MongoModels
         [BsonElement("session_name")]
         public string SessionName { get; set; }
 
+        [BsonElement("worker_name")]
+        public string WorkerName { get; set; }
+
         [BsonElement("account_column_name")]
         public string AccountColumnName { get; set; }
 

@@ -36,7 +36,7 @@ namespace FinanceTool
             InitializeUI();
         }
 
-       
+
 
         /// <summary>
         /// 셀 툴팁 텍스트 제공 이벤트
@@ -282,7 +282,7 @@ namespace FinanceTool
             }
         }
 
-       
+
 
         /// <summary>
         /// 파일 업로드 버튼 클릭
@@ -383,6 +383,21 @@ namespace FinanceTool
                         await UpdateSessionName(sessionData, newSessionName, e.RowIndex);
                     }
                 }
+                // 세션명 편집 처리
+                if (columnName == "WorkerName")
+                {
+                    var newWorkerName = dgv_sessions.Rows[e.RowIndex].Cells["WorkerName"].Value?.ToString()?.Trim();
+
+                    //Debug.WriteLine($"세션 정보 업데이트 로직 진입 columnName : {columnName}  ,sessionData.SessionName : {sessionData.SessionName}  newSessionName  : {newSessionName}");
+                    //Debug.WriteLine($"string.IsNullOrEmpty(newSessionName) : {string.IsNullOrEmpty(newSessionName)}    newSessionName != sessionData.SessionName  : {newSessionName != sessionData.SessionName}");
+
+                    //if (!string.IsNullOrEmpty(newSessionName) && newSessionName != sessionData.SessionName)
+                    if (!string.IsNullOrEmpty(newWorkerName))
+                    {
+                        //Debug.WriteLine($"세션 정보 업데이트 start");
+                        await UpdateWorkerName(sessionData, newWorkerName, e.RowIndex);
+                    }
+                }
                 else
                 {
                     //Debug.WriteLine($"세션 정보 업데이트 아님 columnName : {columnName}");
@@ -397,7 +412,7 @@ namespace FinanceTool
         }
 
         /// <summary>
-        /// 세션명 유효성 검사
+        /// 세션명/작업자명 유효성 검사
         /// </summary>
         private void Dgv_sessions_CellValidating(object sender, DataGridViewCellValidatingEventArgs e)
         {
@@ -443,14 +458,28 @@ namespace FinanceTool
                         }
                     }
                 }
+                else if (dgv_sessions.Columns[e.ColumnIndex].Name == "WorkerName")
+                {
+                    var newWorkerName = e.FormattedValue?.ToString()?.Trim();
+
+
+                    // 세션명 길이 제한 (20자)
+                    if (newWorkerName.Length > 50)
+                    {
+                        e.Cancel = true;
+                        MessageBox.Show("작업자명은 50자를 초과할 수 없습니다.", "입력 오류",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"세션명 유효성 검사 오류: {ex.Message}");
+                Debug.WriteLine($"세션명/작업자명 유효성 검사 오류: {ex.Message}");
             }
         }
 
-       
+
         /// <summary>
         /// 세션 그리드 셀 포맷팅 (다운로드 버튼 상태 처리)
         /// </summary>
@@ -462,6 +491,13 @@ namespace FinanceTool
 
                 // SessionName 컬럼만 LightYellow로 강제 설정
                 if (columnName == "SessionName")
+                {
+                    e.CellStyle.BackColor = System.Drawing.Color.LightYellow;
+                    e.CellStyle.SelectionBackColor = System.Drawing.Color.Orange; // 선택 시 색상
+                }
+
+                // WorkerName 컬럼도 LightYellow로 강제 설정
+                if (columnName == "WorkerName")
                 {
                     e.CellStyle.BackColor = System.Drawing.Color.LightYellow;
                     e.CellStyle.SelectionBackColor = System.Drawing.Color.Orange; // 선택 시 색상
@@ -616,7 +652,7 @@ namespace FinanceTool
             }
         }
 
-        
+
         private async void btn_merge_sessions_Click(object sender, EventArgs e)
         {
             try
@@ -740,29 +776,29 @@ namespace FinanceTool
             }
         }
 
-       
-        
+
+
         private async void btn_complete_Click(object sender, EventArgs e)
         {
             try
+            {
+                // 1단계: 선택된 세션들 확인
+                var selectedSessions = GetSelectedSessions();
+                if (selectedSessions.Count == 0)
                 {
-                    // 1단계: 선택된 세션들 확인
-                    var selectedSessions = GetSelectedSessions();
-                    if (selectedSessions.Count == 0)
-                    {
-                        MessageBox.Show("처리할 세션을 선택해주세요.", "알림",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
+                    MessageBox.Show("처리할 세션을 선택해주세요.", "알림",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
 
-                    if (selectedSessions.Count > 1)
-                    {
-                        MessageBox.Show("처리할 세션은 1개만 선택해주세요.", "알림",
-                            MessageBoxButtons.OK, MessageBoxIcon.Information);
-                        return;
-                    }
+                if (selectedSessions.Count > 1)
+                {
+                    MessageBox.Show("처리할 세션은 1개만 선택해주세요.", "알림",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
 
-                    var selectedSession = selectedSessions.First();
+                var selectedSession = selectedSessions.First();
 
                 // 현재 세션 ID를 전역 변수에 저장
                 DataHandler.SetCurrentSessionId(selectedSession.Id);
@@ -782,75 +818,183 @@ namespace FinanceTool
                             MessageBoxIcon.Question
                         );
 
-                    if (confirmResult != DialogResult.Yes) return;
+                if (confirmResult != DialogResult.Yes) return;
 
-                    // 3단계: 진행 상황 표시 및 처리 실행
-                    using (var progressForm = new ProcessProgressForm())
+                // 3단계: 진행 상황 표시 및 처리 실행
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    progressForm.SetTitle("계정분석 처리 중...");
+
+                    // SessionDataProcessor 생성 및 실행
+                    var processor = new SessionDataProcessor();
+
+                    try
                     {
-                        progressForm.Show();
-                        progressForm.SetTitle("계정분석 처리 중...");
+                        var result = await processor.ProcessFullWorkflowAsync(
+                            selectedSessions,
+                             async (percentage, message) => await progressForm.UpdateProgressHandler(percentage, message)
+                        );
 
-                        // SessionDataProcessor 생성 및 실행
-                        var processor = new SessionDataProcessor();
-            
+                        await progressForm.UpdateProgressHandler(95, "결과 처리 중...");
+
+                        if (result.Success)
+                        {
+                            await progressForm.UpdateProgressHandler(100, "처리 완료");
+                            await Task.Delay(500);
+
+                            // 4단계: 성공 시 결과 표시
+                            string successMessage = $"계정분석 처리가 완료되었습니다.\n\n" +
+                                                  $"• 처리된 세션: {selectedSessions.Count}개\n" +
+                                                  $"• 처리된 파일: {result.ProcessedFileCount}개\n" +
+                                                  $"• 처리된 데이터: {result.ProcessedRowCount:N0}건\n\n" +
+                                                  "파일 로드 화면으로 이동합니다.";
+
+                            MessageBox.Show(successMessage, "처리 완료",
+                                MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                            //현재 세션명 저장
+                            DataHandler.currentSessionName = selectedSession.SessionName;
+
+                            // 5단계: 자동으로 fileLoad.cs 화면으로 전환
+                            NavigateToFileLoadScreen();
+
+
+                        }
+                        else
+                        {
+                            // 실패 시 오류 메시지 표시
+                            string errorMessage = $"계정분석 처리 중 오류가 발생했습니다.\n\n" +
+                                                 $"오류 내용: {result.ErrorMessage}\n\n" +
+                                                 "로그를 확인하시거나 다시 시도해주세요.";
+
+                            MessageBox.Show(errorMessage, "처리 실패",
+                                MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    }
+                    finally
+                    {
+                        // 리소스 정리
+                        processor.Dispose();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"계정분석 시작 오류: {ex.Message}");
+                MessageBox.Show($"계정분석 시작 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private async void btn_del_sessions_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // 1단계: 선택된 세션들 확인
+                var selectedSessions = GetSelectedSessions();
+
+                if (selectedSessions.Count == 0)
+                {
+                    MessageBox.Show("삭제할 세션을 선택해주세요.", "알림",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // 2단계: 일괄 삭제 확인 (한 번만)
+                int totalFiles = selectedSessions.Sum(s => s.FileCount);
+                decimal totalAmount = selectedSessions.Sum(s => s.TotalAmount);
+
+                var confirmResult = MessageBox.Show(
+                    $"선택된 {selectedSessions.Count}개의 세션을 삭제하시겠습니까?\\n\\n",
+                    "세션 일괄 삭제 확인",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (confirmResult != DialogResult.Yes) return;
+
+                // 3단계: 진행 상황 표시하며 일괄 삭제 수행
+                using (var progressForm = new ProcessProgressForm())
+                {
+                    progressForm.Show();
+                    await progressForm.UpdateProgressHandler(5, "세션 일괄 삭제 시작...");
+
+                    int deletedCount = 0;
+                    int failedCount = 0;
+                    var failedSessions = new List<string>();
+
+                    for (int i = 0; i < selectedSessions.Count; i++)
+                    {
+                        var session = selectedSessions[i];
+                        int currentProgress = 5 + ((i + 1) * 90 / selectedSessions.Count);
+
+                        await progressForm.UpdateProgressHandler(currentProgress,
+                            $"세션 삭제 중... ({i + 1}/{selectedSessions.Count}): {session.SessionName}");
+
                         try
                         {
-                            var result = await processor.ProcessFullWorkflowAsync(
-                                selectedSessions,
-                                 async (percentage, message) => await progressForm.UpdateProgressHandler(percentage, message)
-                            );
+                            // 현재 DataSource에서 해당 세션의 인덱스 찾기
+                            var currentSessionList = (dgv_sessions.DataSource as List<SessionDisplayData>) ?? new List<SessionDisplayData>();
+                            int rowIndex = currentSessionList.FindIndex(s => s.Id == session.Id);
 
-                            await progressForm.UpdateProgressHandler(95, "결과 처리 중...");
-
-                            if (result.Success)
+                            if (rowIndex >= 0)
                             {
-                                await progressForm.UpdateProgressHandler(100, "처리 완료");
-                                await Task.Delay(500);
-
-                                // 4단계: 성공 시 결과 표시
-                                string successMessage = $"계정분석 처리가 완료되었습니다.\n\n" +
-                                                      $"• 처리된 세션: {selectedSessions.Count}개\n" +
-                                                      $"• 처리된 파일: {result.ProcessedFileCount}개\n" +
-                                                      $"• 처리된 데이터: {result.ProcessedRowCount:N0}건\n\n" +
-                                                      "파일 로드 화면으로 이동합니다.";
-
-                                MessageBox.Show(successMessage, "처리 완료",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-                                // 5단계: 자동으로 fileLoad.cs 화면으로 전환
-                                NavigateToFileLoadScreen();
-
-                               
+                                // skipConfirmation = true로 호출하여 개별 확인 생략
+                                await DeleteSession(session, rowIndex, skipConfirmation: true);
+                                deletedCount++;
+                                Debug.WriteLine($"세션 삭제 성공: {session.SessionName}");
                             }
                             else
                             {
-                                // 실패 시 오류 메시지 표시
-                                string errorMessage = $"계정분석 처리 중 오류가 발생했습니다.\n\n" +
-                                                     $"오류 내용: {result.ErrorMessage}\n\n" +
-                                                     "로그를 확인하시거나 다시 시도해주세요.";
-
-                                MessageBox.Show(errorMessage, "처리 실패",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                Debug.WriteLine($"세션을 목록에서 찾을 수 없음: {session.SessionName}");
+                                failedCount++;
+                                failedSessions.Add(session.SessionName);
                             }
                         }
-                        finally
+                        catch (Exception deleteEx)
                         {
-                            // 리소스 정리
-                            processor.Dispose();
+                            Debug.WriteLine($"세션 삭제 실패: {session.SessionName} - {deleteEx.Message}");
+                            failedCount++;
+                            failedSessions.Add(session.SessionName);
                         }
+
+                        // UI 업데이트를 위한 짧은 지연
+                        await Task.Delay(100);
                     }
+
+                    await progressForm.UpdateProgressHandler(100, "일괄 삭제 완료");
+                    await Task.Delay(500);
+
+                    // 4단계: 결과 메시지 표시
+                    string resultMessage = $"세션 일괄 삭제가 완료되었습니다.\\n\\n" +
+                                          $"• 삭제 성공: {deletedCount}개\\n";
+
+                    if (failedCount > 0)
+                    {
+                        resultMessage += $"• 삭제 실패: {failedCount}개\\n\\n" +
+                                        "실패한 세션:\\n" +
+                                        string.Join("\\n", failedSessions.Select(name => $"  - {name}"));
+
+                        MessageBox.Show(resultMessage, "일괄 삭제 완료 (일부 실패)",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show(resultMessage, "일괄 삭제 완료",
+                            MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+
+                    Debug.WriteLine($"세션 일괄 삭제 완료 - 성공: {deletedCount}, 실패: {failedCount}");
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"계정분석 시작 오류: {ex.Message}");
-                    MessageBox.Show($"계정분석 시작 중 오류가 발생했습니다.\n{ex.Message}",
-                        "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"세션 일괄 삭제 오류: {ex.Message}");
+                MessageBox.Show($"세션 일괄 삭제 중 오류가 발생했습니다.\\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
-
-       
-
-        
     }
 
     /// <summary>

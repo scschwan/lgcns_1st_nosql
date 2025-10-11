@@ -57,6 +57,9 @@ namespace FinanceTool
         {
             try
             {
+                //현재 세션명 출력
+                current_sessionName.Text = "현재 세션명 : " + DataHandler.currentSessionName;
+
                 // dataGridView_2nd용 설정
                 cmb_pageSize.Items.Clear();
                 //cmb_pageSize.Items.AddRange(new object[] { 50, 100, 200, 500, 1000 });
@@ -645,7 +648,7 @@ namespace FinanceTool
 
                 if (this.ParentForm is Form1 form)
                 {
-                    form.LoadUserControl(userControlHandler.uc_clustering);
+                    form.LoadUserControl(userControlHandler.uc_clustering ,form.classificationToolStripMenuItem);
                 }
                 await progressForm.UpdateProgressHandler(90, "화면 완료...");
                 await Task.Delay(10);

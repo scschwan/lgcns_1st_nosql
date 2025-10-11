@@ -66,6 +66,7 @@
             col_session_status = new DataGridViewCheckBoxColumn();
             col_download = new DataGridViewButtonColumn();
             lbl_sessions = new Label();
+            btn_del_sessions = new Button();
             tableLayoutMain.SuspendLayout();
             pnl_header.SuspendLayout();
             tableLayoutHeader.SuspendLayout();
@@ -212,6 +213,7 @@
             // 
             // pnl_button_area
             // 
+            pnl_button_area.Controls.Add(btn_del_sessions);
             pnl_button_area.Controls.Add(btn_merge_sessions);
             pnl_button_area.Controls.Add(btn_complete);
             pnl_button_area.Dock = DockStyle.Fill;
@@ -224,11 +226,11 @@
             // btn_merge_sessions
             // 
             btn_merge_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-            btn_merge_sessions.BackColor = Color.IndianRed;
+            btn_merge_sessions.BackColor = Color.Orange;
             btn_merge_sessions.FlatStyle = FlatStyle.Flat;
             btn_merge_sessions.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             btn_merge_sessions.ForeColor = Color.White;
-            btn_merge_sessions.Location = new Point(367, 62);
+            btn_merge_sessions.Location = new Point(7, 62);
             btn_merge_sessions.Margin = new Padding(3, 4, 3, 4);
             btn_merge_sessions.MinimumSize = new Size(120, 44);
             btn_merge_sessions.Name = "btn_merge_sessions";
@@ -516,6 +518,23 @@
             lbl_sessions.Text = "생성된 세션 목록";
             lbl_sessions.TextAlign = ContentAlignment.MiddleCenter;
             // 
+            // btn_del_sessions
+            // 
+            btn_del_sessions.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btn_del_sessions.BackColor = Color.IndianRed;
+            btn_del_sessions.FlatStyle = FlatStyle.Flat;
+            btn_del_sessions.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            btn_del_sessions.ForeColor = Color.White;
+            btn_del_sessions.Location = new Point(163, 62);
+            btn_del_sessions.Margin = new Padding(3, 4, 3, 4);
+            btn_del_sessions.MinimumSize = new Size(120, 44);
+            btn_del_sessions.Name = "btn_del_sessions";
+            btn_del_sessions.Size = new Size(150, 50);
+            btn_del_sessions.TabIndex = 4;
+            btn_del_sessions.Text = "세션 삭제";
+            btn_del_sessions.UseVisualStyleBackColor = false;
+            btn_del_sessions.Click += btn_del_sessions_Click;
+            // 
             // uc_MultiFileUpload
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -574,5 +593,6 @@
         private Button btn_complete;
         private Button btn_add_to_session;
         private Button btn_merge_sessions;
+        private Button btn_del_sessions;
     }
 }

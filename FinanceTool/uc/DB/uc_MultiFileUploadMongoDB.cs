@@ -418,25 +418,87 @@ namespace FinanceTool
         }
 
         /// <summary>
+        /// 작업자명 업데이트 처리
+        /// </summary>
+        private async Task UpdateWorkerName(SessionDisplayData sessionData, string newWorkerName, int rowIndex)
+        {
+            string originalWorkerName = sessionData.WorkerName;
+
+            try
+            {
+                // UI에서 먼저 업데이트 (즉시 반응)
+                sessionData.WorkerName = newWorkerName;
+                dgv_sessions.Rows[rowIndex].Cells["WorkerName"].Value = newWorkerName;
+
+                // MongoDB 업데이트
+                bool updated = await _fileSessionRepository.UpdateWorkerNameAsync(sessionData.Id, newWorkerName);
+
+                if (updated)
+                {
+                    Debug.WriteLine($"작업자명 업데이트 성공: {originalWorkerName} → {newWorkerName}");
+
+                    // 성공 표시 (옵션: 조용한 알림)
+                    dgv_sessions.Rows[rowIndex].Cells["WorkerName"].Style.BackColor = System.Drawing.Color.LightGreen;
+
+                    // 3초 후 배경색 원래대로
+                    var timer = new System.Windows.Forms.Timer();
+                    timer.Interval = 3000;
+                    timer.Tick += (s, e) =>
+                    {
+                        if (rowIndex < dgv_sessions.Rows.Count)
+                        {
+                            dgv_sessions.Rows[rowIndex].Cells["WorkerName"].Style.BackColor = System.Drawing.Color.White;
+                        }
+                        timer.Stop();
+                        timer.Dispose();
+                    };
+                    timer.Start();
+                }
+                else
+                {
+                    // 실패 시 원래 값으로 복원
+                    sessionData.WorkerName = originalWorkerName;
+                    dgv_sessions.Rows[rowIndex].Cells["WorkerName"].Value = originalWorkerName;
+
+                    MessageBox.Show("작업자명 업데이트에 실패했습니다.\n잠시 후 다시 시도해주세요.", "업데이트 실패",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 오류 시 원래 값으로 복원
+                sessionData.SessionName = originalWorkerName;
+                dgv_sessions.Rows[rowIndex].Cells["WorkerName"].Value = originalWorkerName;
+
+                Debug.WriteLine($"세션명 업데이트 오류: {ex.Message}");
+                MessageBox.Show($"세션명 업데이트 중 오류가 발생했습니다.\n{ex.Message}",
+                    "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
         /// 세션 삭제 처리
         /// </summary>
-        private async Task DeleteSession(SessionDisplayData sessionData, int rowIndex)
+        private async Task DeleteSession(SessionDisplayData sessionData, int rowIndex, bool skipConfirmation = false)
         {
             try
             {
-                // 삭제 확인
-                var result = MessageBox.Show(
-                    $"'{sessionData.SessionName}' 세션을 삭제하시겠습니까?\n\n" +
-                    $"• 파일 개수: {sessionData.FileCount}개\n" +
-                    $"• 합산 금액: {sessionData.TotalAmountFormatted}\n\n" +
-                    "※ 세션 정보만 삭제되며, 업로드된 파일은 유지됩니다.\n" +
-                    "※ 연결된 파일들은 다시 개별 파일로 분리됩니다.",
-                    "세션 삭제 확인",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question
-                );
+                // skipConfirmation이 false일 때만 확인 메시지 표시
+                if (!skipConfirmation)
+                {
+                    var result = MessageBox.Show(
+                        $"'{sessionData.SessionName}' 세션을 삭제하시겠습니까?\\n\\n" +
+                        $"• 파일 개수: {sessionData.FileCount}개\\n" +
+                        $"• 합산 금액: {sessionData.TotalAmountFormatted}\\n\\n" +
+                        "※ 세션 정보만 삭제되며, 업로드된 파일은 유지됩니다.\\n" +
+                        "※ 연결된 파일들은 다시 개별 파일로 분리됩니다.",
+                        "세션 삭제 확인",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Question
+                    );
 
-                if (result != DialogResult.Yes) return;
+                    if (result != DialogResult.Yes) return;
+                }
 
                 using (var progressForm = new ProcessProgressForm())
                 {
@@ -465,8 +527,12 @@ namespace FinanceTool
                             currentSessionsInner.RemoveAt(rowIndex);
                             dgv_sessions.DataSource = currentSessionsInner.ToList();
 
-                            MessageBox.Show("세션이 삭제되었습니다.", "삭제 완료",
+                            if (!skipConfirmation)
+                            {
+                                MessageBox.Show("세션이 삭제되었습니다.", "삭제 완료",
                                 MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                            
                             return;
                         }
                         else
@@ -541,13 +607,16 @@ namespace FinanceTool
                     await progressForm.UpdateProgressHandler(100, "삭제 완료");
                     await Task.Delay(500);
 
-                    MessageBox.Show(
-                    $"세션이 성공적으로 삭제되었습니다.\n\n" +
-                    $"• 해제된 파일: {affectedFiles.Count}개",
-                    "삭제 완료",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                    );
+                    if (!skipConfirmation)
+                    {
+                        MessageBox.Show(
+                                        $"세션이 성공적으로 삭제되었습니다.\n\n",
+                                        "삭제 완료",
+                                        MessageBoxButtons.OK,
+                                        MessageBoxIcon.Information
+                                        );
+                    }
+                    
                     Debug.WriteLine($"세션 삭제 완료: {sessionData.SessionName}, 해제된 파일: {affectedFiles.Count}개");
 
                 }

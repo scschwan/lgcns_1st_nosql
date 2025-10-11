@@ -130,12 +130,12 @@
 
         private MenuStrip menuStrip1;
         private Panel mainPanel;
-        private ToolStripMenuItem fileLoadToolStripMenuItem;
-        private ToolStripMenuItem dataPreprocessingToolStripMenuItem;
-        private ToolStripMenuItem dataAnalToolStripMenuItem;
-        private ToolStripMenuItem classificationToolStripMenuItem;
-        private ToolStripMenuItem exportToolStripMenuItem;
-        private ToolStripMenuItem fileUploadToolStripMenuItem;
-        private ToolStripMenuItem subClusteringToolStripMenuItem;
+        public ToolStripMenuItem fileLoadToolStripMenuItem;
+        public ToolStripMenuItem dataPreprocessingToolStripMenuItem;
+        public ToolStripMenuItem dataAnalToolStripMenuItem;
+        public ToolStripMenuItem classificationToolStripMenuItem;
+        public ToolStripMenuItem exportToolStripMenuItem;
+        public ToolStripMenuItem fileUploadToolStripMenuItem;
+        public ToolStripMenuItem subClusteringToolStripMenuItem;
     }
 }

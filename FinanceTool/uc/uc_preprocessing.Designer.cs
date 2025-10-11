@@ -62,6 +62,7 @@
             label6 = new Label();
             pnl_footer = new Panel();
             button5 = new Button();
+            current_sessionName = new Label();
             tableLayoutMain.SuspendLayout();
             pnl_header.SuspendLayout();
             tableLayoutContent.SuspendLayout();
@@ -100,6 +101,7 @@
             // pnl_header
             // 
             pnl_header.BackColor = Color.WhiteSmoke;
+            pnl_header.Controls.Add(current_sessionName);
             pnl_header.Controls.Add(label9);
             pnl_header.Controls.Add(label10);
             pnl_header.Dock = DockStyle.Fill;
@@ -263,9 +265,9 @@
             seper_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             seper_list_allcheck.AutoSize = true;
             seper_list_allcheck.Font = new Font("Pretendard", 11F);
-            seper_list_allcheck.Location = new Point(406, 65);
+            seper_list_allcheck.Location = new Point(416, 65);
             seper_list_allcheck.Name = "seper_list_allcheck";
-            seper_list_allcheck.Size = new Size(93, 24);
+            seper_list_allcheck.Size = new Size(83, 22);
             seper_list_allcheck.TabIndex = 44;
             seper_list_allcheck.Text = "전체 선택";
             seper_list_allcheck.UseVisualStyleBackColor = true;
@@ -327,7 +329,7 @@
             new_seper_word.Location = new Point(8, 30);
             new_seper_word.Name = "new_seper_word";
             new_seper_word.PlaceholderText = "신규 변환 대상 입력";
-            new_seper_word.Size = new Size(336, 27);
+            new_seper_word.Size = new Size(336, 25);
             new_seper_word.TabIndex = 27;
             new_seper_word.KeyDown += new_seper_word_KeyDown;
             // 
@@ -373,9 +375,9 @@
             remove_list_allcheck.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             remove_list_allcheck.AutoSize = true;
             remove_list_allcheck.Font = new Font("Pretendard", 11F);
-            remove_list_allcheck.Location = new Point(406, 65);
+            remove_list_allcheck.Location = new Point(416, 65);
             remove_list_allcheck.Name = "remove_list_allcheck";
-            remove_list_allcheck.Size = new Size(93, 24);
+            remove_list_allcheck.Size = new Size(83, 22);
             remove_list_allcheck.TabIndex = 48;
             remove_list_allcheck.Text = "전체 선택";
             remove_list_allcheck.UseVisualStyleBackColor = true;
@@ -437,7 +439,7 @@
             new_remove_word.Location = new Point(8, 30);
             new_remove_word.Name = "new_remove_word";
             new_remove_word.PlaceholderText = "신규 불용어 대상 입력";
-            new_remove_word.Size = new Size(336, 27);
+            new_remove_word.Size = new Size(336, 25);
             new_remove_word.TabIndex = 25;
             new_remove_word.KeyDown += tb_remove_KeyDown;
             // 
@@ -532,7 +534,7 @@
             label1.ForeColor = Color.IndianRed;
             label1.Location = new Point(15, 70);
             label1.Name = "label1";
-            label1.Size = new Size(252, 19);
+            label1.Size = new Size(215, 17);
             label1.TabIndex = 37;
             label1.Text = "AI가 추가적으로 키워드를 분할합니다.";
             // 
@@ -542,7 +544,7 @@
             label8.Font = new Font("Pretendard", 11F);
             label8.Location = new Point(130, 110);
             label8.Name = "label8";
-            label8.Size = new Size(194, 20);
+            label8.Size = new Size(167, 18);
             label8.TabIndex = 36;
             label8.Text = "글자 이상 키워드 자동 분할";
             // 
@@ -551,7 +553,7 @@
             ai_limit_count.Font = new Font("Pretendard", 11F);
             ai_limit_count.Location = new Point(40, 108);
             ai_limit_count.Name = "ai_limit_count";
-            ai_limit_count.Size = new Size(80, 27);
+            ai_limit_count.Size = new Size(80, 25);
             ai_limit_count.TabIndex = 35;
             ai_limit_count.TextAlign = HorizontalAlignment.Center;
             ai_limit_count.Value = new decimal(new int[] { 4, 0, 0, 0 });
@@ -564,7 +566,7 @@
             label6.ForeColor = Color.IndianRed;
             label6.Location = new Point(15, 45);
             label6.Name = "label6";
-            label6.Size = new Size(227, 19);
+            label6.Size = new Size(190, 17);
             label6.TabIndex = 31;
             label6.Text = "※ 구분자 기반으로 키워드 추출 후";
             // 
@@ -596,6 +598,16 @@
             button5.UseVisualStyleBackColor = false;
             button5.Click += btn_complete_Click;
             // 
+            // current_sessionName
+            // 
+            current_sessionName.AutoSize = true;
+            current_sessionName.Font = new Font("Pretendard", 18F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            current_sessionName.Location = new Point(1375, 40);
+            current_sessionName.Name = "current_sessionName";
+            current_sessionName.Size = new Size(143, 29);
+            current_sessionName.TabIndex = 48;
+            current_sessionName.Text = "현재 세션명 : ";
+            // 
             // uc_preprocessing
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -607,6 +619,7 @@
             Size = new Size(1904, 1017);
             tableLayoutMain.ResumeLayout(false);
             pnl_header.ResumeLayout(false);
+            pnl_header.PerformLayout();
             tableLayoutContent.ResumeLayout(false);
             tableLayoutLeft.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dataGridView_target).EndInit();
@@ -663,5 +676,6 @@
         private System.Windows.Forms.Label label6;
         private System.Windows.Forms.Panel pnl_footer;
         private System.Windows.Forms.Button button5;
+        private Label current_sessionName;
     }
 }

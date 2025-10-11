@@ -112,7 +112,39 @@ namespace FinanceTool.Repositories
             }
         }
 
-      
+        /// <summary>
+        /// 세션의 작업자 이름을 업데이트합니다
+        /// </summary>
+        /// <param name="sessionId">업데이트할 세션의 ObjectId</param>
+        /// <param name="newSessionName">새로운 세션명</param>
+        /// <returns>업데이트 성공 시 true, 실패 시 false</returns>
+        /// <remarks>
+        /// 사용자가 세션명을 수정할 때 사용되는 메서드입니다.
+        /// 데이터베이스 필드명을 직접 사용하여 MongoDB 문서를 업데이트합니다.
+        /// 
+        /// 예외 처리: 내부적으로 예외를 처리하여 false 반환
+        /// 로깅: 오류 발생 시 Debug.WriteLine을 통해 로그 출력
+        /// 성능: 세션 ID 기반 인덱스 활용
+        /// 주의: 필드명을 문자열로 직접 지정 (강한 타입 안전성 경고)
+        /// </remarks>
+        public async Task<bool> UpdateWorkerNameAsync(ObjectId sessionId, string newWorkerName)
+        {
+            try
+            {
+                var filter = Builders<FileSessionDocument>.Filter.Eq("_id", sessionId);
+                var update = Builders<FileSessionDocument>.Update.Set("worker_name", newWorkerName);
+
+                var result = await _collection.UpdateOneAsync(filter, update);
+                return result.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"작업자명 업데이트 오류: {ex.Message}");
+                return false;
+            }
+        }
+
+
 
         /// <summary>
         /// 지정된 세션에 파일 ID를 추가합니다

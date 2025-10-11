@@ -35,7 +35,7 @@ namespace FinanceTool
                 // 화면 전환
                 if (this.ParentForm is Form1 form)
                 {
-                    form.LoadUserControl(userControlHandler.uc_detailClustering);
+                    form.LoadUserControl(userControlHandler.uc_detailClustering, form.subClusteringToolStripMenuItem);
                 }
 
                 Debug.WriteLine($"세부 클러스터링 화면 진입 완료: 부모 클러스터 {parentClusterId}");

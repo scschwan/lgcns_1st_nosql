@@ -68,6 +68,9 @@ namespace FinanceTool
         /// </remarks>
         public void InitializePagingControls(bool attachEvents)
         {
+            //현재 세션명 출력
+            current_sessionName.Text = "현재 세션명 : " + DataHandler.currentSessionName;
+
             // 콤보박스 초기화
             cmb_pageSize.Items.Clear();
             cmb_pageSize.Items.AddRange(new object[] { 500, 1000, 2000, 5000 });

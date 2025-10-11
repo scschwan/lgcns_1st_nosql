@@ -259,7 +259,7 @@ namespace FinanceTool
 
                 if (this.ParentForm is Form1 form)
                 {
-                    form.LoadUserControl(userControlHandler.uc_Preprocessing);
+                    form.LoadUserControl(userControlHandler.uc_Preprocessing , form.dataPreprocessingToolStripMenuItem);
                 }
             }
             catch (Exception ex)

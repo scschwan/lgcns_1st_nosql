@@ -43,6 +43,9 @@ namespace FinanceTool
         // 컨텍스트 메뉴 초기화 (initUI에서 호출)
         private void InitializeContextMenu()
         {
+            //현재 세션명 출력
+            current_sessionName.Text = "현재 세션명 : " + DataHandler.currentSessionName;
+
             ContextMenuStrip contextMenu = new ContextMenuStrip();
 
             // 세부 클러스터링 메뉴 항목 추가

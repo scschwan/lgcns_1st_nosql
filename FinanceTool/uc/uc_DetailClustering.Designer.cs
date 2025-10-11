@@ -30,9 +30,9 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_left = new Panel();
             groupBox1 = new GroupBox();
@@ -103,6 +103,7 @@
             merge_cancel_button = new Button();
             check_search_button = new Button();
             merge_check_table = new DataGridView();
+            current_sessionName = new Label();
             tableLayoutMain.SuspendLayout();
             pnl_left.SuspendLayout();
             groupBox1.SuspendLayout();
@@ -138,13 +139,15 @@
             tableLayoutMain.ColumnCount = 2;
             tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 65F));
             tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 35F));
-            tableLayoutMain.Controls.Add(pnl_left, 0, 0);
-            tableLayoutMain.Controls.Add(pnl_right, 1, 0);
+            tableLayoutMain.Controls.Add(pnl_left, 0, 1);
+            tableLayoutMain.Controls.Add(pnl_right, 1, 1);
+            tableLayoutMain.Controls.Add(current_sessionName, 1, 0);
             tableLayoutMain.Dock = DockStyle.Fill;
             tableLayoutMain.Location = new Point(0, 0);
             tableLayoutMain.Name = "tableLayoutMain";
-            tableLayoutMain.RowCount = 1;
-            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutMain.RowCount = 2;
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 5F));
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 95F));
             tableLayoutMain.Size = new Size(1904, 1017);
             tableLayoutMain.TabIndex = 0;
             // 
@@ -152,10 +155,10 @@
             // 
             pnl_left.Controls.Add(groupBox1);
             pnl_left.Dock = DockStyle.Fill;
-            pnl_left.Location = new Point(10, 10);
+            pnl_left.Location = new Point(10, 60);
             pnl_left.Margin = new Padding(10);
             pnl_left.Name = "pnl_left";
-            pnl_left.Size = new Size(1217, 997);
+            pnl_left.Size = new Size(1217, 947);
             pnl_left.TabIndex = 0;
             // 
             // groupBox1
@@ -165,7 +168,7 @@
             groupBox1.Font = new Font("Pretendard", 15.75F);
             groupBox1.Location = new Point(0, 0);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(1217, 997);
+            groupBox1.Size = new Size(1217, 947);
             groupBox1.TabIndex = 42;
             groupBox1.TabStop = false;
             // 
@@ -191,7 +194,7 @@
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 53F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
-            tableLayoutLeft.Size = new Size(1211, 965);
+            tableLayoutLeft.Size = new Size(1211, 915);
             tableLayoutLeft.TabIndex = 0;
             // 
             // label1
@@ -384,7 +387,7 @@
             pnl_merge_data.Location = new Point(5, 384);
             pnl_merge_data.Margin = new Padding(5);
             pnl_merge_data.Name = "pnl_merge_data";
-            pnl_merge_data.Size = new Size(1201, 526);
+            pnl_merge_data.Size = new Size(1201, 476);
             pnl_merge_data.TabIndex = 2;
             // 
             // merge_cluster_table
@@ -402,7 +405,7 @@
             merge_cluster_table.MinimumSize = new Size(500, 300);
             merge_cluster_table.Name = "merge_cluster_table";
             merge_cluster_table.ReadOnly = true;
-            merge_cluster_table.Size = new Size(1191, 520);
+            merge_cluster_table.Size = new Size(1191, 470);
             merge_cluster_table.TabIndex = 34;
             merge_cluster_table.CellContentClick += merge_cluster_table_CellContentClick;
             // 
@@ -416,7 +419,7 @@
             pnl_merge_pagination.Controls.Add(num_pageNumber);
             pnl_merge_pagination.Controls.Add(lbl_pagination2);
             pnl_merge_pagination.Dock = DockStyle.Fill;
-            pnl_merge_pagination.Location = new Point(3, 918);
+            pnl_merge_pagination.Location = new Point(3, 868);
             pnl_merge_pagination.Name = "pnl_merge_pagination";
             pnl_merge_pagination.Size = new Size(1205, 44);
             pnl_merge_pagination.TabIndex = 3;
@@ -644,10 +647,10 @@
             // 
             pnl_right.Controls.Add(tableLayoutRight);
             pnl_right.Dock = DockStyle.Fill;
-            pnl_right.Location = new Point(1247, 10);
+            pnl_right.Location = new Point(1247, 60);
             pnl_right.Margin = new Padding(10);
             pnl_right.Name = "pnl_right";
-            pnl_right.Size = new Size(647, 997);
+            pnl_right.Size = new Size(647, 947);
             pnl_right.TabIndex = 1;
             // 
             // tableLayoutRight
@@ -662,7 +665,7 @@
             tableLayoutRight.RowCount = 2;
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 55.5667F));
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 44.4333F));
-            tableLayoutRight.Size = new Size(647, 997);
+            tableLayoutRight.Size = new Size(647, 947);
             tableLayoutRight.TabIndex = 0;
             // 
             // groupBox3
@@ -676,7 +679,7 @@
             groupBox3.Location = new Point(5, 5);
             groupBox3.Margin = new Padding(5);
             groupBox3.Name = "groupBox3";
-            groupBox3.Size = new Size(637, 544);
+            groupBox3.Size = new Size(637, 516);
             groupBox3.TabIndex = 43;
             groupBox3.TabStop = false;
             // 
@@ -920,10 +923,10 @@
             groupbox2.Controls.Add(merge_check_table);
             groupbox2.Dock = DockStyle.Fill;
             groupbox2.Font = new Font("Pretendard", 15.75F);
-            groupbox2.Location = new Point(5, 559);
+            groupbox2.Location = new Point(5, 531);
             groupbox2.Margin = new Padding(5);
             groupbox2.Name = "groupbox2";
-            groupbox2.Size = new Size(637, 433);
+            groupbox2.Size = new Size(637, 411);
             groupbox2.TabIndex = 44;
             groupbox2.TabStop = false;
             groupbox2.Text = "세부 Clustering 병합 결과 확인";
@@ -964,7 +967,7 @@
             label7.AutoSize = true;
             label7.Font = new Font("Pretendard", 9.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
             label7.ForeColor = Color.IndianRed;
-            label7.Location = new Point(20, 401);
+            label7.Location = new Point(20, 379);
             label7.Name = "label7";
             label7.Size = new Size(234, 16);
             label7.TabIndex = 47;
@@ -978,7 +981,7 @@
             complete_btn.FlatStyle = FlatStyle.Flat;
             complete_btn.Font = new Font("Pretendard", 14.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             complete_btn.ForeColor = Color.White;
-            complete_btn.Location = new Point(417, 381);
+            complete_btn.Location = new Point(417, 359);
             complete_btn.Name = "complete_btn";
             complete_btn.Size = new Size(210, 37);
             complete_btn.TabIndex = 45;
@@ -1035,39 +1038,50 @@
             merge_check_table.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             merge_check_table.BackgroundColor = Color.White;
             merge_check_table.BorderStyle = BorderStyle.Fixed3D;
-            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle1.BackColor = SystemColors.Control;
-            dataGridViewCellStyle1.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle1.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.True;
-            merge_check_table.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle4.BackColor = SystemColors.Control;
+            dataGridViewCellStyle4.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle4.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle4.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle4.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle4.WrapMode = DataGridViewTriState.True;
+            merge_check_table.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle4;
             merge_check_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = SystemColors.Window;
-            dataGridViewCellStyle2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle2.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
-            merge_check_table.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle5.BackColor = SystemColors.Window;
+            dataGridViewCellStyle5.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle5.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.False;
+            merge_check_table.DefaultCellStyle = dataGridViewCellStyle5;
             merge_check_table.EnableHeadersVisualStyles = false;
             merge_check_table.GridColor = Color.LightGray;
             merge_check_table.Location = new Point(12, 142);
             merge_check_table.MinimumSize = new Size(300, 200);
             merge_check_table.Name = "merge_check_table";
             merge_check_table.ReadOnly = true;
-            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle3.BackColor = SystemColors.Control;
-            dataGridViewCellStyle3.Font = new Font("돋움체", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle3.ForeColor = SystemColors.WindowText;
-            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.True;
-            merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle3;
-            merge_check_table.Size = new Size(615, 235);
+            dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle6.BackColor = SystemColors.Control;
+            dataGridViewCellStyle6.Font = new Font("돋움체", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle6.ForeColor = SystemColors.WindowText;
+            dataGridViewCellStyle6.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle6.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle6.WrapMode = DataGridViewTriState.True;
+            merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle6;
+            merge_check_table.Size = new Size(615, 213);
             merge_check_table.TabIndex = 23;
+            // 
+            // current_sessionName
+            // 
+            current_sessionName.Anchor = AnchorStyles.Bottom;
+            current_sessionName.AutoSize = true;
+            current_sessionName.Font = new Font("Pretendard", 18F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            current_sessionName.Location = new Point(1499, 21);
+            current_sessionName.Name = "current_sessionName";
+            current_sessionName.Size = new Size(143, 29);
+            current_sessionName.TabIndex = 50;
+            current_sessionName.Text = "현재 세션명 : ";
             // 
             // uc_DetailClustering
             // 
@@ -1079,6 +1093,7 @@
             Name = "uc_DetailClustering";
             Size = new Size(1904, 1017);
             tableLayoutMain.ResumeLayout(false);
+            tableLayoutMain.PerformLayout();
             pnl_left.ResumeLayout(false);
             groupBox1.ResumeLayout(false);
             tableLayoutLeft.ResumeLayout(false);
@@ -1194,5 +1209,6 @@
         private Label label1;
         private Label label10;
         private Label sub_search_info_label;
+        private Label current_sessionName;
     }
 }

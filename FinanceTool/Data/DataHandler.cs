@@ -206,7 +206,13 @@ namespace FinanceTool
         /// <value>컸명과 해당 컸의 표시 순서 인덱스를 매핑</value>
         /// <remarks>DataGridView의 컸 순서를 사용자 선호에 따라 동적으로 관리</remarks>
         public static Dictionary<string, int> columnDisplayOrder = new Dictionary<string, int>();
-        
+
+        /// <summary>
+        /// 현재 작업중인 세션명 이름 저장
+        /// </summary>
+        /// <value>현재 작업중인 세션명 이름 저장</value>
+        public static string currentSessionName = "";
+
 
 
 

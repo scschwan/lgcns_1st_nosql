@@ -57,6 +57,7 @@
             del_col_list_allcheck = new CheckBox();
             dataGridView_delete_col2 = new DataGridView();
             restore_col_btn = new Button();
+            current_sessionName = new Label();
             tableLayoutMain.SuspendLayout();
             pnl_left.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
@@ -79,13 +80,15 @@
             tableLayoutMain.ColumnCount = 2;
             tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 500F));
-            tableLayoutMain.Controls.Add(pnl_left, 0, 0);
-            tableLayoutMain.Controls.Add(pnl_right, 1, 0);
+            tableLayoutMain.Controls.Add(pnl_left, 0, 1);
+            tableLayoutMain.Controls.Add(pnl_right, 1, 1);
+            tableLayoutMain.Controls.Add(current_sessionName, 1, 0);
             tableLayoutMain.Dock = DockStyle.Fill;
             tableLayoutMain.Location = new Point(0, 0);
             tableLayoutMain.Name = "tableLayoutMain";
-            tableLayoutMain.RowCount = 1;
-            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutMain.RowCount = 2;
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 5F));
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 95F));
             tableLayoutMain.Size = new Size(1813, 1005);
             tableLayoutMain.TabIndex = 0;
             // 
@@ -93,10 +96,10 @@
             // 
             pnl_left.Controls.Add(tableLayoutLeft);
             pnl_left.Dock = DockStyle.Fill;
-            pnl_left.Location = new Point(10, 10);
+            pnl_left.Location = new Point(10, 60);
             pnl_left.Margin = new Padding(10);
             pnl_left.Name = "pnl_left";
-            pnl_left.Size = new Size(1293, 985);
+            pnl_left.Size = new Size(1293, 935);
             pnl_left.TabIndex = 0;
             // 
             // tableLayoutLeft
@@ -113,7 +116,7 @@
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 60F));
-            tableLayoutLeft.Size = new Size(1293, 985);
+            tableLayoutLeft.Size = new Size(1293, 935);
             tableLayoutLeft.TabIndex = 0;
             // 
             // pnl_original_section
@@ -124,7 +127,7 @@
             pnl_original_section.Location = new Point(5, 5);
             pnl_original_section.Margin = new Padding(5);
             pnl_original_section.Name = "pnl_original_section";
-            pnl_original_section.Size = new Size(1283, 452);
+            pnl_original_section.Size = new Size(1283, 427);
             pnl_original_section.TabIndex = 0;
             // 
             // label10
@@ -133,7 +136,7 @@
             label10.BackColor = Color.SteelBlue;
             label10.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label10.ForeColor = Color.White;
-            label10.Location = new Point(432, 7);
+            label10.Location = new Point(432, -6);
             label10.Name = "label10";
             label10.Size = new Size(380, 40);
             label10.TabIndex = 57;
@@ -155,7 +158,7 @@
             dataGridView_origin.MinimumSize = new Size(400, 200);
             dataGridView_origin.Name = "dataGridView_origin";
             dataGridView_origin.ReadOnly = true;
-            dataGridView_origin.Size = new Size(1263, 392);
+            dataGridView_origin.Size = new Size(1263, 367);
             dataGridView_origin.TabIndex = 0;
             // 
             // pnl_keyword_section
@@ -163,10 +166,10 @@
             pnl_keyword_section.Controls.Add(label4);
             pnl_keyword_section.Controls.Add(dataGridView_keyword);
             pnl_keyword_section.Dock = DockStyle.Fill;
-            pnl_keyword_section.Location = new Point(5, 467);
+            pnl_keyword_section.Location = new Point(5, 442);
             pnl_keyword_section.Margin = new Padding(5);
             pnl_keyword_section.Name = "pnl_keyword_section";
-            pnl_keyword_section.Size = new Size(1283, 452);
+            pnl_keyword_section.Size = new Size(1283, 427);
             pnl_keyword_section.TabIndex = 1;
             // 
             // label4
@@ -175,7 +178,7 @@
             label4.BackColor = Color.SteelBlue;
             label4.Font = new Font("Pretendard", 18F, FontStyle.Bold);
             label4.ForeColor = Color.White;
-            label4.Location = new Point(432, 7);
+            label4.Location = new Point(432, -6);
             label4.Name = "label4";
             label4.Size = new Size(380, 40);
             label4.TabIndex = 58;
@@ -197,7 +200,7 @@
             dataGridView_keyword.MinimumSize = new Size(400, 200);
             dataGridView_keyword.Name = "dataGridView_keyword";
             dataGridView_keyword.ReadOnly = true;
-            dataGridView_keyword.Size = new Size(1263, 392);
+            dataGridView_keyword.Size = new Size(1263, 367);
             dataGridView_keyword.TabIndex = 1;
             // 
             // pnl_pagination_section
@@ -211,7 +214,7 @@
             pnl_pagination_section.Controls.Add(num_pageNumber);
             pnl_pagination_section.Controls.Add(lbl_pagination2);
             pnl_pagination_section.Dock = DockStyle.Fill;
-            pnl_pagination_section.Location = new Point(3, 927);
+            pnl_pagination_section.Location = new Point(3, 877);
             pnl_pagination_section.Name = "pnl_pagination_section";
             pnl_pagination_section.Size = new Size(1287, 55);
             pnl_pagination_section.TabIndex = 2;
@@ -308,10 +311,10 @@
             // 
             pnl_right.Controls.Add(tableLayoutRight);
             pnl_right.Dock = DockStyle.Fill;
-            pnl_right.Location = new Point(1323, 10);
+            pnl_right.Location = new Point(1323, 60);
             pnl_right.Margin = new Padding(10);
             pnl_right.Name = "pnl_right";
-            pnl_right.Size = new Size(480, 985);
+            pnl_right.Size = new Size(480, 935);
             pnl_right.TabIndex = 1;
             // 
             // tableLayoutRight
@@ -326,7 +329,7 @@
             tableLayoutRight.RowCount = 2;
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 65F));
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 35F));
-            tableLayoutRight.Size = new Size(480, 985);
+            tableLayoutRight.Size = new Size(480, 935);
             tableLayoutRight.TabIndex = 0;
             // 
             // groupBox1
@@ -339,7 +342,7 @@
             groupBox1.Location = new Point(5, 5);
             groupBox1.Margin = new Padding(5);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(470, 630);
+            groupBox1.Size = new Size(470, 597);
             groupBox1.TabIndex = 61;
             groupBox1.TabStop = false;
             groupBox1.Text = "Clustering 결과";
@@ -380,7 +383,7 @@
             dataGridView_classify.Location = new Point(10, 82);
             dataGridView_classify.MinimumSize = new Size(300, 200);
             dataGridView_classify.Name = "dataGridView_classify";
-            dataGridView_classify.Size = new Size(450, 538);
+            dataGridView_classify.Size = new Size(450, 505);
             dataGridView_classify.TabIndex = 2;
             dataGridView_classify.CellClick += dataGridView_classify_CellClick;
             dataGridView_classify.CellValueChanged += dataGridView_classify_CellValueChanged;
@@ -393,10 +396,10 @@
             groupBox3.Controls.Add(restore_col_btn);
             groupBox3.Dock = DockStyle.Fill;
             groupBox3.Font = new Font("Pretendard", 15.75F, FontStyle.Bold, GraphicsUnit.Point, 129);
-            groupBox3.Location = new Point(5, 645);
+            groupBox3.Location = new Point(5, 612);
             groupBox3.Margin = new Padding(5);
             groupBox3.Name = "groupBox3";
-            groupBox3.Size = new Size(470, 335);
+            groupBox3.Size = new Size(470, 318);
             groupBox3.TabIndex = 44;
             groupBox3.TabStop = false;
             groupBox3.Text = "제거 열 설정";
@@ -438,7 +441,7 @@
             dataGridView_delete_col2.Location = new Point(10, 65);
             dataGridView_delete_col2.MinimumSize = new Size(250, 150);
             dataGridView_delete_col2.Name = "dataGridView_delete_col2";
-            dataGridView_delete_col2.Size = new Size(330, 226);
+            dataGridView_delete_col2.Size = new Size(330, 209);
             dataGridView_delete_col2.TabIndex = 42;
             // 
             // restore_col_btn
@@ -449,13 +452,24 @@
             restore_col_btn.FlatStyle = FlatStyle.Flat;
             restore_col_btn.Font = new Font("Pretendard", 11.25F, FontStyle.Bold, GraphicsUnit.Point, 129);
             restore_col_btn.ForeColor = Color.White;
-            restore_col_btn.Location = new Point(330, 296);
+            restore_col_btn.Location = new Point(330, 279);
             restore_col_btn.Name = "restore_col_btn";
             restore_col_btn.Size = new Size(131, 35);
             restore_col_btn.TabIndex = 14;
             restore_col_btn.Text = "선택 열 적용";
             restore_col_btn.UseVisualStyleBackColor = false;
             restore_col_btn.Click += restore_col_btn_Click;
+            // 
+            // current_sessionName
+            // 
+            current_sessionName.Anchor = AnchorStyles.Bottom;
+            current_sessionName.AutoSize = true;
+            current_sessionName.Font = new Font("Pretendard", 18F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            current_sessionName.Location = new Point(1491, 21);
+            current_sessionName.Name = "current_sessionName";
+            current_sessionName.Size = new Size(143, 29);
+            current_sessionName.TabIndex = 50;
+            current_sessionName.Text = "현재 세션명 : ";
             // 
             // uc_Classification
             // 
@@ -467,6 +481,7 @@
             Name = "uc_Classification";
             Size = new Size(1813, 1005);
             tableLayoutMain.ResumeLayout(false);
+            tableLayoutMain.PerformLayout();
             pnl_left.ResumeLayout(false);
             tableLayoutLeft.ResumeLayout(false);
             pnl_original_section.ResumeLayout(false);
@@ -523,5 +538,6 @@
         private Label label10;
         private Label label4;
         private Label label1;
+        private Label current_sessionName;
     }
 }

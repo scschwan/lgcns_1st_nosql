@@ -14,11 +14,67 @@ namespace FinanceTool
         private bool macCheckYN = false;
         //private bool trialYN = true;
 
+        // 현재 활성화된 메뉴 아이템을 추적하는 변수
+        private ToolStripMenuItem _activeMenuItem = null;
+
+        // 기본 메뉴 색상 (비활성)
+        private readonly System.Drawing.Color DefaultMenuBackColor = System.Drawing.Color.Transparent;
+        private readonly System.Drawing.Color DefaultMenuForeColor = System.Drawing.Color.Black;
+
+        // 활성 메뉴 색상
+        private readonly System.Drawing.Color ActiveMenuBackColor = System.Drawing.Color.LightBlue;  // 또는 원하는 색상
+        private readonly System.Drawing.Color ActiveMenuForeColor = System.Drawing.Color.Navy;       // 또는 원하는 색상
+
+
         public Form1()
         {
             InitializeComponent();
         }
 
+        /// <summary>
+        /// 모든 메뉴 아이템을 기본 색상으로 초기화
+        /// </summary>
+        private void ResetAllMenuColors()
+        {
+            fileUploadToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            fileUploadToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+
+            fileLoadToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            fileLoadToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+
+            dataPreprocessingToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            dataPreprocessingToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+
+            dataAnalToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            dataAnalToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+
+            classificationToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            classificationToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+
+            exportToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            exportToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+
+            subClusteringToolStripMenuItem.BackColor = DefaultMenuBackColor;
+            subClusteringToolStripMenuItem.ForeColor = DefaultMenuForeColor;
+        }
+
+        /// <summary>
+        /// 특정 메뉴 아이템을 활성 상태로 표시
+        /// </summary>
+        /// <param name="menuItem">강조할 메뉴 아이템</param>
+        private void SetActiveMenu(ToolStripMenuItem menuItem)
+        {
+            // 모든 메뉴를 기본 색상으로 초기화
+            ResetAllMenuColors();
+
+            // 선택된 메뉴만 활성 색상으로 변경
+            if (menuItem != null)
+            {
+                menuItem.BackColor = ActiveMenuBackColor;
+                menuItem.ForeColor = ActiveMenuForeColor;
+                _activeMenuItem = menuItem;
+            }
+        }
 
         /// <summary>
         /// ÄÁÆ®·Ñ Å©±â ¹× À§Ä¡¸¦ ÀçÁ¶Á¤ÇÏ´Â ¸Þ¼Òµå
@@ -44,6 +100,7 @@ namespace FinanceTool
             // ¸ÞÀÎ È­¸é ÃÊ±âÈ­ ÀÛ¾÷
             //mainPanel.Controls.Add(userControlHandler.uc_fileLoad);
             mainPanel.Controls.Add(userControlHandler.uc_multiFileUpload);
+            SetActiveMenu(fileUploadToolStripMenuItem);
 
             // ÆûÀ» ÀÏ½ÃÀûÀ¸·Î ºñÈ°¼ºÈ­ (ProcessProgressFormÀº º°µµ ÆûÀÌ¹Ç·Î ¿µÇâ ¾øÀ½)
             this.Enabled = false;
@@ -101,42 +158,49 @@ namespace FinanceTool
 
         }
 
-        // ¸ðµç ÄÁÆ®·ÑÀÇ Enabled ¼Ó¼ºÀ» ¼³Á¤ÇÏ´Â Àç±Í ¸Þ¼Òµå
-
-
-        public void LoadUserControl(UserControl control)
+        /// <summary>
+        /// UserControl 로드 및 해당 메뉴 강조
+        /// </summary>
+        /// <param name="control">로드할 UserControl</param>
+        /// <param name="menuItem">강조할 메뉴 아이템 (선택사항)</param>
+        public void LoadUserControl(UserControl control, ToolStripMenuItem menuItem = null)
         {
-            // ±âÁ¸ ÄÁÆ®·Ñ Á¦°Å
+            // 기존 컨트롤 제거
             mainPanel.Controls.Clear();
 
-            // »õ ÄÁÆ®·Ñ Ãß°¡ ¹× ·¹ÀÌ¾Æ¿ô ¼³Á¤
+            // 새 컨트롤 추가 및 레이아웃 설정
             control.Dock = DockStyle.Fill;
-            //control.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             mainPanel.Controls.Add(control);
 
-            // ·¹ÀÌ¾Æ¿ô ¾÷µ¥ÀÌÆ®
+            // 레이아웃 업데이트
             control.Invalidate();
             mainPanel.Invalidate();
+
+            // 메뉴 강조 표시
+            if (menuItem != null)
+            {
+                SetActiveMenu(menuItem);
+            }
         }
 
         private void fileLoadToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_fileLoad);
+            LoadUserControl(userControlHandler.uc_fileLoad, fileLoadToolStripMenuItem);
         }
 
         private void dataPreprocessingToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_Preprocessing);
+            LoadUserControl(userControlHandler.uc_Preprocessing, dataPreprocessingToolStripMenuItem);
         }
 
         private void dataAnalToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_dataTransform);
+            LoadUserControl(userControlHandler.uc_dataTransform, dataAnalToolStripMenuItem);
         }
 
         private void classificationToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_clustering);
+            LoadUserControl(userControlHandler.uc_clustering, classificationToolStripMenuItem);
         }
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
@@ -146,18 +210,18 @@ namespace FinanceTool
 
         private void exportToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_classification);
+            LoadUserControl(userControlHandler.uc_classification, exportToolStripMenuItem);
         }
 
 
         private void fileUploadToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_multiFileUpload);
+            LoadUserControl(userControlHandler.uc_multiFileUpload, fileUploadToolStripMenuItem);
         }
 
         private void subClusteringToolStripMenuItem_Click(object sender, EventArgs e)
         {
-            LoadUserControl(userControlHandler.uc_detailClustering);
+            LoadUserControl(userControlHandler.uc_detailClustering, subClusteringToolStripMenuItem);
         }
     }
 

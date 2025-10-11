@@ -30,6 +30,7 @@
         {
             tableLayoutMain = new TableLayoutPanel();
             pnl_header = new Panel();
+            current_sessionName = new Label();
             tableLayoutContent = new TableLayoutPanel();
             tableLayoutLeft = new TableLayoutPanel();
             pnl_data_headers = new Panel();
@@ -84,6 +85,7 @@
             label2 = new Label();
             dataGridView2 = new DataGridView();
             tableLayoutMain.SuspendLayout();
+            pnl_header.SuspendLayout();
             tableLayoutContent.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
             pnl_data_headers.SuspendLayout();
@@ -123,6 +125,7 @@
             // pnl_header
             // 
             pnl_header.BackColor = Color.WhiteSmoke;
+            pnl_header.Controls.Add(current_sessionName);
             pnl_header.Dock = DockStyle.Fill;
             pnl_header.Location = new Point(0, 0);
             pnl_header.Margin = new Padding(0);
@@ -130,6 +133,16 @@
             pnl_header.Padding = new Padding(10);
             pnl_header.Size = new Size(1904, 100);
             pnl_header.TabIndex = 0;
+            // 
+            // current_sessionName
+            // 
+            current_sessionName.AutoSize = true;
+            current_sessionName.Font = new Font("Pretendard", 18F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            current_sessionName.Location = new Point(1375, 61);
+            current_sessionName.Name = "current_sessionName";
+            current_sessionName.Size = new Size(143, 29);
+            current_sessionName.TabIndex = 47;
+            current_sessionName.Text = "현재 세션명 : ";
             // 
             // tableLayoutContent
             // 
@@ -838,6 +851,8 @@
             Size = new Size(1904, 1017);
             Load += uc_FileLoad_Load;
             tableLayoutMain.ResumeLayout(false);
+            pnl_header.ResumeLayout(false);
+            pnl_header.PerformLayout();
             tableLayoutContent.ResumeLayout(false);
             tableLayoutLeft.ResumeLayout(false);
             pnl_data_headers.ResumeLayout(false);
@@ -921,5 +936,6 @@
         private Label label11;
         private ComboBox comboBox_standard_key;
         private DataGridView dataGridView_standard;
+        private Label current_sessionName;
     }
 }

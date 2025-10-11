@@ -83,6 +83,8 @@ namespace FinanceTool
         // 4. 컨텍스트 메뉴 초기화
         private void InitializeContextMenu()
         {
+            
+
             // 컨텍스트 메뉴 생성
             ContextMenuStrip contextMenu = new ContextMenuStrip();
             ToolStripMenuItem viewDetailsItem = new ToolStripMenuItem("세부 정보 보기");
@@ -135,6 +137,9 @@ namespace FinanceTool
         {
             try
             {
+
+                //현재 세션명 출력
+                current_sessionName.Text = "현재 세션명 : " + DataHandler.currentSessionName;
 
                 // MongoDB에서 클러스터링 데이터 로드
                 var clusteringRepo = new ClusteringRepository();
@@ -795,7 +800,7 @@ namespace FinanceTool
 
                     if (this.ParentForm is Form1 form)
                     {
-                        form.LoadUserControl(userControlHandler.uc_classification);
+                        form.LoadUserControl(userControlHandler.uc_classification , form.exportToolStripMenuItem);
                     }
 
                     isFinishSession = true;

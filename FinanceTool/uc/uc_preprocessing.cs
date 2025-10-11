@@ -40,6 +40,9 @@ namespace FinanceTool
 
         public async Task initUI()
         {
+            //현재 세션명 출력
+            current_sessionName.Text = "현재 세션명 : " + DataHandler.currentSessionName;
+
             Debug.WriteLine($"[preprocessing]processTable.Columns.Count : {DataHandler.processTable.Columns.Count}");
             Debug.WriteLine($"[preprocessing]processTable.Rows.Count : {DataHandler.processTable.Rows.Count}");
 
@@ -679,7 +682,7 @@ namespace FinanceTool
                     if (this.ParentForm is Form1 form)
                     {
                         Debug.WriteLine("btn_complete_Click -> LoadUserControl start");
-                        form.LoadUserControl(userControlHandler.uc_dataTransform);
+                        form.LoadUserControl(userControlHandler.uc_dataTransform , form.dataAnalToolStripMenuItem);
                         Debug.WriteLine("btn_complete_Click -> LoadUserControl complete");
                         await progressForm.UpdateProgressHandler(100, "데이터 저장 완료");
                     }

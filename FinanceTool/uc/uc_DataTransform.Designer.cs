@@ -28,8 +28,8 @@
         /// </summary>
         private void InitializeComponent()
         {
-            DataGridViewCellStyle dataGridViewCellStyle1 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             tableLayoutMain = new TableLayoutPanel();
             pnl_left = new Panel();
             tableLayoutLeft = new TableLayoutPanel();
@@ -77,6 +77,7 @@
             label3 = new Label();
             button2 = new Button();
             dept_col_check = new CheckBox();
+            current_sessionName = new Label();
             tableLayoutMain.SuspendLayout();
             pnl_left.SuspendLayout();
             tableLayoutLeft.SuspendLayout();
@@ -104,13 +105,15 @@
             tableLayoutMain.ColumnCount = 2;
             tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60F));
             tableLayoutMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40F));
-            tableLayoutMain.Controls.Add(pnl_left, 0, 0);
-            tableLayoutMain.Controls.Add(pnl_right, 1, 0);
+            tableLayoutMain.Controls.Add(pnl_left, 0, 1);
+            tableLayoutMain.Controls.Add(pnl_right, 1, 1);
+            tableLayoutMain.Controls.Add(current_sessionName, 1, 0);
             tableLayoutMain.Dock = DockStyle.Fill;
             tableLayoutMain.Location = new Point(0, 0);
             tableLayoutMain.Name = "tableLayoutMain";
-            tableLayoutMain.RowCount = 1;
-            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
+            tableLayoutMain.RowCount = 2;
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 5F));
+            tableLayoutMain.RowStyles.Add(new RowStyle(SizeType.Percent, 95F));
             tableLayoutMain.Size = new Size(1904, 1017);
             tableLayoutMain.TabIndex = 0;
             // 
@@ -118,10 +121,10 @@
             // 
             pnl_left.Controls.Add(tableLayoutLeft);
             pnl_left.Dock = DockStyle.Fill;
-            pnl_left.Location = new Point(10, 10);
+            pnl_left.Location = new Point(10, 60);
             pnl_left.Margin = new Padding(10);
             pnl_left.Name = "pnl_left";
-            pnl_left.Size = new Size(1122, 997);
+            pnl_left.Size = new Size(1122, 947);
             pnl_left.TabIndex = 0;
             // 
             // tableLayoutLeft
@@ -144,7 +147,7 @@
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
             tableLayoutLeft.RowStyles.Add(new RowStyle(SizeType.Absolute, 50F));
-            tableLayoutLeft.Size = new Size(1122, 997);
+            tableLayoutLeft.Size = new Size(1122, 947);
             tableLayoutLeft.TabIndex = 0;
             // 
             // pnl_original_header
@@ -176,7 +179,7 @@
             pnl_original_data.Location = new Point(5, 55);
             pnl_original_data.Margin = new Padding(5);
             pnl_original_data.Name = "pnl_original_data";
-            pnl_original_data.Size = new Size(1112, 388);
+            pnl_original_data.Size = new Size(1112, 363);
             pnl_original_data.TabIndex = 1;
             // 
             // dataGridView_2nd
@@ -194,7 +197,7 @@
             dataGridView_2nd.MinimumSize = new Size(400, 200);
             dataGridView_2nd.Name = "dataGridView_2nd";
             dataGridView_2nd.ReadOnly = true;
-            dataGridView_2nd.Size = new Size(1102, 378);
+            dataGridView_2nd.Size = new Size(1102, 353);
             dataGridView_2nd.TabIndex = 0;
             // 
             // pnl_original_pagination
@@ -207,7 +210,7 @@
             pnl_original_pagination.Controls.Add(num_pageNumber);
             pnl_original_pagination.Controls.Add(lbl_pagination2);
             pnl_original_pagination.Dock = DockStyle.Fill;
-            pnl_original_pagination.Location = new Point(3, 451);
+            pnl_original_pagination.Location = new Point(3, 426);
             pnl_original_pagination.Name = "pnl_original_pagination";
             pnl_original_pagination.Size = new Size(1116, 44);
             pnl_original_pagination.TabIndex = 2;
@@ -286,7 +289,7 @@
             // 
             pnl_transform_header.Controls.Add(label1);
             pnl_transform_header.Dock = DockStyle.Fill;
-            pnl_transform_header.Location = new Point(3, 501);
+            pnl_transform_header.Location = new Point(3, 476);
             pnl_transform_header.Name = "pnl_transform_header";
             pnl_transform_header.Size = new Size(1116, 44);
             pnl_transform_header.TabIndex = 3;
@@ -308,10 +311,10 @@
             // 
             pnl_transform_data.Controls.Add(dataGridView_transform);
             pnl_transform_data.Dock = DockStyle.Fill;
-            pnl_transform_data.Location = new Point(5, 553);
+            pnl_transform_data.Location = new Point(5, 528);
             pnl_transform_data.Margin = new Padding(5);
             pnl_transform_data.Name = "pnl_transform_data";
-            pnl_transform_data.Size = new Size(1112, 388);
+            pnl_transform_data.Size = new Size(1112, 363);
             pnl_transform_data.TabIndex = 4;
             // 
             // dataGridView_transform
@@ -329,7 +332,7 @@
             dataGridView_transform.MinimumSize = new Size(400, 200);
             dataGridView_transform.Name = "dataGridView_transform";
             dataGridView_transform.ReadOnly = true;
-            dataGridView_transform.Size = new Size(1102, 378);
+            dataGridView_transform.Size = new Size(1102, 353);
             dataGridView_transform.TabIndex = 0;
             // 
             // pnl_transform_pagination
@@ -342,7 +345,7 @@
             pnl_transform_pagination.Controls.Add(num_pageNumber2);
             pnl_transform_pagination.Controls.Add(lbl_pagination4);
             pnl_transform_pagination.Dock = DockStyle.Fill;
-            pnl_transform_pagination.Location = new Point(3, 949);
+            pnl_transform_pagination.Location = new Point(3, 899);
             pnl_transform_pagination.Name = "pnl_transform_pagination";
             pnl_transform_pagination.Size = new Size(1116, 45);
             pnl_transform_pagination.TabIndex = 5;
@@ -421,10 +424,10 @@
             // 
             pnl_right.Controls.Add(tableLayoutRight);
             pnl_right.Dock = DockStyle.Fill;
-            pnl_right.Location = new Point(1152, 10);
+            pnl_right.Location = new Point(1152, 60);
             pnl_right.Margin = new Padding(10);
             pnl_right.Name = "pnl_right";
-            pnl_right.Size = new Size(742, 997);
+            pnl_right.Size = new Size(742, 947);
             pnl_right.TabIndex = 1;
             // 
             // tableLayoutRight
@@ -441,7 +444,7 @@
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 42.6278839F));
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 47.2417259F));
             tableLayoutRight.RowStyles.Add(new RowStyle(SizeType.Percent, 10F));
-            tableLayoutRight.Size = new Size(742, 997);
+            tableLayoutRight.Size = new Size(742, 947);
             tableLayoutRight.TabIndex = 0;
             // 
             // groupBox1
@@ -454,7 +457,7 @@
             groupBox1.Location = new Point(5, 5);
             groupBox1.Margin = new Padding(5);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(732, 415);
+            groupBox1.Size = new Size(732, 394);
             groupBox1.TabIndex = 25;
             groupBox1.TabStop = false;
             groupBox1.Text = "키워드 요약";
@@ -467,21 +470,21 @@
             sum_keyword_table.BackgroundColor = Color.White;
             sum_keyword_table.BorderStyle = BorderStyle.Fixed3D;
             sum_keyword_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle1.BackColor = SystemColors.Window;
-            dataGridViewCellStyle1.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle1.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle1.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle1.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle1.WrapMode = DataGridViewTriState.False;
-            sum_keyword_table.DefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle3.BackColor = SystemColors.Window;
+            dataGridViewCellStyle3.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle3.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle3.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle3.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle3.WrapMode = DataGridViewTriState.False;
+            sum_keyword_table.DefaultCellStyle = dataGridViewCellStyle3;
             sum_keyword_table.EnableHeadersVisualStyles = false;
             sum_keyword_table.GridColor = Color.LightGray;
             sum_keyword_table.Location = new Point(10, 80);
             sum_keyword_table.MinimumSize = new Size(300, 150);
             sum_keyword_table.Name = "sum_keyword_table";
             sum_keyword_table.ReadOnly = true;
-            sum_keyword_table.Size = new Size(712, 325);
+            sum_keyword_table.Size = new Size(712, 304);
             sum_keyword_table.TabIndex = 36;
             sum_keyword_table.CellClick += dataGridView_modified_CellClick;
             // 
@@ -516,10 +519,10 @@
             groupbox2.Controls.Add(match_keyword_table);
             groupbox2.Dock = DockStyle.Fill;
             groupbox2.Font = new Font("Pretendard", 15.75F);
-            groupbox2.Location = new Point(5, 430);
+            groupbox2.Location = new Point(5, 409);
             groupbox2.Margin = new Padding(5);
             groupbox2.Name = "groupbox2";
-            groupbox2.Size = new Size(732, 461);
+            groupbox2.Size = new Size(732, 437);
             groupbox2.TabIndex = 30;
             groupbox2.TabStop = false;
             groupbox2.Text = "키워드 변환";
@@ -606,21 +609,21 @@
             match_keyword_table.BackgroundColor = Color.White;
             match_keyword_table.BorderStyle = BorderStyle.Fixed3D;
             match_keyword_table.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle2.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = SystemColors.Window;
-            dataGridViewCellStyle2.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            dataGridViewCellStyle2.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle2.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
-            match_keyword_table.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle4.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle4.BackColor = SystemColors.Window;
+            dataGridViewCellStyle4.Font = new Font("Pretendard", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 129);
+            dataGridViewCellStyle4.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle4.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle4.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle4.WrapMode = DataGridViewTriState.False;
+            match_keyword_table.DefaultCellStyle = dataGridViewCellStyle4;
             match_keyword_table.EnableHeadersVisualStyles = false;
             match_keyword_table.GridColor = Color.LightGray;
             match_keyword_table.Location = new Point(15, 126);
             match_keyword_table.MinimumSize = new Size(300, 200);
             match_keyword_table.Name = "match_keyword_table";
             match_keyword_table.ReadOnly = true;
-            match_keyword_table.Size = new Size(704, 329);
+            match_keyword_table.Size = new Size(704, 305);
             match_keyword_table.TabIndex = 23;
             match_keyword_table.CellClick += match_keyword_table_CellClick;
             // 
@@ -633,10 +636,10 @@
             groupBox3.Controls.Add(dept_col_check);
             groupBox3.Dock = DockStyle.Fill;
             groupBox3.Font = new Font("Pretendard", 15.75F, FontStyle.Regular, GraphicsUnit.Point, 129);
-            groupBox3.Location = new Point(5, 901);
+            groupBox3.Location = new Point(5, 856);
             groupBox3.Margin = new Padding(5);
             groupBox3.Name = "groupBox3";
-            groupBox3.Size = new Size(732, 91);
+            groupBox3.Size = new Size(732, 86);
             groupBox3.TabIndex = 36;
             groupBox3.TabStop = false;
             groupBox3.Text = "Cluster 설정";
@@ -710,6 +713,17 @@
             dept_col_check.UseVisualStyleBackColor = true;
             dept_col_check.CheckedChanged += dept_col_check_CheckedChanged;
             // 
+            // current_sessionName
+            // 
+            current_sessionName.Anchor = AnchorStyles.Bottom;
+            current_sessionName.AutoSize = true;
+            current_sessionName.Font = new Font("Pretendard", 18F, FontStyle.Bold, GraphicsUnit.Point, 129);
+            current_sessionName.Location = new Point(1451, 21);
+            current_sessionName.Name = "current_sessionName";
+            current_sessionName.Size = new Size(143, 29);
+            current_sessionName.TabIndex = 49;
+            current_sessionName.Text = "현재 세션명 : ";
+            // 
             // uc_DataTransform
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
@@ -720,6 +734,7 @@
             Name = "uc_DataTransform";
             Size = new Size(1904, 1017);
             tableLayoutMain.ResumeLayout(false);
+            tableLayoutMain.PerformLayout();
             pnl_left.ResumeLayout(false);
             tableLayoutLeft.ResumeLayout(false);
             pnl_original_header.ResumeLayout(false);
@@ -801,5 +816,6 @@
         private Label lbl_pagination4;
         private Label label10;
         private Label label1;
+        private Label current_sessionName;
     }
 }
