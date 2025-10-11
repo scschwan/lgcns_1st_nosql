@@ -404,6 +404,7 @@
             merge_cluster_table.ReadOnly = true;
             merge_cluster_table.Size = new Size(1191, 520);
             merge_cluster_table.TabIndex = 34;
+            merge_cluster_table.TabStop = false;
             merge_cluster_table.CellContentClick += merge_cluster_table_CellContentClick;
             // 
             // pnl_merge_pagination
@@ -735,6 +736,7 @@
             dataGridView_modified.ReadOnly = true;
             dataGridView_modified.Size = new Size(597, 212);
             dataGridView_modified.TabIndex = 23;
+            dataGridView_modified.TabStop = false;
             // 
             // tabPage2
             // 
@@ -795,6 +797,7 @@
             dataGridView_recoman_keyword.Name = "dataGridView_recoman_keyword";
             dataGridView_recoman_keyword.Size = new Size(280, 120);
             dataGridView_recoman_keyword.TabIndex = 43;
+            dataGridView_recoman_keyword.TabStop = false;
             // 
             // new_reco_word
             // 
@@ -866,6 +869,7 @@
             dataGridView_lv1.Name = "dataGridView_lv1";
             dataGridView_lv1.Size = new Size(291, 120);
             dataGridView_lv1.TabIndex = 43;
+            dataGridView_lv1.TabStop = false;
             // 
             // new_lv1_word
             // 
@@ -1068,6 +1072,7 @@
             merge_check_table.RowHeadersDefaultCellStyle = dataGridViewCellStyle3;
             merge_check_table.Size = new Size(615, 235);
             merge_check_table.TabIndex = 23;
+            merge_check_table.TabStop = false;
             // 
             // uc_Clustering
             // 

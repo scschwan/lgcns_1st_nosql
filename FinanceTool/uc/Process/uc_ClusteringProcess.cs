@@ -184,6 +184,7 @@ namespace FinanceTool
 
                         dataGridView_modified.CellClick += dataGridView_keyword_CellClick;
                         dataGridView_modified.SortCompare += DataHandler.money_SortCompare;
+                        dataGridView_modified.TabStop = false;
 
 
                         dataGridView_supply_summary.SortCompare += DataHandler.money_SortCompare;
@@ -1082,7 +1083,9 @@ namespace FinanceTool
             finally
             {
                 // UI 업데이트 재개
+                dataGridView_modified.TabStop = false;
                 dataGridView_modified.ResumeLayout();
+
             }
         }
 

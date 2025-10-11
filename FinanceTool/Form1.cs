@@ -7,7 +7,11 @@ namespace FinanceTool
     {
         public static DataTable excelData = new DataTable();
         private TrialManager trialManager;
+        //사용기간 체크 flag
         private bool trialYN = false;
+
+        //mac address 체크 flag
+        private bool macCheckYN = false;
         //private bool trialYN = true;
 
         public Form1()
@@ -50,7 +54,11 @@ namespace FinanceTool
                 TrialManager trialManager = new TrialManager();
 
                 //2025.07.22 mac address 검증 로직 추가
-                await trialManager.checkMacaddress();
+                if (macCheckYN)
+                {
+                    await trialManager.checkMacaddress();
+                }
+                
 
                 if (trialYN)
                 {
