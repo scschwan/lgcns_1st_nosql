@@ -113,11 +113,15 @@ namespace FinanceTool
         /// </summary>
         /// <value>계정의 계층 구조 인덱스 목록</value>
         public static List<int> levelList = new List<int>();
-        
+
         /// <summary>
         /// 계정 레벨명 목록
         /// </summary>
         /// <value>계정의 계층 구조 이름 목록</value>
+        ///  // 수정 전에 선택된 컬럼명 확인
+        // DataHandler.levelName[0]; // 금액 컬럼명
+        // DataHandler.levelName[1]; // 타겟 컬럼명
+
         public static List<string> levelName = new List<string>();
        
         /// <summary>

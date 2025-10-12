@@ -361,6 +361,14 @@ namespace FinanceTool
                 dataTable.Columns.Add("세부클러스터명", typeof(string));
             }
 
+            // *** 개선: 금액 컬럼명 가져오기 ***
+            string moneyColumnName = null;
+            if (DataHandler.levelName != null && DataHandler.levelName.Count > 0)
+            {
+                moneyColumnName = DataHandler.levelName[0];
+                Debug.WriteLine($"금액 컬럼으로 설정: {moneyColumnName}");
+            }
+
             // columnList에 명시된 컬럼만 추가
             foreach (string columnName in columnList)
             {
@@ -374,7 +382,18 @@ namespace FinanceTool
                 Debug.WriteLine($" 표기하는 컬럼 정보 : {columnName}");
                 if (!dataTable.Columns.Contains(columnName))
                 {
-                    dataTable.Columns.Add(columnName);
+                    //dataTable.Columns.Add(columnName);
+                    // *** 개선: 금액 컬럼은 decimal 타입으로 지정 ***
+                    if (!string.IsNullOrEmpty(moneyColumnName) && columnName.Equals(moneyColumnName))
+                    {
+                        dataTable.Columns.Add(columnName, typeof(decimal));
+                        Debug.WriteLine($"  → decimal 타입으로 추가: {columnName}");
+                    }
+                    else
+                    {
+                        dataTable.Columns.Add(columnName);
+                        Debug.WriteLine($"  → string 타입으로 추가: {columnName}");
+                    }
                 }
             }
 
@@ -394,7 +413,61 @@ namespace FinanceTool
                     {
                         if (columnList.Contains(kvp.Key) && dataTable.Columns.Contains(kvp.Key))
                         {
-                            row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                            // *** 개선: 금액 컬럼은 decimal로 변환 ***
+                            if (!string.IsNullOrEmpty(moneyColumnName) && kvp.Key.Equals(moneyColumnName))
+                            {
+                                // 금액 데이터 변환 처리
+                                if (kvp.Value != null)
+                                {
+                                    decimal moneyValue = 0m;
+
+                                    // 다양한 타입에 대한 변환 처리
+                                    if (kvp.Value is decimal decimalValue)
+                                    {
+                                        moneyValue = decimalValue;
+                                    }
+                                    else if (kvp.Value is double doubleValue)
+                                    {
+                                        moneyValue = (decimal)doubleValue;
+                                    }
+                                    else if (kvp.Value is int intValue)
+                                    {
+                                        moneyValue = intValue;
+                                    }
+                                    else if (kvp.Value is long longValue)
+                                    {
+                                        moneyValue = longValue;
+                                    }
+                                    else
+                                    {
+                                        // 문자열인 경우 파싱 시도
+                                        string strValue = kvp.Value.ToString();
+
+                                        // 쉼표 제거 및 공백 제거
+                                        strValue = strValue.Replace(",", "").Trim();
+
+                                        if (decimal.TryParse(strValue, out decimal parsedValue))
+                                        {
+                                            moneyValue = parsedValue;
+                                        }
+                                        else
+                                        {
+                                            Debug.WriteLine($"금액 변환 실패: {kvp.Key} = {kvp.Value} (타입: {kvp.Value.GetType()})");
+                                        }
+                                    }
+
+                                    row[kvp.Key] = moneyValue;
+                                }
+                                else
+                                {
+                                    row[kvp.Key] = DBNull.Value;
+                                }
+                            }
+                            else
+                            {
+                                // 일반 컬럼은 기존 방식대로 처리
+                                row[kvp.Key] = kvp.Value ?? DBNull.Value;
+                            }
                         }
                     }
                 }

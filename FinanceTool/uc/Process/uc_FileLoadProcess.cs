@@ -689,8 +689,11 @@ namespace FinanceTool
                 InitializeStandardDataGridView();
 
                 // 5. 이벤트 핸들러 등록
+                comboBox_standard_key.SelectedIndexChanged -= ComboBox_standard_key_SelectedIndexChanged;
                 comboBox_standard_key.SelectedIndexChanged += ComboBox_standard_key_SelectedIndexChanged;
+                comboBox_standard_target.SelectedIndexChanged -= ComboBox_standard_target_SelectedIndexChanged;
                 comboBox_standard_target.SelectedIndexChanged += ComboBox_standard_target_SelectedIndexChanged;
+                standard_btn.Click -= Standard_btn_Click;
                 standard_btn.Click += Standard_btn_Click;
 
                 Debug.WriteLine($"컬럼 로드 완료 -  전체: {_allColumns.Count}개");
