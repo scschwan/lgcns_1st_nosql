@@ -1000,6 +1000,7 @@ namespace FinanceTool
             // 이벤트 핸들러 등록
             dgv.MouseUp += DataGridView_MouseUp;
             dgv.CellContentClick += DataGridView_CellContentClick;
+            dgv.TabStop = false;
         }
 
        

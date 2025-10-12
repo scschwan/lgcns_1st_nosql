@@ -189,6 +189,7 @@ namespace FinanceTool
 
                         dataGridView_supply_summary.SortCompare += DataHandler.money_SortCompare;
                         dataGridView_supply_summary.CellClick += dataGridView_supply_summary_CellClick;
+                        dataGridView_supply_summary.TabStop = false;
 
                         Debug.WriteLine("LoadSeparatorsAndRemovers");
                         LoadSeparatorsAndRemovers();
