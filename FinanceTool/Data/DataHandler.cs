@@ -217,6 +217,12 @@ namespace FinanceTool
         /// <value>현재 작업중인 세션명 이름 저장</value>
         public static string currentSessionName = "";
 
+        /// <summary>
+        /// 현재 작업중인 세션 계정명 컬럼 저장
+        /// </summary>
+        /// <value>현재 작업중인 세션 계정명 컬럼 저장</value>
+        public static string currentAccountColName = "";
+
 
 
 

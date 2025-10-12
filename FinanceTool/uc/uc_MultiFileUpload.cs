@@ -855,6 +855,7 @@ namespace FinanceTool
 
                             //현재 세션명 저장
                             DataHandler.currentSessionName = selectedSession.SessionName;
+                            DataHandler.currentAccountColName = selectedSession.AccountColumnName;
 
                             // 5단계: 자동으로 fileLoad.cs 화면으로 전환
                             NavigateToFileLoadScreen();

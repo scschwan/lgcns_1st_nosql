@@ -255,11 +255,13 @@ namespace FinanceTool
             {
                 // ComboBox에 열 이름 추가 (공통 로직)
                 SetupComboBox(stand_col_combo, "데이터 삭제 기준 열 선택");
-                SetupComboBox(sub_acc_col_combo, "세목 열 선택");
-                SetupComboBox(dept_col_combo, "코스트센터 열 선택");
-                SetupComboBox(prod_col_combo, "공급업체 열 선택");
-                SetupComboBox(cmb_target, "키워드 대상 열 선택");
-                SetupComboBox(cmb_money, "금액 열 선택");
+                //SetupComboBox(sub_acc_col_combo, "세목 열 선택", "세목");
+                Debug.WriteLine($"[SetupColumnLists] DataHandler.currentAccountColName : {DataHandler.currentAccountColName}");
+                SetupComboBox(sub_acc_col_combo, "세목 열 선택", DataHandler.currentAccountColName);
+                SetupComboBox(dept_col_combo, "코스트센터 열 선택","코스트센터");
+                SetupComboBox(prod_col_combo, "공급업체 열 선택","공급업체");
+                SetupComboBox(cmb_target, "키워드 대상 열 선택","타겟");
+                SetupComboBox(cmb_money, "금액 열 선택","금액");
 
 
             }
@@ -280,18 +282,46 @@ namespace FinanceTool
         /// 사용자 인터페이스의 일관성을 위한 표준화된 ComboBox 설정
         /// </remarks>
         /// <exception cref="ArgumentNullException">comboBox가 null인 경우</exception>
-        private void SetupComboBox(ComboBox comboBox, string defaultText)
+        private void SetupComboBox(ComboBox comboBox, string defaultText , string defaultColName = null)
         {
+            int selectedIndex = 0;
+            int colIndex = 1;
             comboBox.Items.Clear();
             comboBox.Items.Add(defaultText);
 
             foreach (string column in process_col_list)
             {
                 comboBox.Items.Add(column);
+                //2025.10.12
+                //컬럼명이 항목명과 일치할경우 자동 세팅
+                if (!String.IsNullOrEmpty(defaultColName))
+                {
+                    if (defaultColName.Equals(column))
+                    {
+                        Debug.WriteLine($"[SetupComboBox] 컬럼명 세팅 일치 값 확인 => defaultColName : {defaultColName}    column : {column} , colIndex : {colIndex}");
+                        //기본 콤보박스 값으로 인해 +1 추가
+                        selectedIndex = colIndex;
+                    }
+                    
+                }
+                colIndex++;
             }
 
+            //2025.10.12
+            //컬럼명이 항목명과 일치할경우 자동 세팅
+
             if (comboBox.Items.Count > 0)
-                comboBox.SelectedIndex = 0;
+            {
+                if (selectedIndex > 0 )
+                {
+                    comboBox.SelectedIndex = selectedIndex;
+                }
+                else
+                {
+                    comboBox.SelectedIndex = 0;
+                }
+            }
+                
         }
 
 

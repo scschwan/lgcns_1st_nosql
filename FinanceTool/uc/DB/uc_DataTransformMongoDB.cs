@@ -699,8 +699,20 @@ namespace FinanceTool
                 modifiedDataTable.Columns.Add("합산금액", typeof(string));
 
                 // 키워드 빈도 기준으로 정렬 (내림차순)
+                /*
                 var sortedKeywords = keywordFrequency.OrderByDescending(pair => pair.Value)
                                                     .ThenBy(pair => pair.Key);
+                */
+
+                // *** 수정: 합산금액 기준으로 정렬 (내림차순) ***
+                var sortedKeywords = keywordFrequency
+                    .OrderByDescending(pair =>
+                    {
+                        // 해당 키워드의 합산금액 가져오기
+                        keywordTotalMoney.TryGetValue(pair.Key, out decimal totalMoney);
+                        return totalMoney;
+                    })
+                    .ThenBy(pair => pair.Key);  // 금액이 같으면 키워드명으로 정렬
 
                 foreach (var pair in sortedKeywords)
                 {
