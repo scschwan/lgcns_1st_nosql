@@ -7,6 +7,6 @@
 /create_sample
 /result.xlsx
  *.zip
-/FinanceTool/bin/Debug/net8.0-windows/runtimes
+/FinanceTool/bin
 /FinanceTool/obj
 /sampl1.xlsx
