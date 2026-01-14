@@ -189,6 +189,7 @@ namespace FinanceTool
 
                         dataGridView_supply_summary.SortCompare += DataHandler.money_SortCompare;
                         dataGridView_supply_summary.CellClick += dataGridView_supply_summary_CellClick;
+                        dataGridView_supply_summary.TabStop = false;
 
                         Debug.WriteLine("LoadSeparatorsAndRemovers");
                         LoadSeparatorsAndRemovers();
@@ -1024,7 +1025,11 @@ namespace FinanceTool
                 }
 
                 // 정렬을 위해 리스트로 변환 (Count 기준 내림차순)
-                var sortedKeywords = keywordDict.OrderByDescending(kv => kv.Value.Count).ToList();
+                //var sortedKeywords = keywordDict.OrderByDescending(kv => kv.Value.Count).ToList();
+                // *** 수정: 합산금액 기준으로 정렬 (내림차순) ***
+                var sortedKeywords = keywordDict.OrderByDescending(kv => kv.Value.TotalAmount)
+                                                .ThenBy(kv => kv.Key)  // 금액이 같으면 키워드명으로 정렬
+                                                .ToList();
 
                 // DataGridView 컬럼 설정
                 // *** 1번 기능: 좌상단 체크박스 컬럼 추가 ***
@@ -1187,7 +1192,11 @@ namespace FinanceTool
                 }
 
                 // 정렬을 위해 리스트로 변환 (Count 기준 내림차순)
-                var sortedKeywords = keywordDict.OrderByDescending(kv => kv.Value.Count).ToList();
+                //var sortedKeywords = keywordDict.OrderByDescending(kv => kv.Value.Count).ToList();
+                // *** 수정: 합산금액 기준으로 정렬 (내림차순) ***
+                var sortedKeywords = keywordDict.OrderByDescending(kv => kv.Value.TotalAmount)
+                                                .ThenBy(kv => kv.Key)  // 금액이 같으면 키워드명으로 정렬
+                                                .ToList();
 
                 // DataGridView 컬럼 설정
                 // *** 1번 기능: 좌상단 체크박스 컬럼 추가 ***

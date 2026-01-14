@@ -81,6 +81,59 @@ namespace FinanceTool
                 int selectedClusterId = Convert.ToInt32(selectedRow.Cells["ID"].Value);
                 string clusterName = selectedRow.Cells["클러스터명"]?.Value?.ToString() ?? "";
 
+                // *** 추가: 세부 클러스터 선택 시 메인 클러스터 ID 찾기 ***
+                string detailClusterName = selectedRow.Cells["세부클러스터명"]?.Value?.ToString() ?? "";
+
+                // 세부 클러스터를 선택한 경우 (세부클러스터명에 값이 있는 경우)
+                if (!string.IsNullOrEmpty(detailClusterName))
+                {
+                    Debug.WriteLine($"세부 클러스터 선택됨 - 메인 클러스터 찾기 시작");
+                    Debug.WriteLine($"  선택된 클러스터명: {clusterName}");
+                    Debug.WriteLine($"  선택된 세부클러스터명: {detailClusterName}");
+
+                    // DataGridView에서 메인 클러스터 찾기
+                    // 조건: 클러스터명이 같고, 세부클러스터명이 비어있는 row
+                    DataGridViewRow mainClusterRow = null;
+
+                    foreach (DataGridViewRow row in dataGridView_classify.Rows)
+                    {
+                        if (row.Cells["클러스터명"]?.Value?.ToString() == clusterName)
+                        {
+                            string rowDetailClusterName = row.Cells["세부클러스터명"]?.Value?.ToString() ?? "";
+
+                            // 세부클러스터명이 비어있는 row = 메인 클러스터
+                            if (string.IsNullOrEmpty(rowDetailClusterName))
+                            {
+                                mainClusterRow = row;
+                                break;
+                            }
+                        }
+                    }
+
+                    // 메인 클러스터를 찾은 경우
+                    if (mainClusterRow != null && mainClusterRow.Cells["ID"]?.Value != null)
+                    {
+                        int mainClusterId = Convert.ToInt32(mainClusterRow.Cells["ID"].Value);
+                        Debug.WriteLine($"메인 클러스터 찾음 - ID: {mainClusterId}, 클러스터명: {clusterName}");
+
+                        // 메인 클러스터 ID로 변경
+                        selectedClusterId = mainClusterId;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"메인 클러스터를 찾지 못함 - 선택된 ID 사용: {selectedClusterId}");
+                        // 메인 클러스터를 찾지 못한 경우 경고 메시지 표시
+                        MessageBox.Show(
+                            $"'{clusterName}' 클러스터의 메인 클러스터를 찾을 수 없습니다.\n" +
+                            "'세부클러스터명'이 없는 항목을 선택하여 진입하여 주시길 바랍니다.",
+                            "알림",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+
+                        return;
+                    }
+                }
+
                 Debug.WriteLine($"세부 클러스터링 진입: 클러스터 ID {selectedClusterId}, 이름: {clusterName}");
 
                 // 확인 메시지

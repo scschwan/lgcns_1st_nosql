@@ -217,6 +217,12 @@ namespace FinanceTool
         /// <value>현재 작업중인 세션명 이름 저장</value>
         public static string currentSessionName = "";
 
+        /// <summary>
+        /// 현재 작업중인 세션 계정명 컬럼 저장
+        /// </summary>
+        /// <value>현재 작업중인 세션 계정명 컬럼 저장</value>
+        public static string currentAccountColName = "";
+
 
 
 
@@ -994,6 +1000,7 @@ namespace FinanceTool
             // 이벤트 핸들러 등록
             dgv.MouseUp += DataGridView_MouseUp;
             dgv.CellContentClick += DataGridView_CellContentClick;
+            dgv.TabStop = false;
         }
 
        
