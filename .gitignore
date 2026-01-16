@@ -9,4 +9,6 @@
  *.zip
 /FinanceTool/bin
 /FinanceTool/obj
+/FinanceTool/java
+/FinanceTool/Font
 /sampl1.xlsx
